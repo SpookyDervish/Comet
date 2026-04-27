@@ -1,0 +1,52 @@
+#pragma once
+#include <stdint.h>
+#include "lexer.h"
+
+
+/*
+Note:
+    we're basically going for Pratt Parsing here, even though it's somewhat hard to implement in C
+    we have statements and expressions and whatnot
+*/
+
+
+
+typedef enum {
+    // literals
+    AST_INT,
+    AST_DOUBLE,
+    AST_IDENTIFIER,
+
+    AST_PROGRAM,
+
+    // statements
+    AST_EXPRESSION_STATEMENT,
+    AST_ASSIGN_STATEMENT,
+
+    // expressions
+    AST_INFIX_EXPRESSION
+} CometASTNodeType;
+
+// Main ASTNode struct, this can hold the different types of nodes.
+typedef struct CometASTNode CometASTNode;
+struct CometASTNode {
+    CometASTNodeType nodeType;
+    union {
+        struct AST_INT { int64_t number; } AST_INT;
+        struct AST_DOUBLE { double number; } AST_DOUBLE;
+        struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
+
+        struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; } AST_PROGRAM;
+
+        struct AST_INFIX_EXPRESSION { CometASTNode* left; CometASTNode* right; char* op; } AST_INFIX_EXPRESSION;
+
+        struct AST_EXPRESSION_STATEMENT { CometASTNode* expression; } AST_EXPRESSION_STATEMENT;
+        struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; } AST_ASSIGN_STATEMENT;
+    } data;  
+};
+
+// put a node on the heap
+CometASTNode* allocateNode(CometASTNode parent);
+char* ASTNodeTypeToCStr(CometASTNodeType nodeType);
+
+#define AST_NODE(nodeType, ...) allocateNode((CometASTNode){nodeType, {.nodeType=(struct nodeType){__VA_ARGS__}}})
