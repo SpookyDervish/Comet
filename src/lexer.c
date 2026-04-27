@@ -147,7 +147,6 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
 
     while (lexer->pos < lexer->sourceLen) {
         char current = lexer->currentChar;
-        //printf("c = %c\n", current);
 
         if (current == '.') {
 
@@ -188,8 +187,6 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
         }
     }
     buffer[bufferPos] = 0;
-
-    printf("\n");
 
     if (isFloat) {
         tok.type = CT_FLOAT_LITERAL;
@@ -347,7 +344,6 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                     append(tokens, token.as.success);
                 } else {
-                    printf("ERROR\n");
                     Estr buffer = CREATE_ESTR("Unexpected token \"");
                     char unexpected[] = {lexer->currentChar, 0};
                     APPEND_ESTR(buffer, unexpected);
