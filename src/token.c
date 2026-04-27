@@ -14,6 +14,8 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_FLOAT_LITERAL";
         case CT_BOOL_LITERAL:
             return "CT_BOOL_LITERAL";
+        case CT_STRING_LITERAL:
+            return "CT_STRING_LITERAL";
         case CT_EQ:
             return "CT_EQ";
         case CT_OPEN_CURLY:
@@ -40,6 +42,8 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_DOT";
         case CT_DOT_DOT:
             return "CT_DOT_DOT";
+        case CT_END_LABEL:
+            return "CT_END_LABEL";
         default:
             return "FIXME";
         

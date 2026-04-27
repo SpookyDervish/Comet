@@ -3,11 +3,11 @@
 #include <stdio.h>
 
 int main() {
-    ResultType(CometLexer, charptr) lexer = newLexer("small x = 123");
+    ResultType(CometLexer, charptr) lexer = newLexer("string x = \"hello world!\"");
     ResultType(tokenList, charptr) tokens = lex(&lexer.as.success);
 
     if (tokens.error) {
-        printf("%s\n", tokens.as.error);
+        printf("lexer error: %s\n", tokens.as.error);
     }
 
 
