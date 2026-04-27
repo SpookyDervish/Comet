@@ -28,6 +28,9 @@ typedef enum {
     AST_REASSIGN_STATEMENT,
     AST_WHILE_STATEMENT,
     AST_FOR_STATEMENT,
+    AST_IF_STATEMENT,
+    AST_BREAK_STATEMENT,
+    AST_CONTINUE_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -52,6 +55,9 @@ struct CometASTNode {
         struct AST_REASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; } AST_REASSIGN_STATEMENT;
         struct AST_WHILE_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_WHILE_STATEMENT;
         struct AST_FOR_STATEMENT { CometASTNode* ident; CometASTNode* start; CometASTNode* end; CometASTNode* step; CometASTNode* program; } AST_FOR_STATEMENT;
+        struct AST_IF_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_IF_STATEMENT;
+        struct AST_BREAK_STATEMENT { } AST_BREAK_STATEMENT;
+        struct AST_CONTINUE_STATEMENT { } AST_CONTINUE_STATEMENT;
     } data;  
 };
 

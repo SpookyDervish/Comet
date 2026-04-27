@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "token.h"
 
 const char* KEYWORDS[] = {
     "for",
@@ -17,7 +18,10 @@ const char* KEYWORDS[] = {
     "be",
     "enum",
     "import",
-    "step"
+    "step",
+    "if",
+    "break",
+    "continue"
     
 };
 
@@ -325,6 +329,29 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '/': append(tokens, TOKEN_LITERAL(CT_DIVIDE, "/")); break;
             case '%': append(tokens, TOKEN_LITERAL(CT_MOD, "%")); break;
             case '^': append(tokens, TOKEN_LITERAL(CT_POW, "^")); break;
+
+            case '<':
+                ResultType(char, charptr) ltEq = lexerPeek(lexer);
+
+                if (!ltEq.error && ltEq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_LTE, "<="));
+                 } else {
+                    append(tokens, TOKEN_LITERAL(CT_LT, "<"));
+                 }
+
+                break; 
+            case '>':
+                ResultType(char, charptr) gtEq = lexerPeek(lexer);
+
+                if (!gtEq.error && gtEq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_GTE, ">="));
+                 } else {
+                    append(tokens, TOKEN_LITERAL(CT_GT, ">"));
+                 }
+
+                break; 
             
             default:
                 if (isdigit(lexer->currentChar)) {

@@ -16,6 +16,11 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_DIVIDE, PRECEDENCE_PRODUCT},
     {CT_MOD, PRECEDENCE_PRODUCT},
     {CT_POW, PRECEDENCE_EXPONENT},
+    {CT_LT, PRECEDENCE_LESSGREATER},
+    {CT_GT, PRECEDENCE_LESSGREATER},
+    {CT_LTE, PRECEDENCE_LESSGREATER},
+    {CT_GTE, PRECEDENCE_LESSGREATER},
+    {CT_EQ_EQ, PRECEDENCE_EQUALS},
 };
 
 ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser);
@@ -39,6 +44,11 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_DIVIDE, parseInfixExpression},
     {CT_MOD, parseInfixExpression},
     {CT_POW, parseInfixExpression},
+    {CT_LT, parseInfixExpression},
+    {CT_GT, parseInfixExpression},
+    {CT_LTE, parseInfixExpression},
+    {CT_GTE, parseInfixExpression},
+    {CT_EQ_EQ, parseInfixExpression},
 };
 
 // -- HELPER METHODS -- //
@@ -237,7 +247,20 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_WHILE_STATEMENT.expression);
             printf(" {\n");
             printNode(node->data.AST_WHILE_STATEMENT.program);
-            printf("       }");
+            printf("       } :while");
+            break;
+        case AST_BREAK_STATEMENT:
+            printf("break");
+            break;
+        case AST_CONTINUE_STATEMENT:
+            printf("continue");
+            break;
+        case AST_IF_STATEMENT:
+            printf("if ");
+            printNode(node->data.AST_IF_STATEMENT.expression);
+            printf(" {\n");
+            printNode(node->data.AST_IF_STATEMENT.program);
+            printf("       } :if");
             break;
         case AST_FOR_STATEMENT:
             printf("for ");
@@ -250,7 +273,7 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_FOR_STATEMENT.step);
             printf(" {\n");
             printNode(node->data.AST_FOR_STATEMENT.program);
-            printf("       }");
+            printf("       } :for");
             break;
 
         default:
@@ -503,6 +526,34 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseBreakStatement(CometParser* parser) {
+    return Success(astNodePtr, charptr, AST_NODE(AST_BREAK_STATEMENT));
+}
+
+ResultType(astNodePtr, charptr) parseContinueStatement(CometParser* parser) {
+    return Success(astNodePtr, charptr, AST_NODE(AST_CONTINUE_STATEMENT));
+}
+
+ResultType(astNodePtr, charptr) parseIfStatement(CometParser* parser) {
+    // basic format
+    // if 1+1 == 2 {}
+
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (expr.error) {
+        return expr;
+    }
+
+    ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+    if (block.error) {
+        return block;
+    }
+
+    CometASTNode* stmt = AST_NODE(AST_IF_STATEMENT, expr.as.success, block.as.success);
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser) {
     // basic format
     // x = x + 1
@@ -532,6 +583,12 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
         return parseWhileStatement(parser);
     } else if (strcmp(keyword, "for") == 0) {
         return parseForStatement(parser);
+    } else if (strcmp(keyword, "if") == 0) {
+        return parseIfStatement(parser);
+    } else if (strcmp(keyword, "break") == 0) {
+        return parseBreakStatement(parser);
+    } else if (strcmp(keyword, "continue") == 0) {
+        return parseContinueStatement(parser);
     } else {
         char* buffer = malloc(256);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);

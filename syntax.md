@@ -52,7 +52,7 @@ while true {
 } :while
 
 -- this is inclusive (will print numbers 1 to 10)
-for i in 1 .. 10 {
+for int i in 1 .. 10 {
     if i == 6 {
         continue -- skip 6
     } :if
