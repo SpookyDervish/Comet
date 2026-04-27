@@ -11,6 +11,9 @@
  * we can emulate their complicated enum system, and I'd argue that
  * we do it better. Besides, it's in a better programming language.
  *
+ * Slightly modified by Nathaniel Chandler to add charptr to the header
+ * itself.
+ *
  * Enjoy!
  *
  * Licenced to you under the MIT license - see below.
@@ -22,8 +25,6 @@
  * #include "error.h"
  * #include <stdio.h>
  * 
- * // You can't write char*, you have to define it with a typedef
- * typedef char* charptr;
  * 
  * Result(int, charptr) myFn(int x) {
  *    if (x > 5) {
@@ -64,6 +65,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
  * DEALINGS IN THE SOFTWARE.
 */
+
+// You can't write char*, you have to define it with a typedef
+typedef char* charptr;
+typedef struct {} Nothing;
 
 // Creates a new struct with the a (success) and b (error) types. 
 // If Result(a, b) has already been called with the same paramaters, please

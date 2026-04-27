@@ -13,15 +13,15 @@
 ```lua
 -- single line comment
 
-//
+--[[
 multi
 line
 comment
-\\
+]]
 ```
 
 ## Variables
-```lua
+```cpp
 small x = 123
 int y = 123456
 big z = 123123123123
@@ -31,7 +31,7 @@ double hi = 0.123123123123
 
 bool my_bool = true -- can also be false
 
-bool MY_CONSTANT = true -- constants are all capitals, can not be changed
+const bool MY_CONSTANT = true -- constants are all capitals, can not be changed at runtime
 ```
 
 ## Loops
@@ -43,39 +43,139 @@ while true {
     print("Hello, World!")
 } :while
 
-for i .. 10 {
+-- this is inclusive (will print numbers 1 to 10)
+for i in 1 .. 10 {
     print(i)
 } :for
 ```
 
 ## Functions
-```lua
-function my_function(small my_arg) {
+```cpp
+func add(int num1, int num2) -> int {
+    return num1 + num2
+} :add
 
-} :my_function
+-- functions can have an expression as a body
+func square(int x) -> int => x * x 
 
 
-my_function(123)
+int result = add(5, 2)
+print(result)
 ```
+
 
 ## Structs
 ```lua
 
 -- private: read/write but only for the struct itself, nothing outside
--- protected: read only for anything outside the struct
+-- readonly: read only for everything outside, read/write for the struct itself
+-- protected: read/write for struct and its substructs
+-- public (default): read/write for everyone
 struct Player {
     -- things can have default values or not
-    protected string name
+    readonly string name
 
-    protected small health = 100
-    protected small age = 0
+    readonly small health = 100
+    readonly small age = 0
 
-    function greet() {
+    private int socialSecurityNumber
+
+    func greet() -> void {
         print("Hello, " + self.name + "!")
     } :greet
 
-    constructor(string name) {
+    init(string name) {
         self.name = name
-    } :constructor
+        self.socialSecurityNumber = 123456789
+    } :init
 } :Player
+
+
+player1 = new Player("Player1")
+```
+
+## Templates
+```cpp
+struct List <T: Any> {
+    T myField
+
+    func append(T value) -> void {
+        -- ...
+    }
+
+    init(T in) {
+        self.myField = in
+    } :init
+} :List
+
+struct Hashmap <T: can be Hash> { -- can the given type be casted to Hash?
+    
+}
+
+struct Example <T: can func speak() -> void> {
+}
+
+struct Example2 <T: Number> { -- is numeric, we can also say Float, Int, or a specific type name like List or small
+
+}
+```
+
+## Inheritance
+```py
+struct Animal {
+    func speak() -> void {
+        print("...")
+    }
+
+    init() {} : init
+}
+
+struct Dog : Animal {
+    readonly string ownerName
+
+    override func speak() -> void {
+        print("Woof! My owner is " + self.ownerName as string)
+    }
+
+    init(string ownerName) {
+        super()
+        self.ownerName = ownerName
+
+          
+    } : init
+}
+```
+
+## Enums
+```c
+enum Colour : int {
+    Red,
+    Green,
+    Blue
+} :Colour
+
+print(Colour.Red) -- prints 0
+```
+
+## Modules
+```lua
+import collections -- imports everything from collections
+
+List<int> my_list = new List<int>()
+```
+
+## Casting
+```cpp
+struct MyStruct {    
+    readonly test = 123
+
+    init() {} :init
+
+    to string {
+        return "<MyStruct test=" + self.test as string + ">"
+    }
+} :MyStruct
+
+MyStruct new_struct = new MyStruct()
+print(new_struct as string) -- "<MyStruct test=123>"
 ```
