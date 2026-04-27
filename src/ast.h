@@ -1,4 +1,5 @@
 #pragma once
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include "lexer.h"
@@ -24,6 +25,8 @@ typedef enum {
     // statements
     AST_EXPRESSION_STATEMENT,
     AST_ASSIGN_STATEMENT,
+    AST_WHILE_STATEMENT,
+    AST_FOR_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -39,13 +42,14 @@ struct CometASTNode {
         struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
         struct AST_TYPE_NAME { char* name; } AST_TYPE_NAME;
 
-        struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; } AST_PROGRAM;
+        struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
 
         struct AST_INFIX_EXPRESSION { CometASTNode* left; CometASTNode* right; char* op; } AST_INFIX_EXPRESSION;
 
         struct AST_EXPRESSION_STATEMENT { CometASTNode* expression; } AST_EXPRESSION_STATEMENT;
         struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; CometASTNode* type; } AST_ASSIGN_STATEMENT;
         struct AST_WHILE_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_WHILE_STATEMENT;
+        struct AST_FOR_STATEMENT { CometASTNode* ident; CometASTNode* start; CometASTNode* end; CometASTNode* step; CometASTNode* program; } AST_FOR_STATEMENT;
     } data;  
 };
 

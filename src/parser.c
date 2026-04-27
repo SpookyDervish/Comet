@@ -1,4 +1,13 @@
 #include "parser.h"
+#include "ast.h"
+#include "lexer.h"
+#include "token.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+
+ResultType(astNodePtr, charptr) parseStatement(CometParser* parser);
 
 const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_PLUS, PRECEDENCE_SUM},
@@ -58,7 +67,8 @@ ResultType(parserPtr, charptr) newParser(tokenList tokens) {
     parser->program = AST_NODE(
         AST_PROGRAM,
         calloc(parser->statementArraySize, sizeof(CometASTNode*)),
-        0
+        0,
+        parser->statementArraySize
     );
 
     if (!parser->program->data.AST_PROGRAM.statements) {
@@ -88,16 +98,16 @@ void parserNextToken(CometParser* parser) {
 }
 
 // add a statement to the statements list of the program, accounting for memory and whatnot
-void appendStatement(CometParser* parser, CometASTNode* statement) {
-    parser->program->data.AST_PROGRAM.statements[parser->statementIndex++] = statement;
-    parser->program->data.AST_PROGRAM.numStatements++;
-
+void appendStatement(CometASTNode* program, CometASTNode* statement) {
     // ensure we realloc to make space if we run out, doubling the number of max
     // statements each time
-    if (parser->statementIndex >= parser->statementArraySize) {
-        parser->statementArraySize *= 2;
-        parser->program->data.AST_PROGRAM.statements = realloc(parser->program->data.AST_PROGRAM.statements, sizeof(CometASTNode*) * parser->statementArraySize);
+    if (program->data.AST_PROGRAM.numStatements+1 >= program->data.AST_PROGRAM.statementsArraySize) {
+        program->data.AST_PROGRAM.statementsArraySize *= 2;
+        program->data.AST_PROGRAM.statements = realloc(program->data.AST_PROGRAM.statements, sizeof(CometASTNode*) * program->data.AST_PROGRAM.statementsArraySize);
     }
+
+    program->data.AST_PROGRAM.statements[program->data.AST_PROGRAM.numStatements] = statement;
+    program->data.AST_PROGRAM.numStatements++;
 }
 
 bool currentTokenIs(CometParser* parser, CometTokenType tokenType) {
@@ -121,6 +131,21 @@ ResultType(int, charptr) expectPeek(CometParser* parser, CometTokenType tokenTyp
         return Error(int, charptr, buffer);
     }
     parserNextToken(parser);
+    return Success(int, charptr, 1);
+}
+
+ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keywrod) {
+    ResultType(int, charptr) next = expectPeek(parser, CT_KEYWORD);
+    if (next.error) {
+        return next;
+    }
+
+    if (strcmp(parser->currentToken->value.literal, keywrod) != 0) {
+        char* buffer = malloc(256);
+        sprintf(buffer, "Expected current token to be %s but got %s instead.", keywrod, parser->currentToken->value.literal);
+        return Error(int, charptr, buffer);
+    }
+
     return Success(int, charptr, 1);
 }
 
@@ -199,6 +224,26 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_ASSIGN_STATEMENT.ident);
             printf(" = ");
             printNode(node->data.AST_ASSIGN_STATEMENT.expression);
+            break;
+        case AST_WHILE_STATEMENT:
+            printf("while ");
+            printNode(node->data.AST_WHILE_STATEMENT.expression);
+            printf(" {\n");
+            printNode(node->data.AST_WHILE_STATEMENT.program);
+            printf("       }");
+            break;
+        case AST_FOR_STATEMENT:
+            printf("for ");
+            printNode(node->data.AST_FOR_STATEMENT.ident);
+            printf(" in ");
+            printNode(node->data.AST_FOR_STATEMENT.start);
+            printf("..");
+            printNode(node->data.AST_FOR_STATEMENT.end);
+            printf(" step ");
+            printNode(node->data.AST_FOR_STATEMENT.step);
+            printf(" {\n");
+            printNode(node->data.AST_FOR_STATEMENT.program);
+            printf("       }");
             break;
 
         default:
@@ -322,11 +367,153 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
+    CometASTNode** statements = calloc(1, sizeof(CometASTNode*));
+    if (!statements) {
+        return Error(astNodePtr, charptr, "parseBlockStatement: failed to allocate memory for block statement!");
+    }
+
+    CometASTNode* program = AST_NODE(AST_PROGRAM, statements, 0, 1);
+
+    ResultType(int, charptr) openCurly = expectPeek(parser, CT_OPEN_CURLY);
+    if (openCurly.error) {
+        return Error(astNodePtr, charptr, openCurly.as.error);
+    }
+
+    parserNextToken(parser);
+
+    while (parser->currentToken->type != CT_CLOSE_CURLY) {
+        if (parser->currentToken->type == CT_EOF) {
+            return Error(astNodePtr, charptr, "While statement was not closed!");
+        }
+
+        ResultType(astNodePtr, charptr) stmt = parseStatement(parser);
+        if (stmt.error)
+            return stmt;
+
+        appendStatement(program, stmt.as.success);
+        parserNextToken(parser);
+    }
+
+    return Success(astNodePtr, charptr, program);
+}
+
+ResultType(astNodePtr, charptr) parseWhileStatement(CometParser* parser) {
+    // basic format:
+    // while true {}
+
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, charptr) expression = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (expression.error) {
+        return expression;
+    }
+
+    ResultType(astNodePtr, charptr) program = parseBlockStatement(parser);
+    if (program.error) {
+        return program;
+    }
+
+    CometASTNode* stmt = AST_NODE(AST_WHILE_STATEMENT, expression.as.success, program.as.success);
+
+    return Success(astNodePtr, charptr, stmt);
+}
+
+ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
+    // basic format
+    // for int i in 0 .. 10 {}
+
+    ResultType(int, charptr) expectType = expectPeek(parser, CT_TYPE_NAME);
+    if (expectType.error) {
+        return Error(astNodePtr, charptr, expectType.as.error);
+    }
+
+    CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+
+    ResultType(int, charptr) expectIdent = expectPeek(parser, CT_IDENT);
+    if (expectIdent.error) {
+        return Error(astNodePtr, charptr, expectIdent.as.error);
+    }
+
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+    
+
+    ResultType(int, charptr) expectIn = expectPeekKeyword(parser, "in");
+    if (expectIn.error) {
+        return Error(astNodePtr, charptr, expectIn.as.error);
+    }
+
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, charptr) start = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (start.error) {
+        return start;
+    }
+
+    ResultType(int, charptr) dotDot = expectPeek(parser, CT_DOT_DOT);
+    if (dotDot.error) {
+        return Error(astNodePtr, charptr, dotDot.as.error);
+    }
+
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, charptr) end = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (end.error) {
+        return end;
+    }
+
+    ResultType(astNodePtr, charptr) stepNode;
+    ResultType(int, charptr) step = expectPeekKeyword(parser, "step");
+   
+    if (!step.error) {
+        parserNextToken(parser);
+        stepNode = parseExpression(parser, PRECEDENCE_LOWEST);
+        if (stepNode.error) {
+            return stepNode;
+        }
+    } else {
+        stepNode = Success(astNodePtr, charptr, AST_NODE(AST_INT, 1));
+    }
+
+    ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+    if (block.error) {
+        return block;
+    }
+
+    CometASTNode* stmt = AST_NODE(
+        AST_FOR_STATEMENT,
+        ident,
+        start.as.success,
+        end.as.success,
+        stepNode.as.success,
+        block.as.success
+    );
+    return Success(astNodePtr, charptr, stmt);
+}
+
+ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
+    char* keyword = parser->currentToken->value.literal;
+
+    if (strcmp(keyword, "while") == 0) {
+        return parseWhileStatement(parser);
+    } else if (strcmp(keyword, "for") == 0) {
+        return parseForStatement(parser);
+    } else {
+        char* buffer = malloc(256);
+        sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
+        return Error(astNodePtr, charptr, buffer);
+    }
+}
+
 // -- PARSER HELPERS -- //
 ResultType(astNodePtr, charptr) parseStatement(CometParser* parser) {
     switch (parser->currentToken->type) {
         case CT_TYPE_NAME:
             return parseAssignmentStatement(parser);
+
+        case CT_KEYWORD:
+            return parseKeyword(parser);
 
         default:
             return parseExpressionStatement(parser);
@@ -341,7 +528,7 @@ ResultType(astNodePtr, charptr) buildAST(CometParser* parser) {
         if (stmt.error)
             return stmt;
 
-        appendStatement(parser, stmt.as.success);
+        appendStatement(parser->program, stmt.as.success);
         parserNextToken(parser);
     }
 

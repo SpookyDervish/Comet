@@ -16,7 +16,8 @@ const char* KEYWORDS[] = {
     "can",
     "be",
     "enum",
-    "import"
+    "import",
+    "step"
     
 };
 
