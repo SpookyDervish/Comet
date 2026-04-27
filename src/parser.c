@@ -19,12 +19,14 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
 };
 
 ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser);
+ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser);
 ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser);
 ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser);
 const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_INT_LITERAL, parseIntLiteral},
     {CT_FLOAT_LITERAL, parseFloatLiteral},
+    {CT_IDENT, parseIdentifier},
     {CT_OPEN_PAREN, parseGroupedExpression},
     {CT_TYPE_NAME, parseTypeName},
 };
@@ -225,6 +227,11 @@ void printNode(CometASTNode* node) {
             printf(" = ");
             printNode(node->data.AST_ASSIGN_STATEMENT.expression);
             break;
+        case AST_REASSIGN_STATEMENT:
+            printNode(node->data.AST_REASSIGN_STATEMENT.ident);
+            printf(" = ");
+            printNode(node->data.AST_REASSIGN_STATEMENT.expression);
+            break;
         case AST_WHILE_STATEMENT:
             printf("while ");
             printNode(node->data.AST_WHILE_STATEMENT.expression);
@@ -320,6 +327,10 @@ ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser) {
 
 ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal));
+}
+
+ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
+    return Success(astNodePtr, charptr, AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal));
 }
 
 // -- STATEMENT METHODS -- //
@@ -492,6 +503,28 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser) {
+    // basic format
+    // x = x + 1
+
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+    ResultType(int, charptr) expectEq = expectPeek(parser, CT_EQ);
+    if (expectEq.error) {
+        return Error(astNodePtr, charptr, expectEq.as.error);
+    }
+
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (expr.error) {
+        return expr;
+    }
+
+    CometASTNode* stmt = AST_NODE(AST_REASSIGN_STATEMENT, ident, expr.as.success);
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -511,6 +544,9 @@ ResultType(astNodePtr, charptr) parseStatement(CometParser* parser) {
     switch (parser->currentToken->type) {
         case CT_TYPE_NAME:
             return parseAssignmentStatement(parser);
+
+        case CT_IDENT:
+            return parseReassignStatement(parser);
 
         case CT_KEYWORD:
             return parseKeyword(parser);
