@@ -34,18 +34,36 @@ bool my_bool = true -- can also be false
 const bool MY_CONSTANT = true -- constants are all capitals, can not be changed at runtime
 ```
 
+## If-Statements
+```lua
+-- the :if is a label showing what's being closed, these labels are optional (will give u a warning if u dont include it)
+-- but MUST match what they're closing
+
+if 1+1 == 2 {
+    print("Math is working!")
+} :if
+```
+
 ## Loops
 ```lua
 
--- the :do is a label showing what's being closed, these labels are optional (will give u a warning if u dont include it)
--- but MUST match what they're closing
 while true {
     print("Hello, World!")
 } :while
 
 -- this is inclusive (will print numbers 1 to 10)
 for i in 1 .. 10 {
+    if i == 6 {
+        continue -- skip 6
+    } :if
+
+    if i == 8 {
+        break -- end the loop at 7
+    }
+
     print(i)
+
+    
 } :for
 ```
 
