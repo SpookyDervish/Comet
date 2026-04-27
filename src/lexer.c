@@ -1,8 +1,4 @@
 #include "lexer.h"
-#include "token.h"
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 const char* KEYWORDS[] = {
     "for",

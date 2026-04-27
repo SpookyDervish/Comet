@@ -1,10 +1,12 @@
 #include "lexer.h"
 #include "parser.h"
-#include "token.h"
+#include "util.h"
 #include <stdio.h>
 
 int main() {
-    ResultType(CometLexer, charptr) lexer = newLexer("int x = 123 + 1 * 5");
+    char* source = getFileContents("test.cmt");
+
+    ResultType(CometLexer, charptr) lexer = newLexer(source);
     ResultType(tokenList, charptr) tokens = lex(&lexer.as.success);
 
     if (tokens.error) {

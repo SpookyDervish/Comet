@@ -3,6 +3,8 @@
 #include "lexer.h"
 #include "token.h"
 #include <uthash.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 // basically the same as a token but with a name instead of a type
 typedef struct {

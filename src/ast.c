@@ -1,4 +1,3 @@
-#include <stdlib.h>
 #include "ast.h"
 
 CometASTNode* allocateNode(CometASTNode node) {

@@ -1,7 +1,5 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include "environment.h"
-#include "ast.h"
+
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     // parent can be NULL if its the root environment
