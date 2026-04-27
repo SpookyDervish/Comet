@@ -44,6 +44,20 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_DOT_DOT";
         case CT_END_LABEL:
             return "CT_END_LABEL";
+        case CT_PLUS:
+            return "CT_PLUS";
+        case CT_MINUS:
+            return "CT_MINUS";
+        case CT_TIMES:
+            return "CT_TIMES";
+        case CT_DIVIDE:
+            return "CT_DIVIDE";
+        case CT_MOD:
+            return "CT_MOD";
+        case CT_POW:
+            return "CT_POW";
+        case CT_EOF:
+            return "CT_EOF";
         default:
             return "FIXME";
         

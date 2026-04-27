@@ -150,6 +150,7 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
 
     while (lexer->pos < lexer->sourceLen) {
         char current = lexer->currentChar;
+        //printf("c = %c\n", current);
 
         if (current == '.') {
 
@@ -182,9 +183,16 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
             buffer = newPtr;
         }
 
-        lexerConsume(lexer);
+        char peek = lexer->source[lexer->pos+1];
+        if (isdigit(peek) && !isspace(peek)) {
+            lexerConsume(lexer);
+        } else {
+            break;
+        }
     }
     buffer[bufferPos] = 0;
+
+    printf("\n");
 
     if (isFloat) {
         tok.type = CT_FLOAT_LITERAL;
@@ -315,6 +323,14 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 append(tokens, stringTok.as.success);
 
                 break; 
+
+
+            case '+': append(tokens, TOKEN_LITERAL(CT_PLUS, "+")); break;
+            case '-': append(tokens, TOKEN_LITERAL(CT_MINUS, "-")); break;
+            case '*': append(tokens, TOKEN_LITERAL(CT_TIMES, "*")); break;
+            case '/': append(tokens, TOKEN_LITERAL(CT_DIVIDE, "/")); break;
+            case '%': append(tokens, TOKEN_LITERAL(CT_MOD, "%")); break;
+            case '^': append(tokens, TOKEN_LITERAL(CT_POW, "^")); break;
             
             default:
                 if (isdigit(lexer->currentChar)) {

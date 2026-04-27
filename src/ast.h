@@ -16,6 +16,7 @@ typedef enum {
     AST_INT,
     AST_DOUBLE,
     AST_IDENTIFIER,
+    AST_TYPE_NAME,
 
     AST_PROGRAM,
 
@@ -35,13 +36,14 @@ struct CometASTNode {
         struct AST_INT { int64_t number; } AST_INT;
         struct AST_DOUBLE { double number; } AST_DOUBLE;
         struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
+        struct AST_TYPE_NAME { char* name; } AST_TYPE_NAME;
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; } AST_PROGRAM;
 
         struct AST_INFIX_EXPRESSION { CometASTNode* left; CometASTNode* right; char* op; } AST_INFIX_EXPRESSION;
 
         struct AST_EXPRESSION_STATEMENT { CometASTNode* expression; } AST_EXPRESSION_STATEMENT;
-        struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; } AST_ASSIGN_STATEMENT;
+        struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; CometASTNode* type; } AST_ASSIGN_STATEMENT;
     } data;  
 };
 

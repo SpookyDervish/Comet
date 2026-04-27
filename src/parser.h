@@ -17,6 +17,19 @@ typedef struct {
     CometEnvironment* environment;
 } CometParser;
 
+typedef CometParser* parserPtr;
+typedef CometASTNode* astNodePtr;
+
+Result(astNodePtr, charptr);
+
+typedef ResultType(astNodePtr, charptr) (*prefixFuncType)(CometParser*);
+typedef ResultType(astNodePtr, charptr) (*infixFuncType)(CometParser*, CometASTNode* left);
+
+Result(parserPtr, charptr);
+Result(int, charptr);
+Result(prefixFuncType, charptr);
+Result(infixFuncType, charptr);
+
 typedef enum {
     PRECEDENCE_LOWEST = 1,
     PRECEDENCE_EQUALS = 2,
@@ -36,9 +49,6 @@ typedef struct {
 } CometTokenPrecedencePair;
 extern const CometTokenPrecedencePair PRECEDENCES[];
 
-typedef CometASTNode*(*prefixFuncType)(CometParser*);
-typedef CometASTNode* (*infixFuncType)(CometParser*, CometASTNode* left);
-
 typedef struct {
     CometTokenType tokenType;
     prefixFuncType function;
@@ -52,8 +62,8 @@ typedef struct {
 extern const CometInfixParseFn INFIX_PARSE_FUNCTIONS[];
 
 // allocate a new Parser
-CometParser* newParser(CometLexer* lexer);
+ResultType(parserPtr, charptr) newParser(tokenList tokens);
 // parse tokens via lexer and return the AST
-CometASTNode* buildAST(CometParser* parser);
+ResultType(astNodePtr, charptr) buildAST(CometParser* parser);
 
 void printNode(CometASTNode* node);

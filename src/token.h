@@ -22,7 +22,7 @@ typedef enum {
     CT_OPEN_CURLY, CT_CLOSE_CURLY, CT_OPEN_PAREN, CT_CLOSE_PAREN,
 
     // other
-    CT_COMMENT, CT_END_LABEL
+    CT_COMMENT, CT_END_LABEL, CT_EOF
 } CometTokenType;
 
 typedef enum {
