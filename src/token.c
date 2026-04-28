@@ -58,6 +58,10 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_POW";
         case CT_EOF:
             return "CT_EOF";
+        case CT_ARROW:
+            return "CT_ARROW";
+        case CT_INLINE_FUNC_ARROW:
+            return "CT_INLINE_FUNC_ARROW";
         default:
             return "FIXME";
         

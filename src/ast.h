@@ -20,6 +20,8 @@ typedef enum {
     AST_IDENTIFIER,
     AST_TYPE_NAME,
 
+    AST_ARG_DEF,
+
     AST_PROGRAM,
 
     // statements
@@ -31,6 +33,8 @@ typedef enum {
     AST_IF_STATEMENT,
     AST_BREAK_STATEMENT,
     AST_CONTINUE_STATEMENT,
+    AST_FUNC_DEF_STATEMENT,
+    AST_RETURN_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -38,6 +42,10 @@ typedef enum {
 
 // Main ASTNode struct, this can hold the different types of nodes.
 typedef struct CometASTNode CometASTNode;
+typedef CometASTNode* astNodePtr;
+
+UseList(astNodePtr);
+
 struct CometASTNode {
     CometASTNodeType nodeType;
     union {
@@ -45,6 +53,8 @@ struct CometASTNode {
         struct AST_DOUBLE { double number; } AST_DOUBLE;
         struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
         struct AST_TYPE_NAME { char* name; } AST_TYPE_NAME;
+
+        struct AST_ARG_DEF { CometASTNode* type; CometASTNode* ident; } AST_ARG_DEF;
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
 
@@ -54,10 +64,26 @@ struct CometASTNode {
         struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; CometASTNode* type; } AST_ASSIGN_STATEMENT;
         struct AST_REASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; } AST_REASSIGN_STATEMENT;
         struct AST_WHILE_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_WHILE_STATEMENT;
-        struct AST_FOR_STATEMENT { CometASTNode* ident; CometASTNode* start; CometASTNode* end; CometASTNode* step; CometASTNode* program; } AST_FOR_STATEMENT;
+        struct AST_FOR_STATEMENT {
+            CometASTNode* ident;
+            CometASTNode* start;
+            CometASTNode* end;
+            CometASTNode* step;
+            CometASTNode* program;
+        } AST_FOR_STATEMENT;
         struct AST_IF_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_IF_STATEMENT;
         struct AST_BREAK_STATEMENT { } AST_BREAK_STATEMENT;
         struct AST_CONTINUE_STATEMENT { } AST_CONTINUE_STATEMENT;
+        struct AST_FUNC_DEF_STATEMENT {
+            CometASTNode* ident;
+            CometASTNode* program;
+            List(astNodePtr) args;
+            CometASTNode* returnType;
+            bool isInline;
+            CometASTNode* inlineExpr;
+        } AST_FUNC_DEF_STATEMENT;
+        struct AST_RETURN_STATEMENT { CometASTNode* expression; } AST_RETURN_STATEMENT;
+
     } data;  
 };
 

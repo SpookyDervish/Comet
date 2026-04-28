@@ -121,7 +121,13 @@ ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
             buffer = newPtr;
         }
 
-        lexerConsume(lexer);
+        char peek = lexer->source[lexer->pos+1];
+        if (isspace(peek) || !(isalnum(peek) || peek == '_')) {
+            break;
+        } else {
+            lexerConsume(lexer);
+        }
+        
     }
     buffer[bufferPos] = 0;
 
@@ -262,13 +268,21 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '\r':
                 break;
             case '=':
-                ResultType(char, charptr) nextEq = lexerPeek(lexer);
+                ResultType(char, charptr) next = lexerPeek(lexer);
 
-                if (!nextEq.error && nextEq.as.success == '=') {
-                    lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_EQ_EQ, "=="));
-                 } else {
+                if (next.error) {
                     append(tokens, TOKEN_LITERAL(CT_EQ, "="));
+                    break;
+                }
+                lexerConsume(lexer);
+
+                if (next.as.success == '=') {
+                    
+                    append(tokens, TOKEN_LITERAL(CT_EQ_EQ, "=="));
+                 } else if (next.as.success == '>') {
+                    append(tokens, TOKEN_LITERAL(CT_INLINE_FUNC_ARROW, "=>"))
+                 } else {
+                    return Error(tokenList, charptr, "Expected '=' or '>' after '='.");
                  }
 
                 break; 
@@ -324,11 +338,23 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
 
             case '+': append(tokens, TOKEN_LITERAL(CT_PLUS, "+")); break;
-            case '-': append(tokens, TOKEN_LITERAL(CT_MINUS, "-")); break;
+            case '-':
+                ResultType(char, charptr) arrow = lexerPeek(lexer);
+
+                if (!arrow.error && arrow.as.success == '>') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_ARROW, "->"));
+                 } else {
+                    append(tokens, TOKEN_LITERAL(CT_MINUS, "-"));
+                 }
+
+                break; 
             case '*': append(tokens, TOKEN_LITERAL(CT_TIMES, "*")); break;
             case '/': append(tokens, TOKEN_LITERAL(CT_DIVIDE, "/")); break;
             case '%': append(tokens, TOKEN_LITERAL(CT_MOD, "%")); break;
             case '^': append(tokens, TOKEN_LITERAL(CT_POW, "^")); break;
+
+            case ',': append(tokens, TOKEN_LITERAL(CT_COMMA, ",")) break;
 
             case '<':
                 ResultType(char, charptr) ltEq = lexerPeek(lexer);

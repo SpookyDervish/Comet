@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "parser.h"
+#include "token.h"
 #include "util.h"
 #include <stdio.h>
 
@@ -13,7 +14,7 @@ int main() {
         printf("lexer error: %s\n", tokens.as.error);
         exit(1);
     }
-
+    
     ResultType(parserPtr, charptr) parser = newParser(tokens.as.success);
     if (parser.error) {
         printf("error while creating parser: %s\n", parser.as.error);

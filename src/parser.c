@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "token.h"
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -254,6 +255,42 @@ void printNode(CometASTNode* node) {
             break;
         case AST_CONTINUE_STATEMENT:
             printf("continue");
+            break;
+        case AST_ARG_DEF:
+            printNode(node->data.AST_ARG_DEF.type);
+            printf(" ");
+            printNode(node->data.AST_ARG_DEF.ident);
+            break;
+        case AST_FUNC_DEF_STATEMENT:
+            printf("func ");
+            printNode(node->data.AST_FUNC_DEF_STATEMENT.ident);
+            printf("(");
+
+            for (size_t i = 0; i < node->data.AST_FUNC_DEF_STATEMENT.args.count; i++) {
+                CometASTNode* arg = *get(node->data.AST_FUNC_DEF_STATEMENT.args, i);
+                printNode(arg);
+
+                if (i < node->data.AST_FUNC_DEF_STATEMENT.args.count-1)
+                    printf(", ");
+            }
+            
+            printf(") -> ");
+            printNode(node->data.AST_FUNC_DEF_STATEMENT.returnType);
+            printf(" ");
+
+            if (node->data.AST_FUNC_DEF_STATEMENT.isInline) {
+                printf("=> ");
+                printNode(node->data.AST_FUNC_DEF_STATEMENT.inlineExpr);
+            } else {
+                printf("{\n");
+                printNode(node->data.AST_FUNC_DEF_STATEMENT.program);
+                printf("       }");
+            }
+
+            break;
+        case AST_RETURN_STATEMENT:
+            printf("return ");
+            printNode(node->data.AST_RETURN_STATEMENT.expression);
             break;
         case AST_IF_STATEMENT:
             printf("if ");
@@ -576,6 +613,122 @@ ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
+    // basic format
+    // func func_name(type arg_name, type2 arg_name2) -> return_type {
+    //     return arg_name + arg_name2
+    // }
+    //
+    // inline body func
+    // func func_name(type arg_name, type2 arg_name2) => arg_name + arg_name2
+
+    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+    if (expectName.error) {
+        return Error(astNodePtr, charptr, expectName.as.error);
+    }
+
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    bool isInline = false;
+
+    ResultType(int, charptr) expectOpenParen = expectPeek(parser, CT_OPEN_PAREN);
+    if (expectOpenParen.error) {
+        return Error(astNodePtr, charptr, expectOpenParen.as.error);
+    }
+
+    // parse args
+    List(astNodePtr) args = newList(astNodePtr);
+
+    while (parser->currentToken->type != CT_CLOSE_PAREN) {
+        if (parser->peekToken->type == CT_EOF) {
+            return Error(astNodePtr, charptr, "Function args were not closed!");
+        } else if (parser->peekToken->type == CT_CLOSE_PAREN) {
+            parserNextToken(parser);
+            break;
+        }
+
+        
+
+        ResultType(int, charptr) expectType = expectPeek(parser, CT_TYPE_NAME);
+        if (expectType.error) {
+            return Error(astNodePtr, charptr, expectType.as.error);
+        }
+        CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+
+        ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
+        if (expectArgName.error) {
+            return Error(astNodePtr, charptr, expectArgName.as.error);
+        }
+        CometASTNode* argName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+        append(args, AST_NODE(AST_ARG_DEF, type, argName));
+
+        ResultType(int, charptr) expectComma = expectPeek(parser, CT_COMMA);
+        if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
+            return Error(astNodePtr, charptr, expectComma.as.error);
+        }
+    }
+
+    ResultType(int, charptr) expectArrow = expectPeek(parser, CT_ARROW);
+    if (expectArrow.error) {
+        return Error(astNodePtr, charptr, expectArrow.as.error);
+    }
+
+    ResultType(int, charptr) expectReturnType = expectPeek(parser, CT_TYPE_NAME);
+    if (expectReturnType.error) {
+        return Error(astNodePtr, charptr, expectReturnType.as.error);
+    }
+
+    CometASTNode* returnType = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+
+    isInline = peekTokenIs(parser, CT_INLINE_FUNC_ARROW);
+
+    if (!(isInline || peekTokenIs(parser, CT_OPEN_CURLY))) {
+        return Error(astNodePtr, charptr, "Expected next token to be '{' '=>'.");
+    }
+
+    CometASTNode* block = NULL;    
+    CometASTNode* inlineExpr = NULL;    
+    if (!isInline) {
+        ResultType(astNodePtr, charptr) blockResult = parseBlockStatement(parser);
+        if (blockResult.error) {
+            return blockResult;
+        }
+
+        block = blockResult.as.success;
+    } else {
+        parserNextToken(parser); // skip return type
+        parserNextToken(parser); // skip the arrow
+        ResultType(astNodePtr, charptr) exprResult = parseExpression(parser, PRECEDENCE_LOWEST);
+        if (exprResult.error) {
+            return exprResult;
+        }
+
+        inlineExpr = exprResult.as.success;
+    }
+    
+
+    CometASTNode* stmt = AST_NODE(
+        AST_FUNC_DEF_STATEMENT,
+        ident,
+        block,
+        args,
+        returnType,
+        isInline,
+        inlineExpr
+    );
+    return Success(astNodePtr, charptr, stmt);
+}
+
+ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
+    parserNextToken(parser);
+    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (expr.error) {
+        return expr;
+    }
+
+    return Success(astNodePtr, charptr, AST_NODE(AST_RETURN_STATEMENT, expr.as.success));
+}
+
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -589,6 +742,10 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
         return parseBreakStatement(parser);
     } else if (strcmp(keyword, "continue") == 0) {
         return parseContinueStatement(parser);
+    } else if (strcmp(keyword, "func") == 0) {
+        return parseFunctionDefStatement(parser);
+    } else if (strcmp(keyword, "return") == 0) {
+        return parseReturnStatement(parser);
     } else {
         char* buffer = malloc(256);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);

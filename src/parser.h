@@ -21,7 +21,6 @@ typedef struct {
 } CometParser;
 
 typedef CometParser* parserPtr;
-typedef CometASTNode* astNodePtr;
 
 Result(astNodePtr, charptr);
 
