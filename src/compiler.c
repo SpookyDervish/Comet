@@ -90,7 +90,7 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
         return Error(Nothing, charptr, "Failed to allocate memory for Tram backend!");
     }
 
-    Tram_Compiler_SetLogLevel(tramCompiler, Tram_LogLevel_All);
+    Tram_Compiler_SetLogLevel(tramCompiler, Tram_LogLevel_Regular);
     Tram_Compiler_SetTarget(tramCompiler, Tram_Target_x86_64_Linux_libc);
 
     Tram_Compiler_Compile(tramCompiler);
@@ -154,6 +154,26 @@ ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, Comet
 }
 
 ResultType(Nothing, charptr) visitReturnStatement(CometCompiler* compiler, CometASTNode* node) {
+    CometASTNode* expr = node->data.AST_RETURN_STATEMENT.expression;
+
+    Tram_ParameterList parameters;
+    if (expr) {
+        ResultType(ValStructPair, charptr) value = resolveValue(compiler, expr);
+        if (value.error)
+            return Error(Nothing, charptr, value.as.error);
+
+        parameters = Tram_ParameterList_Create(
+            1,
+            (Tram_Parameter[]){
+                value.as.success.val,
+            }
+            );
+    } else {
+        parameters = Tram_ParameterList_Create(0, (Tram_Parameter[]){});
+    }
+
+    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Return, parameters));
+    
     return Success(Nothing, charptr, {});
 }
 
@@ -345,6 +365,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitExpressionStatement(compiler, node);
         case AST_FUNC_DEF_STATEMENT:
             return visitFuncDefStatement(compiler, node);
+        case AST_RETURN_STATEMENT:
+            return visitReturnStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION:
             ResultType(ValStructPair, charptr) infixExpr = visitInfixExpression(compiler, node);
@@ -354,7 +376,7 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             break;
 
         default:
-            char buffer[128];
+            char* buffer = malloc(128);
             sprintf(buffer, "No visit method for %s node.", ASTNodeTypeToCStr(node->nodeType));
             return Error(Nothing, charptr, buffer);
     }
