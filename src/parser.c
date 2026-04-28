@@ -335,7 +335,7 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
     ResultType(prefixFuncType, charptr) prefixFunc = getPrefixFunc(parser->currentToken->type);
 
     if (prefixFunc.error) {
-        char buffer[256];
+        char* buffer = malloc(128);
         sprintf(buffer, "No prefix parse function for %s.\n", tokenTypeToCStr(parser->currentToken->type));
         return Error(astNodePtr, charptr, buffer);
     }
@@ -815,7 +815,7 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     } else if (strcmp(keyword, "return") == 0) {
         return parseReturnStatement(parser);
     } else {
-        char buffer[256];
+        char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
         return Error(astNodePtr, charptr, buffer);
     }
