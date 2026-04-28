@@ -62,6 +62,8 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_ARROW";
         case CT_INLINE_FUNC_ARROW:
             return "CT_INLINE_FUNC_ARROW";
+        case CT_COMMA:
+            return "CT_COMMA";
         default:
             return "FIXME";
         

@@ -227,6 +227,18 @@ void printNode(CometASTNode* node) {
             printf(")");
             break;
 
+        case AST_FUNC_CALL:
+            printNode(node->data.AST_FUNC_CALL.ident);
+            printf("(");
+            for (size_t i = 0; i < node->data.AST_FUNC_CALL.args.count; i++) {
+                CometASTNode* arg = *get(node->data.AST_FUNC_CALL.args, i);
+                printNode(arg);
+
+                if (i < node->data.AST_FUNC_CALL.args.count-1)
+                    printf(", ");
+            }
+            printf(")");
+            break;
 
         case AST_EXPRESSION_STATEMENT:
             printNode(node->data.AST_EXPRESSION_STATEMENT.expression);
@@ -377,6 +389,71 @@ ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser) {
     return expr;
 }
 
+ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
+    List(astNodePtr) args = newList(astNodePtr);
+
+    while (parser->currentToken->type != CT_CLOSE_PAREN) {
+        if (parser->peekToken->type == CT_EOF) {
+            return Error(argList, charptr, "Function args were not closed!");
+        } else if (parser->peekToken->type == CT_CLOSE_PAREN) {
+            parserNextToken(parser);
+            break;
+        }
+
+        
+
+        ResultType(int, charptr) expectType = expectPeek(parser, CT_TYPE_NAME);
+        if (expectType.error) {
+            return Error(argList, charptr, expectType.as.error);
+        }
+        CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+
+        ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
+        if (expectArgName.error) {
+            return Error(argList, charptr, expectArgName.as.error);
+        }
+        CometASTNode* argName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+        append(args, AST_NODE(AST_ARG_DEF, type, argName));
+
+        ResultType(int, charptr) expectComma = expectPeek(parser, CT_COMMA);
+        if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
+            return Error(argList, charptr, expectComma.as.error);
+        }
+    }
+
+    return Success(argList, charptr, args);
+}
+
+ResultType(argList, charptr) parseFunctionCallArgs(CometParser* parser) {
+    List(astNodePtr) args = newList(astNodePtr);
+
+    parserNextToken(parser); // skip open paren
+    while (parser->currentToken->type != CT_CLOSE_PAREN) {
+        if (parser->peekToken->type == CT_EOF) {
+            return Error(argList, charptr, "Function args were not closed!");
+        }
+
+        
+
+        ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+        if (expr.error) {
+            return Error(argList, charptr, expr.as.error);
+        }
+
+        append(args, expr.as.success);
+
+        ResultType(int, charptr) expectComma = expectPeek(parser, CT_COMMA);
+        if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
+            return Error(argList, charptr, expectComma.as.error);
+        }
+
+        parserNextToken(parser); // skip comma
+    }
+
+    return Success(argList, charptr, args);
+}
+
 // -- PREFIX METHODS -- //
 ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_INT, parser->currentToken->value.intVal));
@@ -391,7 +468,23 @@ ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser) {
 }
 
 ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal));
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+    
+    if (peekTokenIs(parser, CT_OPEN_PAREN)) {
+        parserNextToken(parser);
+        
+
+        ResultType(argList, charptr) args = parseFunctionCallArgs(parser);
+        if (args.error) {
+            return Error(astNodePtr, charptr, args.as.error);
+        }
+
+        CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, ident, args.as.success);
+        return Success(astNodePtr, charptr, funcCallNode);
+    }
+
+    return Success(astNodePtr, charptr, ident);
 }
 
 // -- STATEMENT METHODS -- //
@@ -598,6 +691,10 @@ ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser) {
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
+    if (peekTokenIs(parser, CT_OPEN_PAREN)) { // function call
+        return parseIdentifier(parser);
+    }
+
     ResultType(int, charptr) expectEq = expectPeek(parser, CT_EQ);
     if (expectEq.error) {
         return Error(astNodePtr, charptr, expectEq.as.error);
@@ -637,36 +734,9 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
     }
 
     // parse args
-    List(astNodePtr) args = newList(astNodePtr);
-
-    while (parser->currentToken->type != CT_CLOSE_PAREN) {
-        if (parser->peekToken->type == CT_EOF) {
-            return Error(astNodePtr, charptr, "Function args were not closed!");
-        } else if (parser->peekToken->type == CT_CLOSE_PAREN) {
-            parserNextToken(parser);
-            break;
-        }
-
-        
-
-        ResultType(int, charptr) expectType = expectPeek(parser, CT_TYPE_NAME);
-        if (expectType.error) {
-            return Error(astNodePtr, charptr, expectType.as.error);
-        }
-        CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
-
-        ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
-        if (expectArgName.error) {
-            return Error(astNodePtr, charptr, expectArgName.as.error);
-        }
-        CometASTNode* argName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-
-        append(args, AST_NODE(AST_ARG_DEF, type, argName));
-
-        ResultType(int, charptr) expectComma = expectPeek(parser, CT_COMMA);
-        if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
-            return Error(astNodePtr, charptr, expectComma.as.error);
-        }
+    ResultType(argList, charptr) args = parseFunctionDefArgs(parser);
+    if (args.error) {
+        return Error(astNodePtr, charptr, args.as.error);
     }
 
     ResultType(int, charptr) expectArrow = expectPeek(parser, CT_ARROW);
@@ -712,7 +782,7 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
         AST_FUNC_DEF_STATEMENT,
         ident,
         block,
-        args,
+        args.as.success,
         returnType,
         isInline,
         inlineExpr

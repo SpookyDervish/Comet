@@ -22,6 +22,8 @@ typedef struct {
 
 typedef CometParser* parserPtr;
 
+typedef List(astNodePtr) argList;
+
 Result(astNodePtr, charptr);
 
 typedef ResultType(astNodePtr, charptr) (*prefixFuncType)(CometParser*);
@@ -31,6 +33,7 @@ Result(parserPtr, charptr);
 Result(int, charptr);
 Result(prefixFuncType, charptr);
 Result(infixFuncType, charptr);
+Result(argList, charptr);
 
 typedef enum {
     PRECEDENCE_LOWEST = 1,

@@ -1,6 +1,8 @@
 #include "lexer.h"
 #include "parser.h"
+#include "token.h"
 #include "util.h"
+#include <stddef.h>
 #include <stdio.h>
 
 int main() {
@@ -13,6 +15,10 @@ int main() {
         printf("lexer error: %s\n", tokens.as.error);
         exit(1);
     }
+
+    /*for (size_t i = 0; i < tokens.as.success.count; i++) {
+        printf("%ld. %s\n", i, tokenToCStr(*get(tokens.as.success, i)));
+    }*/
     
     ResultType(parserPtr, charptr) parser = newParser(tokens.as.success);
     if (parser.error) {
