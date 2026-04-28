@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include "token.h"
+#include <ctype.h>
 
 const char* KEYWORDS[] = {
     "for",
@@ -282,6 +283,11 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                  } else if (next.as.success == '>') {
                     append(tokens, TOKEN_LITERAL(CT_INLINE_FUNC_ARROW, "=>"))
                  } else {
+                    if (isspace(next.as.success)) {
+                        append(tokens, TOKEN_LITERAL(CT_EQ, "="))
+                        break;
+                    }  
+
                     return Error(tokenList, charptr, "Expected '=' or '>' after '='.");
                  }
 

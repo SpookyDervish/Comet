@@ -284,7 +284,8 @@ void printNode(CometASTNode* node) {
             } else {
                 printf("{\n");
                 printNode(node->data.AST_FUNC_DEF_STATEMENT.program);
-                printf("       }");
+                printf("       } :");
+                printNode(node->data.AST_FUNC_DEF_STATEMENT.ident);
             }
 
             break;
