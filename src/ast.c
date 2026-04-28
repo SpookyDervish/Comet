@@ -29,6 +29,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";
+        case AST_FUNC_CALL:
+            return "AST_FUNC_CALL";
 
         default:
             return "AST_UNKOWN (FIXME)";

@@ -91,13 +91,13 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
         return Error(Nothing, charptr, "Failed to allocate memory for Tram backend!");
     }
 
-    Tram_Compiler_SetLogLevel(tramCompiler, Tram_LogLevel_Regular);
+    Tram_Compiler_SetLogLevel(tramCompiler, Tram_LogLevel_All);
     Tram_Compiler_SetTarget(tramCompiler, Tram_Target_x86_64_Linux_libc);
 
     Tram_Compiler_Compile(tramCompiler);
 
     if (Tram_Compiler_HasCompiled(tramCompiler)) {
-        //printf("%s\n", Tram_Compiler_GetAsm(tramCompiler));
+        printf("%s\n", Tram_Compiler_GetAsm(tramCompiler));
         Tram_Compiler_AssembleAndLink(tramCompiler, outputName, (Tram_LinkerArgs){.size = 0, .data = NULL});
     } else {
         return Error(Nothing, charptr, "Compilation failed.");
@@ -180,6 +180,65 @@ ResultType(Nothing, charptr) visitReturnStatement(CometCompiler* compiler, Comet
 
 ResultType(Nothing, charptr) visitExpressionStatement(CometCompiler* compiler, CometASTNode* node) {
     return compile(compiler, node->data.AST_EXPRESSION_STATEMENT.expression);
+}
+
+ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, CometASTNode* node) {
+    struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
+    char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+
+    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(
+        Tram_InstructionType_CreateLabel,
+        Tram_ParameterList_Create(
+            1,
+            (Tram_Parameter[]){
+                Tram_Parameter_Variable(funcName)
+            })
+        )
+    );
+
+    CometEnvironment* funcEnv = newEnvironment(funcName, compiler->env);
+    compiler->env = funcEnv;
+    for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
+        ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
+        if (result.error)
+            return result;
+    }
+
+    compiler->env = funcEnv->parent;
+    free(funcEnv);
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, CometASTNode* node) {
+    ResultType(ValStructPair, charptr) value = resolveValue(compiler, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (value.error)
+        return Error(Nothing, charptr, value.as.error);
+
+    char* varIdent = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+    Record* varRecord = lookup(compiler->env, varIdent);
+    if (!varRecord) {
+        char* buffer = malloc(256);
+        sprintf(buffer, "Undefined variable \"%s\"", varIdent);
+        return Error(Nothing, charptr, buffer);
+    }
+
+    // TODO: proper type system
+    if (strcmp(varRecord->type, value.as.success.type) != 0) {
+        return Error(Nothing, charptr, "Can't change type of variable at runtime.");
+    }
+
+    Tram_ParameterList parameters = Tram_ParameterList_Create(
+    2,
+    (Tram_Parameter[]){
+        Tram_Parameter_Register(varRecord->reg),
+        value.as.success.val
+        }
+    );
+    
+    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Put, parameters));
+    return Success(Nothing, charptr, {});
 }
 
 // -- HELPER FUNCTIONS -- //
@@ -358,62 +417,29 @@ ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler,
     return Success(ValStructPair, charptr, result);
 }
 
-ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, CometASTNode* node) {
-    struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
-    char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+ResultType(Nothing, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node) {
+    List(astNodePtr) funcArgs = node->data.AST_FUNC_CALL.args;
+    
+    Tram_Parameter* instArgs = calloc(funcArgs.count + 1, sizeof(Tram_Parameter));
 
-    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(
-        Tram_InstructionType_CreateLabel,
-        Tram_ParameterList_Create(
-            1,
-            (Tram_Parameter[]){
-                Tram_Parameter_Variable(funcName)
-            })
+
+    instArgs[0] = Tram_Parameter_Variable(node->data.AST_FUNC_CALL.ident->data.AST_IDENTIFIER.ident);
+    for (size_t i = 0; i < funcArgs.count; i++) {
+        ResultType(ValStructPair, charptr) value = resolveValue(compiler, *get(node->data.AST_FUNC_CALL.args, i));
+        if (value.error)
+            return Error(Nothing, charptr, value.as.error);
+
+        instArgs[i+1] = value.as.success.val;
+    }
+
+    Tram_Program_AddInstruction(
+        compiler->program,
+        Tram_Instruction_Create(
+            Tram_InstructionType_Call,
+            Tram_ParameterList_Create(funcArgs.count + 1,instArgs)
         )
     );
-
-    CometEnvironment* funcEnv = newEnvironment(funcName, compiler->env);
-    compiler->env = funcEnv;
-    for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
-        ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
-        if (result.error)
-            return result;
-    }
-
-    compiler->env = funcEnv->parent;
-    free(funcEnv);
-
-    return Success(Nothing, charptr, {});
-}
-
-ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, CometASTNode* node) {
-    ResultType(ValStructPair, charptr) value = resolveValue(compiler, node->data.AST_ASSIGN_STATEMENT.expression);
-    if (value.error)
-        return Error(Nothing, charptr, value.as.error);
-
-    char* varIdent = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-
-    Record* varRecord = lookup(compiler->env, varIdent);
-    if (!varRecord) {
-        char* buffer = malloc(256);
-        sprintf(buffer, "Undefined variable \"%s\"", varIdent);
-        return Error(Nothing, charptr, buffer);
-    }
-
-    // TODO: proper type system
-    if (strcmp(varRecord->type, value.as.success.type) != 0) {
-        return Error(Nothing, charptr, "Can't change type of variable at runtime.");
-    }
-
-    Tram_ParameterList parameters = Tram_ParameterList_Create(
-    2,
-    (Tram_Parameter[]){
-        Tram_Parameter_Register(varRecord->reg),
-        value.as.success.val
-        }
-    );
     
-    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Put, parameters));
     return Success(Nothing, charptr, {});
 }
 
@@ -440,6 +466,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
                 return Error(Nothing, charptr, infixExpr.as.error);
 
             break;
+        case AST_FUNC_CALL:
+            return visitFuncCall(compiler, node);
 
         default:
             char* buffer = malloc(128);
