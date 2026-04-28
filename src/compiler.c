@@ -284,6 +284,42 @@ ResultType(Nothing, charptr) countUses(CometCompiler* compiler, CometASTNode* no
         default:
             break;
     }
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Tram_Register, charptr) handleFuncCall(CometCompiler* compiler, CometASTNode* node) {
+    
+    List(astNodePtr) funcArgs = node->data.AST_FUNC_CALL.args;
+    
+    Tram_Parameter* instArgs = calloc(funcArgs.count + 2, sizeof(Tram_Parameter));
+
+    // put the func name as the first arg
+    instArgs[0] = Tram_Parameter_Variable(node->data.AST_FUNC_CALL.ident->data.AST_IDENTIFIER.ident);
+    
+    // put the return reg as the second arg
+    Tram_Register returnValReg = allocRegister(compiler).as.success;
+    instArgs[1] = Tram_Parameter_Register(returnValReg);
+
+    // put the rest of the args in
+    for (size_t i = 0; i < funcArgs.count; i++) {
+        ResultType(ValStructPair, charptr) value = resolveValue(compiler, *get(node->data.AST_FUNC_CALL.args, i));
+        if (value.error)
+            return Error(Tram_Register, charptr, value.as.error);
+
+        instArgs[i+2] = value.as.success.val;
+    }
+
+
+    Tram_Program_AddInstruction(
+        compiler->program,
+        Tram_Instruction_Create(
+            Tram_InstructionType_Call,
+            Tram_ParameterList_Create(funcArgs.count + 2,instArgs)
+        )
+    );
+    
+    return Success(Tram_Register, charptr, returnValReg);
 }
 
 ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
@@ -324,6 +360,14 @@ ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometAS
 
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(compiler, node);
+
+        case AST_FUNC_CALL:
+            ValStructPair funcRes = {
+                .val = Tram_Parameter_Register(handleFuncCall(compiler, node).as.success),
+                .type = 0 // todo: get func return type
+            };
+
+            return Success(ValStructPair, charptr, funcRes);
 
         default:
             return Error(ValStructPair, charptr, "Unsupported type for resolving.");
@@ -417,32 +461,6 @@ ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler,
     return Success(ValStructPair, charptr, result);
 }
 
-ResultType(Nothing, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node) {
-    List(astNodePtr) funcArgs = node->data.AST_FUNC_CALL.args;
-    
-    Tram_Parameter* instArgs = calloc(funcArgs.count + 1, sizeof(Tram_Parameter));
-
-
-    instArgs[0] = Tram_Parameter_Variable(node->data.AST_FUNC_CALL.ident->data.AST_IDENTIFIER.ident);
-    for (size_t i = 0; i < funcArgs.count; i++) {
-        ResultType(ValStructPair, charptr) value = resolveValue(compiler, *get(node->data.AST_FUNC_CALL.args, i));
-        if (value.error)
-            return Error(Nothing, charptr, value.as.error);
-
-        instArgs[i+1] = value.as.success.val;
-    }
-
-    Tram_Program_AddInstruction(
-        compiler->program,
-        Tram_Instruction_Create(
-            Tram_InstructionType_Call,
-            Tram_ParameterList_Create(funcArgs.count + 1,instArgs)
-        )
-    );
-    
-    return Success(Nothing, charptr, {});
-}
-
 // -- MAIN --//
 ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node) {
 
@@ -467,7 +485,13 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
 
             break;
         case AST_FUNC_CALL:
-            return visitFuncCall(compiler, node);
+            ResultType(Tram_Register, charptr) funcCall = handleFuncCall(compiler, node);
+            if (funcCall.error)
+                return Error(Nothing, charptr, funcCall.as.error);
+
+            // since we're ignoring the return value we can just free the reg
+            freeRegister(compiler, funcCall.as.success);
+            break;
 
         default:
             char* buffer = malloc(128);
