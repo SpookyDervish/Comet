@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "token.h"
+#include <tram.h>
 #include <uthash.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,7 +12,7 @@ typedef struct {
     char* name;
     UT_hash_handle hh;
     char* type;
-    CometASTNode value;
+    Tram_Register reg;
 } Record;
 
 typedef struct CometEnvironment CometEnvironment;
@@ -23,5 +24,5 @@ struct CometEnvironment {
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent);
-void defineVar(CometEnvironment* env, char* name, CometASTNode value, char* type);
+void defineVar(CometEnvironment* env, char* name, Tram_Register reg, char* type);
 Record* lookup(CometEnvironment* env, char* name);

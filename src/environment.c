@@ -11,7 +11,7 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     return env;
 }
 
-void defineVar(CometEnvironment* env, char* name, CometASTNode value, char* type) {
+void defineVar(CometEnvironment* env, char* name, Tram_Register reg, char* type) {
     Record* record;
     HASH_FIND_STR(env->records, name, record);
 
@@ -24,7 +24,7 @@ void defineVar(CometEnvironment* env, char* name, CometASTNode value, char* type
     // create a new record and save it to the hash map (or dictionary or whatever you wanna call it)
     record = malloc(sizeof(Record));
     record->name = strdup(name);
-    record->value = value;
+    record->reg = reg;
     record->type = type;
 
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);

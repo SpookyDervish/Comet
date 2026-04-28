@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "ast.h"
+#include "environment.h"
 #include "lexer.h"
 #include "parser.h"
 #include "token.h"
@@ -58,6 +59,9 @@ ResultType(CometCompiler, charptr) createCompiler(CometParser* parser) {
         .usedFloatRegisters = calloc((Tram_Register_f15+1) - Tram_Register_f0, sizeof(Tram_Register)),
     };
 
+    // create an environment with no parent
+    new.env = newEnvironment("root", NULL);
+
     if (!new.usedRegisters || !new.usedFloatRegisters) {
         return Error(CometCompiler, charptr, "Failed to allocate memory for register array!");
     }
@@ -66,9 +70,6 @@ ResultType(CometCompiler, charptr) createCompiler(CometParser* parser) {
 }
 
 ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode* node) {
-    Tram_ParameterList parameters = Tram_ParameterList_Create(1, (Tram_Parameter[]){Tram_Parameter_Variable("main")});
-    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_CreateLabel, parameters));
-    
     for (size_t i = 0; i < node->data.AST_PROGRAM.numStatements; i++) {
         ResultType(Nothing, charptr) result = compile(compiler, node->data.AST_PROGRAM.statements[i]);
         if (result.error)
@@ -111,7 +112,29 @@ ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometAS
 ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, CometASTNode* node) {
     ResultType(Tram_Register, charptr) reg = allocRegister(compiler);
 
+    if (reg.error)
+        return Error(Nothing, charptr, reg.as.error);
+
     ResultType(ValStructPair, charptr) value = resolveValue(compiler, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (value.error)
+        return Error(Nothing, charptr, value.as.error);
+
+    char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+    // check for double definition
+    if (lookup(compiler->env, ident)) {
+        char* buffer = malloc(128);
+        sprintf(buffer, "Redefinition of variable \"%s\"", ident);
+        return Error(Nothing, charptr, buffer);
+    }
+
+    // define var
+    defineVar(
+        compiler->env,
+        ident,
+        reg.as.success,
+        value.as.success.type
+    );
 
     Tram_ParameterList parameters = Tram_ParameterList_Create(
     2,
@@ -127,6 +150,10 @@ ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, Comet
         freeRegister(compiler, value.as.success.val.value.registerValue);
     }
 
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) visitReturnStatement(CometCompiler* compiler, CometASTNode* node) {
     return Success(Nothing, charptr, {});
 }
 
@@ -153,6 +180,23 @@ ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometAS
             };
 
             return Success(ValStructPair, charptr, doubleRes);
+
+        case AST_IDENTIFIER:
+            char* varIdent = node->data.AST_IDENTIFIER.ident;
+
+            Record* varRecord = lookup(compiler->env, varIdent);
+            if (!varRecord) {
+                char* buffer = malloc(256);
+                sprintf(buffer, "Undefined variable \"%s\"", varIdent);
+                return Error(ValStructPair, charptr, buffer);
+            }
+
+            ValStructPair identRes = {
+                .val = Tram_Parameter_Register(varRecord->reg),
+                .type = "int"
+            };
+
+            return Success(ValStructPair, charptr, identRes);
 
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(compiler, node);
@@ -229,7 +273,62 @@ ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler,
 }
 
 ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, CometASTNode* node) {
+    struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
+    char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
+    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(
+        Tram_InstructionType_CreateLabel,
+        Tram_ParameterList_Create(
+            1,
+            (Tram_Parameter[]){
+                Tram_Parameter_Variable(funcName)
+            })
+        )
+    );
+
+    CometEnvironment* funcEnv = newEnvironment(funcName, compiler->env);
+    compiler->env = funcEnv;
+    for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
+        ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
+        if (result.error)
+            return result;
+    }
+
+    compiler->env = funcEnv->parent;
+    free(funcEnv);
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, CometASTNode* node) {
+    ResultType(ValStructPair, charptr) value = resolveValue(compiler, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (value.error)
+        return Error(Nothing, charptr, value.as.error);
+
+    char* varIdent = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+    Record* varRecord = lookup(compiler->env, varIdent);
+    if (!varRecord) {
+        char* buffer = malloc(256);
+        sprintf(buffer, "Undefined variable \"%s\"", varIdent);
+        return Error(Nothing, charptr, buffer);
+    }
+
+    // TODO: proper type system
+    if (strcmp(varRecord->type, value.as.success.type) != 0) {
+        return Error(Nothing, charptr, "Can't change type of variable at runtime.");
+    }
+
+    Tram_ParameterList parameters = Tram_ParameterList_Create(
+    2,
+    (Tram_Parameter[]){
+        Tram_Parameter_Register(varRecord->reg),
+        value.as.success.val
+        }
+    );
+    
+    Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Put, parameters));
+    return Success(Nothing, charptr, {});
 }
 
 // -- MAIN --//
@@ -240,6 +339,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitProgram(compiler, node);
         case AST_ASSIGN_STATEMENT:
             return visitAssignStatement(compiler, node);
+        case AST_REASSIGN_STATEMENT:
+            return visitReassignStatement(compiler, node);
         case AST_EXPRESSION_STATEMENT:
             return visitExpressionStatement(compiler, node);
         case AST_FUNC_DEF_STATEMENT:

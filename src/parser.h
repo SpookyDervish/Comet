@@ -16,8 +16,6 @@ typedef struct {
     CometASTNode* program;
     size_t statementIndex;
     size_t statementArraySize;
-
-    CometEnvironment* environment;
 } CometParser;
 
 typedef CometParser* parserPtr;

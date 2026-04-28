@@ -34,7 +34,7 @@ int main() {
     printNode(ast.as.success);
 
     CometCompiler compiler = createCompiler(parser.as.success).as.success;
-    ResultType(Nothing, charptr) result = compileAST(&compiler, ast.as.success, "test.out");
+    ResultType(Nothing, charptr) result = compileAST(&compiler, ast.as.success, "output");
     if (result.error) {
         printf("Compiler error: %s\n", result.as.error);
         exit(1);

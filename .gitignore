@@ -57,4 +57,5 @@ dkms.conf
 
 # custom ignores
 cometc
+output
 test.cmt

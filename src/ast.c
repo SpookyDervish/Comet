@@ -22,6 +22,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_EXPRESSION_STATEMENT";
         case AST_ASSIGN_STATEMENT:
             return "AST_ASSIGN_STATEMENT";
+        case AST_REASSIGN_STATEMENT:
+            return "AST_REASSIGN_STATEMENT";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";

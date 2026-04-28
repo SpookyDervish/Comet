@@ -3,6 +3,7 @@
 
 #include "../include/error.h"
 #include "ast.h"
+#include "environment.h"
 #include "parser.h"
 
 #include <stddef.h>
@@ -19,6 +20,7 @@ typedef struct {
     Tram_Program* program;
     Tram_Register* usedRegisters;
     Tram_Register* usedFloatRegisters;
+    CometEnvironment* env;
 } CometCompiler;
 
 Result(CometCompiler, charptr);

@@ -87,9 +87,6 @@ ResultType(parserPtr, charptr) newParser(tokenList tokens) {
     if (!parser->program->data.AST_PROGRAM.statements) {
         return Error(parserPtr, charptr, "newCometParser: Failed to allocate memory for program node statements!");
     }
-
-    // create an environment with no parent
-    parser->environment = newEnvironment("root", NULL);
     
     return Success(parserPtr, charptr, parser);
 }
@@ -133,13 +130,13 @@ bool peekTokenIs(CometParser* parser, CometTokenType tokenType) {
 
 ResultType(int, charptr) expectPeek(CometParser* parser, CometTokenType tokenType) {
     if (!parser->peekToken) {
-        char buffer[256];
+        char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got <EOF> instead.", tokenTypeToCStr(tokenType));
         return Error(int, charptr, buffer);
     }
     
     if (!peekTokenIs(parser, tokenType)) {
-        char buffer[256];
+        char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got %s instead.", tokenTypeToCStr(tokenType), tokenTypeToCStr(parser->peekToken->type));
         return Error(int, charptr, buffer);
     }
@@ -154,7 +151,7 @@ ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keyw
     }
 
     if (strcmp(parser->currentToken->value.literal, keywrod) != 0) {
-        char buffer[256];
+        char* buffer = malloc(256);
         sprintf(buffer, "Expected current token to be %s but got %s instead.", keywrod, parser->currentToken->value.literal);
         return Error(int, charptr, buffer);
     }
