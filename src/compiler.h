@@ -12,6 +12,10 @@
 UseList(Tram_Register);
 
 typedef struct {
+    int useCount[Tram_Register_f15+1];
+} Liveness;
+
+typedef struct {
     Tram_Parameter val;
     char* type;
 } ValStructPair;
@@ -21,6 +25,7 @@ typedef struct {
     Tram_Register* usedRegisters;
     Tram_Register* usedFloatRegisters;
     CometEnvironment* env;
+    Liveness liveness;
 } CometCompiler;
 
 Result(CometCompiler, charptr);

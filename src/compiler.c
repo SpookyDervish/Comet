@@ -57,6 +57,7 @@ ResultType(CometCompiler, charptr) createCompiler(CometParser* parser) {
         .program = program,
         .usedRegisters = calloc(Tram_Register_f0, sizeof(Tram_Register)),
         .usedFloatRegisters = calloc((Tram_Register_f15+1) - Tram_Register_f0, sizeof(Tram_Register)),
+        .liveness = (Liveness){}
     };
 
     // create an environment with no parent
@@ -182,6 +183,50 @@ ResultType(Nothing, charptr) visitExpressionStatement(CometCompiler* compiler, C
 }
 
 // -- HELPER FUNCTIONS -- //
+bool isRegisterDead(CometCompiler* compiler, Tram_Register reg) {
+    return compiler->liveness.useCount[reg] <= 0;
+}
+
+ResultType(Nothing, charptr) useRegister(CometCompiler* compiler, Tram_Register reg) {
+    compiler->liveness.useCount[reg]--;
+
+    if (compiler->liveness.useCount[reg] <= 0) {
+        if (reg < Tram_Register_f0)
+            return freeRegister(compiler, reg);
+        else
+            return freeFloatRegister(compiler, reg);
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) countUses(CometCompiler* compiler, CometASTNode* node) {
+    if (!node) return Success(Nothing, charptr, {});
+
+    switch (node->nodeType) {
+        case AST_INFIX_EXPRESSION:
+            countUses(compiler, node->data.AST_INFIX_EXPRESSION.left);
+            countUses(compiler, node->data.AST_INFIX_EXPRESSION.right);
+            break;
+
+        case AST_IDENTIFIER:
+            char* varIdent = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(compiler->env, varIdent);
+            
+            if (!varRecord) {
+                char* buffer = malloc(256);
+                sprintf(buffer, "Undefined variable \"%s\"", varIdent);
+                return Error(Nothing, charptr, buffer);
+            }
+
+            compiler->liveness.useCount[varRecord->reg]++;
+            break;
+
+        default:
+            break;
+    }
+}
+
 ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
 ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
     switch (node->nodeType) {
@@ -239,19 +284,33 @@ ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler,
     char* type = NULL;
 
     if (strcmp(leftVal.as.success.type, "int") == 0 && strcmp(rightVal.as.success.type, "int") == 0) {
-        Tram_Register reg = allocRegister(compiler).as.success;
+        Tram_Register reg;
+
+        if (leftVal.as.success.val.type == Tram_ParameterType_Register &&
+            isRegisterDead(compiler, leftVal.as.success.val.value.registerValue)) {
+            
+            reg = leftVal.as.success.val.value.registerValue;
+
+        } else {
+            reg = allocRegister(compiler).as.success;
+        }
+
+
+        // avoid self copy
+        if (!(leftVal.as.success.val.type == Tram_ParameterType_Register &&
+            leftVal.as.success.val.value.registerValue == reg)) {
+            Tram_ParameterList putParams = Tram_ParameterList_Create(
+            2,
+            (Tram_Parameter[]){
+                Tram_Parameter_Register(reg),
+                leftVal.as.success.val
+                }
+            );
+
+            Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Put, putParams));
+        }
 
         Tram_ParameterList parameters = Tram_ParameterList_Create(
-        2,
-        (Tram_Parameter[]){
-            Tram_Parameter_Register(reg),
-            leftVal.as.success.val
-            }
-        );
-
-        Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Put, parameters));
-
-        parameters = Tram_ParameterList_Create(
         2,
         (Tram_Parameter[]){
             Tram_Parameter_Register(reg),
@@ -282,6 +341,13 @@ ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler,
 
                 return Error(ValStructPair, charptr, buffer);
         }
+    }
+
+    if (leftVal.as.success.val.type == Tram_ParameterType_Register) {
+        useRegister(compiler, leftVal.as.success.val.value.registerValue);
+    }
+    if (rightVal.as.success.val.type == Tram_ParameterType_Register) {
+        useRegister(compiler, rightVal.as.success.val.value.registerValue);
     }
 
     ValStructPair result = (ValStructPair){
