@@ -133,13 +133,13 @@ bool peekTokenIs(CometParser* parser, CometTokenType tokenType) {
 
 ResultType(int, charptr) expectPeek(CometParser* parser, CometTokenType tokenType) {
     if (!parser->peekToken) {
-        char* buffer = malloc(256);
+        char buffer[256];
         sprintf(buffer, "Expected next token to be %s but got <EOF> instead.", tokenTypeToCStr(tokenType));
         return Error(int, charptr, buffer);
     }
     
     if (!peekTokenIs(parser, tokenType)) {
-        char* buffer = malloc(256);
+        char buffer[256];
         sprintf(buffer, "Expected next token to be %s but got %s instead.", tokenTypeToCStr(tokenType), tokenTypeToCStr(parser->peekToken->type));
         return Error(int, charptr, buffer);
     }
@@ -154,7 +154,7 @@ ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keyw
     }
 
     if (strcmp(parser->currentToken->value.literal, keywrod) != 0) {
-        char* buffer = malloc(256);
+        char buffer[256];
         sprintf(buffer, "Expected current token to be %s but got %s instead.", keywrod, parser->currentToken->value.literal);
         return Error(int, charptr, buffer);
     }
@@ -222,7 +222,7 @@ void printNode(CometASTNode* node) {
         case AST_INFIX_EXPRESSION:
             printf("(");
             printNode(node->data.AST_INFIX_EXPRESSION.left);
-            printf(" %s ", node->data.AST_INFIX_EXPRESSION.op);
+            printf(" %s ", node->data.AST_INFIX_EXPRESSION.op.value.literal);
             printNode(node->data.AST_INFIX_EXPRESSION.right);
             printf(")");
             break;
@@ -338,7 +338,7 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
     ResultType(prefixFuncType, charptr) prefixFunc = getPrefixFunc(parser->currentToken->type);
 
     if (prefixFunc.error) {
-        char* buffer = malloc(256);
+        char buffer[256];
         sprintf(buffer, "No prefix parse function for %s.\n", tokenTypeToCStr(parser->currentToken->type));
         return Error(astNodePtr, charptr, buffer);
     }
@@ -364,7 +364,7 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
 }
 
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left) {
-    CometASTNode* infixExpr = AST_NODE(AST_INFIX_EXPRESSION, left, NULL, parser->currentToken->value.literal);
+    CometASTNode* infixExpr = AST_NODE(AST_INFIX_EXPRESSION, left, NULL, *parser->currentToken);
 
     CometPrecedenceType precedence = currentPrecedence(parser);
     parserNextToken(parser);
@@ -818,7 +818,7 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     } else if (strcmp(keyword, "return") == 0) {
         return parseReturnStatement(parser);
     } else {
-        char* buffer = malloc(256);
+        char buffer[256];
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
         return Error(astNodePtr, charptr, buffer);
     }

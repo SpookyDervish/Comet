@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "lexer.h"
+#include "token.h"
 
 
 /*
@@ -60,7 +61,7 @@ struct CometASTNode {
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
 
-        struct AST_INFIX_EXPRESSION { CometASTNode* left; CometASTNode* right; char* op; } AST_INFIX_EXPRESSION;
+        struct AST_INFIX_EXPRESSION { CometASTNode* left; CometASTNode* right; CometToken op; } AST_INFIX_EXPRESSION;
 
         struct AST_EXPRESSION_STATEMENT { CometASTNode* expression; } AST_EXPRESSION_STATEMENT;
         struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; CometASTNode* type; } AST_ASSIGN_STATEMENT;

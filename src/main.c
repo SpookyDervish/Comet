@@ -1,9 +1,8 @@
 #include "lexer.h"
 #include "parser.h"
-#include "token.h"
+#include "compiler.h"
 #include "util.h"
-#include <stddef.h>
-#include <stdio.h>
+#include <stdlib.h>
 
 int main() {
     char* source = getFileContents("test.cmt");
@@ -33,4 +32,11 @@ int main() {
     }
 
     printNode(ast.as.success);
+
+    CometCompiler compiler = createCompiler(parser.as.success).as.success;
+    ResultType(Nothing, charptr) result = compileAST(&compiler, ast.as.success, "test.out");
+    if (result.error) {
+        printf("Compiler error: %s\n", result.as.error);
+        exit(1);
+    }
 }

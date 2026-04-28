@@ -3,8 +3,8 @@ SRC=src
 SRC_FILES=$(wildcard $(SRC)/*.c)
 
 CC=gcc
-CFLAGS=-Wall -pedantic -Wextra -O3
-DEBUG_CFLAGS=-Wall -pedantic -Wextra -O0 -ggdb
+CFLAGS=-Wall -pedantic -Wextra -O3 -ltram
+DEBUG_CFLAGS=-Wall -pedantic -Wextra -O0 -ggdb -ltram
 
 TARGET=cometc
 
