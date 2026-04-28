@@ -97,7 +97,7 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     Tram_Compiler_Compile(tramCompiler);
 
     if (Tram_Compiler_HasCompiled(tramCompiler)) {
-        printf("%s\n", Tram_Compiler_GetAsm(tramCompiler));
+        //printf("%s\n", Tram_Compiler_GetAsm(tramCompiler));
         Tram_Compiler_AssembleAndLink(tramCompiler, outputName, (Tram_LinkerArgs){.size = 0, .data = NULL});
     } else {
         return Error(Nothing, charptr, "Compilation failed.");
