@@ -198,6 +198,30 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
 
     CometEnvironment* funcEnv = newEnvironment(funcName, compiler->env);
     compiler->env = funcEnv;
+
+    for (size_t i = 0; i < funcDef.args.count; i++) {
+        struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
+
+        Tram_Register argReg = allocRegister(compiler).as.success;
+        defineVar(
+            funcEnv,
+            arg.ident->data.AST_IDENTIFIER.ident,
+            argReg,
+            arg.type->data.AST_TYPE_NAME.name
+        );
+
+        Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(
+            Tram_InstructionType_GetArg,
+            Tram_ParameterList_Create(
+                2,
+                (Tram_Parameter[]){
+                    Tram_Parameter_Literal(Tram_Literal_Int(i)),
+                    Tram_Parameter_Register(argReg)
+                })
+            )
+        );
+    }
+
     for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
         ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
         if (result.error)
