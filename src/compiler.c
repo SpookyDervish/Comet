@@ -364,7 +364,7 @@ ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometAS
         case AST_FUNC_CALL:
             ValStructPair funcRes = {
                 .val = Tram_Parameter_Register(handleFuncCall(compiler, node).as.success),
-                .type = 0 // todo: get func return type
+                .type = "int" // todo: get func return type
             };
 
             return Success(ValStructPair, charptr, funcRes);
