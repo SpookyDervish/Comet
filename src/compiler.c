@@ -190,6 +190,12 @@ ResultType(blockPtr, charptr) createBlock(CometCompiler* compiler) {
     new->statements = newList(astNodePtr);
     new->successors = NULL;
     new->succCount = 0;
+
+    new->use = 0;
+    new->def = 0;
+    new->liveIn = 0;
+    new->liveOut = 0;
+
     new->env = compiler->env;
     return Success(blockPtr, charptr, new);
 }
@@ -202,6 +208,11 @@ void appendStatementToBlock(Block* block, CometASTNode* node) {
     append(block->statements, node);
 }
 
+static void addSuccessor(Block* from, Block* to) {
+    from->successors = realloc(from->successors, sizeof(Block*) * (from->succCount + 1));
+    from->successors[from->succCount++] = to;
+}
+
 ResultType(Nothing, charptr) buildCFGStatement(CFGBuilder* builder, CometASTNode* node, CometCompiler* compiler) {
     switch (node->nodeType) {
         case AST_RETURN_STATEMENT: {
@@ -212,9 +223,48 @@ ResultType(Nothing, charptr) buildCFGStatement(CFGBuilder* builder, CometASTNode
             break;
         }
         
+        case AST_IF_STATEMENT: {
+            Block* condBlock = builder->current;
+
+            Block* thenBlock = createBlock(compiler).as.success;
+            Block* elseBlock = createBlock(compiler).as.success; // for when i add else to if-statements
+            Block* joinBlock = createBlock(compiler).as.success;
+
+            addBlock(builder->cfg, thenBlock);
+            addBlock(builder->cfg, elseBlock);
+            addBlock(builder->cfg, joinBlock);
+
+            // connect condition → branches
+            addSuccessor(condBlock, thenBlock);
+            addSuccessor(condBlock, elseBlock);
+
+            // --- THEN branch ---
+            builder->current = thenBlock;
+            CometASTNode* thenProg = node->data.AST_IF_STATEMENT.program;
+
+            for (size_t i = 0; i < thenProg->data.AST_PROGRAM.numStatements; i++) {
+                buildCFGStatement(builder, thenProg->data.AST_PROGRAM.statements[i], compiler);
+            }
+
+            // if not terminated (no return), go to join
+            if (builder->current) {
+                addSuccessor(builder->current, joinBlock);
+            }
+
+            addSuccessor(elseBlock, joinBlock);
+
+            appendStatementToBlock(condBlock, node->data.AST_IF_STATEMENT.expression);
+
+            // continue from join
+            builder->current = joinBlock;
+
+            break;
+        }
 
         default:
-            appendStatementToBlock(builder->current, node);
+            if (builder->current) {
+                appendStatementToBlock(builder->current, node);
+            }
             break;
     }
 
@@ -512,8 +562,8 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
     for (size_t i = 0; i < cfg.as.success->blocks.count; i++) {
         Block* b = (*get(cfg.as.success->blocks, i));
 
-        printf("Block %zu: IN=%u OUT=%u\n",
-            i, b->liveIn, b->liveOut);
+        printf("Block %zu: USE=%u DEF=%u IN=%u OUT=%u\n",
+            i, b->use, b->def, b->liveIn, b->liveOut);
     }
 
     Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(
