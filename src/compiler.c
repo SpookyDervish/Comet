@@ -4,7 +4,9 @@
 #include "lexer.h"
 #include "parser.h"
 #include "token.h"
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,16 +72,6 @@ ResultType(CometCompiler, charptr) createCompiler(CometParser* parser) {
     return Success(CometCompiler, charptr, new);
 }
 
-ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode* node) {
-    for (size_t i = 0; i < node->data.AST_PROGRAM.numStatements; i++) {
-        ResultType(Nothing, charptr) result = compile(compiler, node->data.AST_PROGRAM.statements[i]);
-        if (result.error)
-            return result;
-    }
-
-    return Success(Nothing, charptr, {});
-}
-
 ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, char* outputName) {
     ResultType(Nothing, charptr) compileResult = compile(compiler, root);
     if (compileResult.error)
@@ -108,8 +100,326 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     return Success(Nothing, charptr, {});
 }
 
-// -- STATEMENTS -- //
+// -- HELPER FUNCTIONS -- //
+bool isRegisterDead(CometCompiler* compiler, Tram_Register reg) {
+    return compiler->liveness.useCount[reg] <= 0;
+}
+
+ResultType(Nothing, charptr) useRegister(CometCompiler* compiler, Tram_Register reg) {
+    compiler->liveness.useCount[reg]--;
+
+    if (compiler->liveness.useCount[reg] <= 0) {
+        /*if (reg < Tram_Register_f0)
+            return freeRegister(compiler, reg);
+        else
+            return freeFloatRegister(compiler, reg);*/
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) countUses(CometCompiler* compiler, CometASTNode* node) {
+    if (!node) return Success(Nothing, charptr, {});
+
+    switch (node->nodeType) {
+        case AST_INFIX_EXPRESSION:
+            countUses(compiler, node->data.AST_INFIX_EXPRESSION.left);
+            countUses(compiler, node->data.AST_INFIX_EXPRESSION.right);
+            break;
+
+        case AST_IDENTIFIER:
+            char* varIdent = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(compiler->env, varIdent);
+            
+            if (!varRecord) {
+                char* buffer = malloc(256);
+                sprintf(buffer, "Undefined variable \"%s\"", varIdent);
+                return Error(Nothing, charptr, buffer);
+            }
+
+            compiler->liveness.useCount[varRecord->reg]++;
+            break;
+
+        default:
+            break;
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
 ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node);
+ResultType(Tram_Register, charptr) handleFuncCall(CometCompiler* compiler, CometASTNode* node) {
+    
+    List(astNodePtr) funcArgs = node->data.AST_FUNC_CALL.args;
+    
+    Tram_Parameter* instArgs = calloc(funcArgs.count + 2, sizeof(Tram_Parameter));
+
+    // put the func name as the first arg
+    instArgs[0] = Tram_Parameter_Variable(node->data.AST_FUNC_CALL.ident->data.AST_IDENTIFIER.ident);
+    
+    // put the return reg as the second arg
+    Tram_Register returnValReg = allocRegister(compiler).as.success;
+    instArgs[1] = Tram_Parameter_Register(returnValReg);
+
+    // put the rest of the args in
+    for (size_t i = 0; i < funcArgs.count; i++) {
+        ResultType(ValStructPair, charptr) value = resolveValue(compiler, *get(node->data.AST_FUNC_CALL.args, i));
+        if (value.error)
+            return Error(Tram_Register, charptr, value.as.error);
+
+        instArgs[i+2] = value.as.success.val;
+    }
+
+
+    Tram_Program_AddInstruction(
+        compiler->program,
+        Tram_Instruction_Create(
+            Tram_InstructionType_Call,
+            Tram_ParameterList_Create(funcArgs.count + 2,instArgs)
+        )
+    );
+    
+    return Success(Tram_Register, charptr, returnValReg);
+}
+
+ResultType(blockPtr, charptr) createBlock(CometCompiler* compiler) {
+    Block* new = malloc(sizeof(Block));
+    if (!new)
+        return Error(blockPtr, charptr, "createBlock: failed to allocate memory for new block!");
+
+    new->statements = newList(astNodePtr);
+    new->successors = NULL;
+    new->succCount = 0;
+    new->env = compiler->env;
+    return Success(blockPtr, charptr, new);
+}
+
+void addBlock(FunctionCFG* cfg, Block* block) {
+    append(cfg->blocks, block);
+}
+
+void appendStatementToBlock(Block* block, CometASTNode* node) {
+    append(block->statements, node);
+}
+
+ResultType(Nothing, charptr) buildCFGStatement(CFGBuilder* builder, CometASTNode* node, CometCompiler* compiler) {
+    switch (node->nodeType) {
+        case AST_RETURN_STATEMENT: {
+            appendStatementToBlock(builder->current, node);
+
+            builder->current = NULL;
+
+            break;
+        }
+        
+
+        default:
+            appendStatementToBlock(builder->current, node);
+            break;
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
+static inline uint32_t regBit(Tram_Register r) {
+    return 1u << r;
+}
+
+ResultType(Nothing, charptr) computeExprUse(Block* block, CometCompiler* compiler, CometASTNode* node) {
+    if (!node) return Success(Nothing, charptr, {});
+
+    switch (node->nodeType) {
+        case AST_IDENTIFIER: {
+            Record* varRecord = lookup(block->env, node->data.AST_IDENTIFIER.ident);
+            if (!varRecord) return Success(Nothing, charptr, {});
+
+            uint32_t bit = regBit(varRecord->reg);
+
+            // only use this reg if not already defined in the block
+            if (!(block->def & bit)) {
+                block->use |= bit;
+            }
+            break;
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            ResultType(Nothing, charptr) leftRes = computeExprUse(block, compiler, node->data.AST_INFIX_EXPRESSION.left);
+            if (leftRes.error) return leftRes;
+            ResultType(Nothing, charptr) rightRes = computeExprUse(block, compiler, node->data.AST_INFIX_EXPRESSION.right);
+            if (rightRes.error) return rightRes;
+            break;
+        }
+
+        default:
+            break;
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) computeBlockUseDef(Block* block, CometCompiler* compiler) {
+    block->use = 0;
+    block->def = 0;
+
+    for (size_t i = 0; i < block->statements.count; i++) {
+        CometASTNode* node = *get(block->statements, i);
+
+        switch (node->nodeType) {
+            case AST_ASSIGN_STATEMENT:
+            case AST_REASSIGN_STATEMENT: {
+                ResultType(Nothing, charptr) assignUse = computeExprUse(block, compiler, node->data.AST_ASSIGN_STATEMENT.expression);
+                if (assignUse.error)
+                    return assignUse;
+
+                Record* varRecord = lookup(
+                    block->env,
+                    node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident
+                );
+
+                if (!varRecord) {
+                    return Error(Nothing, charptr, "Undefined variable");
+                }
+
+                block->def |= regBit(varRecord->reg);
+                break;
+            }
+
+            case AST_RETURN_STATEMENT: {
+                ResultType(Nothing, charptr) returnUse = computeExprUse(block, compiler, node->data.AST_RETURN_STATEMENT.expression);
+                if (returnUse.error)
+                    return returnUse;
+                break;
+            }
+
+            case AST_EXPRESSION_STATEMENT: {
+                ResultType(Nothing, charptr) res = computeExprUse(block, compiler, node->data.AST_EXPRESSION_STATEMENT.expression);
+                if (res.error) return res;
+                break;
+            }
+
+            default:
+                break;
+
+        }
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(funcCfgPtr, charptr) buildCFG(CometASTNode* funcBody, CometCompiler* compiler) {
+    FunctionCFG* cfg = malloc(sizeof(FunctionCFG));
+
+    ResultType(blockPtr, charptr) entry = createBlock(compiler);
+    if (entry.error)
+        return Error(funcCfgPtr, charptr, entry.as.error);
+    cfg->entry = entry.as.success;
+    cfg->blocks = newList(blockPtr);
+    addBlock(cfg, entry.as.success);
+
+    CFGBuilder builder = {
+        .cfg = cfg,
+        .current = entry.as.success
+    };
+
+    for (size_t i = 0; i < funcBody->data.AST_PROGRAM.numStatements; i++) {
+        ResultType(Nothing, charptr) result = buildCFGStatement(&builder, funcBody->data.AST_PROGRAM.statements[i], compiler);
+        if (result.error)
+            return Error(funcCfgPtr, charptr, result.as.error);
+    }
+
+    return Success(funcCfgPtr, charptr, cfg);
+}
+
+ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
+ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
+    switch (node->nodeType) {
+        case AST_INT:
+            ValStructPair intRes = {
+                .val = Tram_Parameter_Literal(Tram_Literal_Int(node->data.AST_INT.number)),
+                .type = "int"
+            };
+
+            return Success(ValStructPair, charptr, intRes);
+        case AST_DOUBLE:
+
+            ValStructPair doubleRes = {
+                .val = Tram_Parameter_Literal(Tram_Literal_Float(node->data.AST_DOUBLE.number)),
+                .type = "double"
+            };
+
+            return Success(ValStructPair, charptr, doubleRes);
+
+        case AST_IDENTIFIER:
+            char* varIdent = node->data.AST_IDENTIFIER.ident;
+
+            Record* varRecord = lookup(compiler->env, varIdent);
+            if (!varRecord) {
+                char* buffer = malloc(256);
+                sprintf(buffer, "Undefined variable \"%s\"", varIdent);
+                return Error(ValStructPair, charptr, buffer);
+            }
+
+            ValStructPair identRes = {
+                .val = Tram_Parameter_Register(varRecord->reg),
+                .type = "int"
+            };
+
+            return Success(ValStructPair, charptr, identRes);
+
+        case AST_INFIX_EXPRESSION:
+            return visitInfixExpression(compiler, node);
+
+        case AST_FUNC_CALL:
+            ValStructPair funcRes = {
+                .val = Tram_Parameter_Register(handleFuncCall(compiler, node).as.success),
+                .type = "int" // todo: get func return type
+            };
+
+            return Success(ValStructPair, charptr, funcRes);
+
+        default:
+            return Error(ValStructPair, charptr, "Unsupported type for resolving.");
+    }
+}
+
+void computeLiveness(FunctionCFG* cfg) {
+    bool changed;
+
+    do {
+        changed = false;
+
+        for (int i = (int)cfg->blocks.count - 1; i >= 0; i--) {
+            Block* block = *get(cfg->blocks, i);
+
+            uint32_t oldIn = block->liveIn;
+            uint32_t oldOut = block->liveOut;
+
+            uint32_t out = 0;
+            for (int s = 0; s < block->succCount; s++) {
+                out |= block->successors[s]->liveIn;
+            }
+            block->liveOut = out;
+
+            block->liveIn = block->use | (block->liveOut & ~block->def);
+
+            if (block->liveIn != oldIn || block->liveOut != oldOut) {
+                changed = true;
+            }
+        }
+    } while (changed);
+}
+
+// -- STATEMENTS -- //
+ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode* node) {
+    for (size_t i = 0; i < node->data.AST_PROGRAM.numStatements; i++) {
+        ResultType(Nothing, charptr) result = compile(compiler, node->data.AST_PROGRAM.statements[i]);
+        if (result.error)
+            return result;
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
 ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, CometASTNode* node) {
     ResultType(Tram_Register, charptr) reg = allocRegister(compiler);
 
@@ -182,9 +492,29 @@ ResultType(Nothing, charptr) visitExpressionStatement(CometCompiler* compiler, C
     return compile(compiler, node->data.AST_EXPRESSION_STATEMENT.expression);
 }
 
+ResultType(funcCfgPtr, charptr) buildCFG(CometASTNode* funcBody, CometCompiler* compiler);
 ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, CometASTNode* node) {
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+
+    // build cfg
+    ResultType(funcCfgPtr, charptr) cfg = buildCFG(funcDef.program, compiler);
+    if (cfg.error)
+        return Error(Nothing, charptr, cfg.as.error);
+
+    // compute use/def
+    for (size_t i = 0; i < cfg.as.success->blocks.count; i++) {
+        computeBlockUseDef(*get(cfg.as.success->blocks, i), compiler);
+    }
+
+    computeLiveness(cfg.as.success);
+
+    for (size_t i = 0; i < cfg.as.success->blocks.count; i++) {
+        Block* b = (*get(cfg.as.success->blocks, i));
+
+        printf("Block %zu: IN=%u OUT=%u\n",
+            i, b->liveIn, b->liveOut);
+    }
 
     Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(
         Tram_InstructionType_CreateLabel,
@@ -263,139 +593,6 @@ ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, Com
     
     Tram_Program_AddInstruction(compiler->program, Tram_Instruction_Create(Tram_InstructionType_Put, parameters));
     return Success(Nothing, charptr, {});
-}
-
-// -- HELPER FUNCTIONS -- //
-bool isRegisterDead(CometCompiler* compiler, Tram_Register reg) {
-    return compiler->liveness.useCount[reg] <= 0;
-}
-
-ResultType(Nothing, charptr) useRegister(CometCompiler* compiler, Tram_Register reg) {
-    compiler->liveness.useCount[reg]--;
-
-    if (compiler->liveness.useCount[reg] <= 0) {
-        if (reg < Tram_Register_f0)
-            return freeRegister(compiler, reg);
-        else
-            return freeFloatRegister(compiler, reg);
-    }
-
-    return Success(Nothing, charptr, {});
-}
-
-ResultType(Nothing, charptr) countUses(CometCompiler* compiler, CometASTNode* node) {
-    if (!node) return Success(Nothing, charptr, {});
-
-    switch (node->nodeType) {
-        case AST_INFIX_EXPRESSION:
-            countUses(compiler, node->data.AST_INFIX_EXPRESSION.left);
-            countUses(compiler, node->data.AST_INFIX_EXPRESSION.right);
-            break;
-
-        case AST_IDENTIFIER:
-            char* varIdent = node->data.AST_IDENTIFIER.ident;
-            Record* varRecord = lookup(compiler->env, varIdent);
-            
-            if (!varRecord) {
-                char* buffer = malloc(256);
-                sprintf(buffer, "Undefined variable \"%s\"", varIdent);
-                return Error(Nothing, charptr, buffer);
-            }
-
-            compiler->liveness.useCount[varRecord->reg]++;
-            break;
-
-        default:
-            break;
-    }
-
-    return Success(Nothing, charptr, {});
-}
-
-ResultType(Tram_Register, charptr) handleFuncCall(CometCompiler* compiler, CometASTNode* node) {
-    
-    List(astNodePtr) funcArgs = node->data.AST_FUNC_CALL.args;
-    
-    Tram_Parameter* instArgs = calloc(funcArgs.count + 2, sizeof(Tram_Parameter));
-
-    // put the func name as the first arg
-    instArgs[0] = Tram_Parameter_Variable(node->data.AST_FUNC_CALL.ident->data.AST_IDENTIFIER.ident);
-    
-    // put the return reg as the second arg
-    Tram_Register returnValReg = allocRegister(compiler).as.success;
-    instArgs[1] = Tram_Parameter_Register(returnValReg);
-
-    // put the rest of the args in
-    for (size_t i = 0; i < funcArgs.count; i++) {
-        ResultType(ValStructPair, charptr) value = resolveValue(compiler, *get(node->data.AST_FUNC_CALL.args, i));
-        if (value.error)
-            return Error(Tram_Register, charptr, value.as.error);
-
-        instArgs[i+2] = value.as.success.val;
-    }
-
-
-    Tram_Program_AddInstruction(
-        compiler->program,
-        Tram_Instruction_Create(
-            Tram_InstructionType_Call,
-            Tram_ParameterList_Create(funcArgs.count + 2,instArgs)
-        )
-    );
-    
-    return Success(Tram_Register, charptr, returnValReg);
-}
-
-ResultType(ValStructPair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
-ResultType(ValStructPair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
-    switch (node->nodeType) {
-        case AST_INT:
-            ValStructPair intRes = {
-                .val = Tram_Parameter_Literal(Tram_Literal_Int(node->data.AST_INT.number)),
-                .type = "int"
-            };
-
-            return Success(ValStructPair, charptr, intRes);
-        case AST_DOUBLE:
-
-            ValStructPair doubleRes = {
-                .val = Tram_Parameter_Literal(Tram_Literal_Float(node->data.AST_DOUBLE.number)),
-                .type = "double"
-            };
-
-            return Success(ValStructPair, charptr, doubleRes);
-
-        case AST_IDENTIFIER:
-            char* varIdent = node->data.AST_IDENTIFIER.ident;
-
-            Record* varRecord = lookup(compiler->env, varIdent);
-            if (!varRecord) {
-                char* buffer = malloc(256);
-                sprintf(buffer, "Undefined variable \"%s\"", varIdent);
-                return Error(ValStructPair, charptr, buffer);
-            }
-
-            ValStructPair identRes = {
-                .val = Tram_Parameter_Register(varRecord->reg),
-                .type = "int"
-            };
-
-            return Success(ValStructPair, charptr, identRes);
-
-        case AST_INFIX_EXPRESSION:
-            return visitInfixExpression(compiler, node);
-
-        case AST_FUNC_CALL:
-            ValStructPair funcRes = {
-                .val = Tram_Parameter_Register(handleFuncCall(compiler, node).as.success),
-                .type = "int" // todo: get func return type
-            };
-
-            return Success(ValStructPair, charptr, funcRes);
-
-        default:
-            return Error(ValStructPair, charptr, "Unsupported type for resolving.");
-    }
 }
 
 // -- EXPRESSIONS -- //
