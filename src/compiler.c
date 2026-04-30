@@ -142,6 +142,14 @@ ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, Comet
     CometASTNode* value = node->data.AST_ASSIGN_STATEMENT.expression;
     char* type = node->data.AST_ASSIGN_STATEMENT.type->data.AST_TYPE_NAME.name;
 
+    Record* varRecord = lookup(compiler->env, name);
+    if (varRecord) {
+        Estr errMsg = CREATE_ESTR("Redeclaration of variable \"");
+        APPEND_ESTR(errMsg, name);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(Nothing, charptr, errMsg.str);
+    }
+
     ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
     if (typeValuePair.error)
         return Error(Nothing, charptr, typeValuePair.as.error);
@@ -165,6 +173,35 @@ ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, Comet
 
     return Success(Nothing, charptr, {});
 }
+
+ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, CometASTNode* node) {
+    char* name = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+    CometASTNode* value = node->data.AST_ASSIGN_STATEMENT.expression;
+
+    Record* varRecord = lookup(compiler->env, name);
+    if (!varRecord) {
+        Estr errMsg = CREATE_ESTR("Undefined variable \"");
+        APPEND_ESTR(errMsg, name);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(Nothing, charptr, errMsg.str);
+    }
+
+    ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
+    if (typeValuePair.error)
+        return Error(Nothing, charptr, typeValuePair.as.error);
+
+    if (typeValuePair.as.success.type != varRecord->type) {
+        Estr errMsg = CREATE_ESTR("You can't change the type of variable \"");
+        APPEND_ESTR(errMsg, name);
+        APPEND_ESTR(errMsg, "\" at runtime.");
+        return Error(Nothing, charptr, errMsg.str);
+    }
+
+    LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, varRecord->ptr);
+
+    return Success(Nothing, charptr, {});
+}
+
 
 // -- EXPRESSIONS -- //
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
@@ -279,6 +316,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitExpressionStatement(compiler, node);
         case AST_ASSIGN_STATEMENT:
             return visitAssignStatement(compiler, node);
+        case AST_REASSIGN_STATEMENT:
+            return visitReassignStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);
