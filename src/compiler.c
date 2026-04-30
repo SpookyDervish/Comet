@@ -259,7 +259,7 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     if (compilerResult.error)
         return compilerResult;
 
-    LLVMDumpModule(compiler->module);
+    LLVMPrintModuleToFile(compiler->module, outputName, NULL);
 
     return Success(Nothing, charptr, {});
 }
