@@ -5,7 +5,9 @@
 #include "token.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
+#include <llvm-c/Analysis.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -48,7 +50,6 @@ ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, Co
         }
 
         default:
-            printf("%s\n", ASTNodeTypeToCStr(node->nodeType));
             return Error(CometTypeValuePair, charptr, "Unkown expression type.");
     }
 
@@ -128,19 +129,19 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
         switch (op.type) {
             case CT_PLUS: {
                 // we pass NULL to let LLVM decide the name of the SSA output
-                value = LLVMBuildAdd(compiler->builder, left.as.success.value, right.as.success.value, "tmpadd");
+                value = LLVMBuildAdd(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
                 break;
             }
             case CT_MINUS: {
-                value = LLVMBuildSub(compiler->builder, left.as.success.value, right.as.success.value, NULL);
+                value = LLVMBuildSub(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
                 break;
             }
             case CT_TIMES: {
-                value = LLVMBuildMul(compiler->builder, left.as.success.value, right.as.success.value, NULL);
+                value = LLVMBuildMul(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
                 break;
             }
             case CT_DIVIDE: {
-                value = LLVMBuildSDiv(compiler->builder, left.as.success.value, right.as.success.value, NULL);
+                value = LLVMBuildSDiv(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
                 break;
             }
 
@@ -163,7 +164,7 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     if (compilerResult.error)
         return compilerResult;
 
-    LLVMPrintModuleToFile(compiler->module, outputName, NULL);
+    LLVMDumpModule(compiler->module);
 
     return Success(Nothing, charptr, {});
 }
