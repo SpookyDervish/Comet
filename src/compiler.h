@@ -15,6 +15,11 @@ typedef struct {
 } CometLLVMTypePair;
 
 typedef struct {
+    LLVMValueRef value;
+    LLVMTypeRef type;
+} CometTypeValuePair;
+
+typedef struct {
     CometEnvironment* env;
     LLVMContextRef context;
     LLVMModuleRef module;
@@ -24,6 +29,7 @@ typedef struct {
 } CometCompiler;
 typedef CometCompiler* cometCompilerPtr;
 
+Result(CometTypeValuePair, charptr);
 Result(LLVMTypeRef, charptr);
 Result(cometCompilerPtr, charptr);
 

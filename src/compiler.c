@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "lexer.h"
 #include "parser.h"
+#include "token.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 #include <stddef.h>
@@ -19,6 +20,41 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
     return Error(LLVMTypeRef, charptr, "The type was not found!");
 }
 
+ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
+ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
+    CometTypeValuePair res;
+
+    switch (node->nodeType) {
+        case AST_INT: {
+            LLVMTypeRef intType = getType(compiler, "int").as.success;
+            res = (CometTypeValuePair){
+                LLVMConstInt(intType, node->data.AST_INT.number, false),
+                intType
+            };
+            break;
+        }
+
+        case AST_DOUBLE: {
+            LLVMTypeRef doubleType = getType(compiler, "double").as.success;
+            res = (CometTypeValuePair){
+                LLVMConstReal(doubleType, node->data.AST_DOUBLE.number),
+                doubleType
+            };
+            break;
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            return visitInfixExpression(compiler, node);
+        }
+
+        default:
+            printf("%s\n", ASTNodeTypeToCStr(node->nodeType));
+            return Error(CometTypeValuePair, charptr, "Unkown expression type.");
+    }
+
+    return Success(CometTypeValuePair, charptr, res);
+}
+
 // -- STATEMENTS -- //
 ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode* node) {
     for (size_t i = 0; i < node->data.AST_PROGRAM.numStatements; i++) {
@@ -33,7 +69,6 @@ ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode*
 ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, CometASTNode* node) {
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
 
-    printf("%s\n", funcDef.returnType->data.AST_TYPE_NAME.name);
     ResultType(LLVMTypeRef, charptr) returnType = getType(compiler, funcDef.returnType->data.AST_TYPE_NAME.name);
     if (returnType.error)
         return Error(Nothing, charptr, returnType.as.error);
@@ -50,7 +85,76 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(compiler->context, function, entryName.str);
     LLVMPositionBuilderAtEnd(compiler->builder, entry);
 
+    for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
+        ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
+        if (result.error)
+            return result;
+    }
+
     return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) visitReturnStatement(CometCompiler* compiler, CometASTNode* node) {
+    
+    ResultType(CometTypeValuePair, charptr) returnValue = resolveValue(compiler, node->data.AST_RETURN_STATEMENT.expression);
+    
+    if (returnValue.error)
+        return Error(Nothing, charptr, returnValue.as.error);
+    
+    LLVMBuildRet(compiler->builder, returnValue.as.success.value);
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) visitExpressionStatement(CometCompiler* compiler, CometASTNode* node) {
+    return compile(compiler, node->data.AST_EXPRESSION_STATEMENT.expression);
+}
+
+// -- EXPRESSIONS -- //
+ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
+    CometToken op = node->data.AST_INFIX_EXPRESSION.op;
+
+    ResultType(CometTypeValuePair, charptr) left = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
+    if (left.error) return Error(CometTypeValuePair, charptr, left.as.error);
+    ResultType(CometTypeValuePair, charptr) right = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.right);
+    if (right.error) return Error(CometTypeValuePair, charptr, right.as.error);
+
+    // performing an operation on two ints
+    LLVMTypeRef type;
+    LLVMValueRef value;
+    if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
+        type = getType(compiler, "int").as.success;
+
+        switch (op.type) {
+            case CT_PLUS: {
+                // we pass NULL to let LLVM decide the name of the SSA output
+                value = LLVMBuildAdd(compiler->builder, left.as.success.value, right.as.success.value, "tmpadd");
+                break;
+            }
+            case CT_MINUS: {
+                value = LLVMBuildSub(compiler->builder, left.as.success.value, right.as.success.value, NULL);
+                break;
+            }
+            case CT_TIMES: {
+                value = LLVMBuildMul(compiler->builder, left.as.success.value, right.as.success.value, NULL);
+                break;
+            }
+            case CT_DIVIDE: {
+                value = LLVMBuildSDiv(compiler->builder, left.as.success.value, right.as.success.value, NULL);
+                break;
+            }
+
+            default:
+                return Error(CometTypeValuePair, charptr, "Unexpected operator for int and int!");
+        }
+    } else {
+        return Error(CometTypeValuePair, charptr, "Cannot perform operation on those types.");
+    }
+
+    CometTypeValuePair result = {
+        value, type
+    };
+    return Success(CometTypeValuePair, charptr, result);
 }
  
 // -- MAIN --//
@@ -101,13 +205,24 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
 }
 
 ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node) {
-
     switch (node->nodeType) {
         case AST_PROGRAM:
             return visitProgram(compiler, node);
 
         case AST_FUNC_DEF_STATEMENT:
             return visitFuncDefStatement(compiler, node);
+        case AST_RETURN_STATEMENT:
+            return visitReturnStatement(compiler, node);
+        case AST_EXPRESSION_STATEMENT:
+            return visitExpressionStatement(compiler, node);
+
+        case AST_INFIX_EXPRESSION: {
+            ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);
+            if (result.error)
+                return Error(Nothing, charptr, result.as.error);
+
+            return Success(Nothing, charptr, {});
+        }
 
         default: {
             char* buffer = malloc(128);
