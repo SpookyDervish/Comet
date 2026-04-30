@@ -3,17 +3,20 @@ SRC=src
 SRC_FILES=$(wildcard $(SRC)/*.c)
 
 CC=gcc
-CFLAGS=-Wall -pedantic -Wextra -O3 -ltram
-DEBUG_CFLAGS=-Wall -pedantic -Wextra -O0 -ggdb -ltram
+CXX=g++
+CFLAGS=-Wall -pedantic -Wextra $(shell llvm-config --cflags)
+LDFLAGS=$(shell llvm-config --ldflags)
+LDLIBS=$(shell llvm-config --libs core) $(shell llvm-config --system-libs)
+DEBUG_CFLAGS=-Wall -pedantic -Wextra -ggdb $(shell llvm-config --cflags)
 
 TARGET=cometc
 
 
 $(TARGET): $(SRC_FILES)
-	$(CC) $(CFLAGS) $(SRC_FILES) -o $(TARGET)
+	$(CC) $(SRC_FILES) -o $(TARGET) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 debug:
-	$(CC) $(DEBUG_CFLAGS) $(SRC_FILES) -o $(TARGET)
+	$(CC) $(SRC_FILES) -o $(TARGET) $(DEBUG_CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 clean:
 	rm $(TARGET)

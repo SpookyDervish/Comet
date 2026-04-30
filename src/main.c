@@ -14,10 +14,6 @@ int main() {
         printf("lexer error: %s\n", tokens.as.error);
         exit(1);
     }
-
-    /*for (size_t i = 0; i < tokens.as.success.count; i++) {
-        printf("%ld. %s\n", i, tokenToCStr(*get(tokens.as.success, i)));
-    }*/
     
     ResultType(parserPtr, charptr) parser = newParser(tokens.as.success);
     if (parser.error) {
@@ -33,8 +29,12 @@ int main() {
 
     printNode(ast.as.success);
 
-    CometCompiler compiler = createCompiler(parser.as.success).as.success;
-    ResultType(Nothing, charptr) result = compileAST(&compiler, ast.as.success, "output");
+    ResultType(cometCompilerPtr, charptr) compiler = createCompiler(parser.as.success);
+    if (compiler.error) {
+        printf("error while creating compiler: %s\n", compiler.as.error);
+    }
+
+    ResultType(Nothing, charptr) result = compileAST(compiler.as.success, ast.as.success, "output.llvm");
     if (result.error) {
         printf("Compiler error: %s\n", result.as.error);
         exit(1);

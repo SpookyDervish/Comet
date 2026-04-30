@@ -1,0 +1,6 @@
+; ModuleID = 'main'
+source_filename = "main"
+
+define i8 @main() {
+main_entry:
+}

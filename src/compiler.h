@@ -5,16 +5,30 @@
 #include "ast.h"
 #include "environment.h"
 #include "parser.h"
+#include <llvm-c/Types.h>
 #include <stddef.h>
+#include <llvm-c/Core.h>
+
+typedef struct {
+    char* typeName;
+    LLVMTypeRef llvmType;
+} CometLLVMTypePair;
 
 typedef struct {
     CometEnvironment* env;
+    LLVMContextRef context;
+    LLVMModuleRef module;
+    LLVMBuilderRef builder;
+    CometLLVMTypePair* typeMap;
+    size_t typeMapSize;
 } CometCompiler;
+typedef CometCompiler* cometCompilerPtr;
 
-Result(CometCompiler, charptr);
+Result(LLVMTypeRef, charptr);
+Result(cometCompilerPtr, charptr);
 
-ResultType(CometCompiler, charptr) createCompiler(CometParser* parser);
-ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, char* outputName);
+ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser);
+ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName);
 ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node);
 
 #endif
