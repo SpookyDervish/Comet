@@ -24,6 +24,7 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
 }
 
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
+ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node);
 ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
     CometTypeValuePair res;
 
@@ -54,6 +55,10 @@ ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, Co
 
         case AST_INFIX_EXPRESSION: {
             return visitInfixExpression(compiler, node);
+        }
+
+        case AST_FUNC_CALL: {
+            return visitFuncCall(compiler, node);
         }
 
         case AST_IDENTIFIER: {
@@ -100,17 +105,55 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
     if (returnType.error)
         return Error(Nothing, charptr, returnType.as.error);
 
+    // get func arg types
+    List(LLVMTypeRef) argTypes = newList(LLVMTypeRef);
+    for (size_t i = 0; i < funcDef.args.count; i++) {
+        struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
+
+        ResultType(LLVMTypeRef, charptr) argType = getType(compiler, arg.type->data.AST_TYPE_NAME.name);
+        if (argType.error)
+            return Error(Nothing, charptr, argType.as.error);
+
+        append(argTypes, argType.as.success);
+    }
+
     // create function
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
-    LLVMTypeRef funcType = LLVMFunctionType(returnType.as.success, NULL, 0, false);
+    LLVMTypeRef funcType = LLVMFunctionType(returnType.as.success, argTypes.pointer, argTypes.count, false);
     LLVMValueRef function = LLVMAddFunction(compiler->module,funcName , funcType);
 
     // create function entry
     Estr entryName = CREATE_ESTR(funcName);
     APPEND_ESTR(entryName, "_entry");
 
+    // define func in compilers current env
+    
+    defineVar(compiler->env, funcName, function, funcType);
+
+    
+
+    // create entry and compile func body
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(compiler->context, function, entryName.str);
     LLVMPositionBuilderAtEnd(compiler->builder, entry);
+
+    // setup func environment
+    compiler->env = newEnvironment(entryName.str, compiler->env);
+    for (size_t i = 0; i < funcDef.args.count; i++) {
+        // get arg and alloc space for it
+        struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
+        char* argName = arg.ident->data.AST_IDENTIFIER.ident;
+        
+
+        LLVMTypeRef argType = *get(argTypes, i);
+
+        LLVMValueRef argValue = LLVMGetParam(function, i);
+
+        LLVMValueRef argPtr = LLVMBuildAlloca(compiler->builder, argType, argName);
+        LLVMBuildStore(compiler->builder, argValue, argPtr);
+
+        // add env var for it
+        defineVar(compiler->env, argName, argPtr, argType);
+    }
 
     for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
         ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
@@ -252,6 +295,37 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
     };
     return Success(CometTypeValuePair, charptr, result);
 }
+
+ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node) {
+    struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
+    char* funcName = funcCall.ident->data.AST_IDENTIFIER.ident;
+
+    Record* funcRecord = lookup(compiler->env, funcName);
+    if (!funcRecord) {
+        Estr errMsg = CREATE_ESTR("Attempt to call undefined function \"");
+        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, "\"");
+
+        return Error(CometTypeValuePair, charptr, errMsg.str);
+    }
+
+    List(LLVMValueRef) argValues = newList(LLVMValueRef);
+    for (size_t i = 0; i < funcCall.args.count; i++) {
+        ResultType(CometTypeValuePair, charptr) arg = resolveValue(compiler, *get(funcCall.args, i));
+        if (arg.error)
+            return arg;
+
+        append(argValues, arg.as.success.value);
+    }
+
+    LLVMValueRef returnValue = LLVMBuildCall2(compiler->builder, funcRecord->type, funcRecord->ptr, argValues.pointer, argValues.count, funcName);
+    CometTypeValuePair result = {
+        .value = returnValue,
+        .type = LLVMGetReturnType(funcRecord->type)
+    };
+
+    return Success(CometTypeValuePair, charptr, result);
+}
  
 // -- MAIN --//
 ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName) {
@@ -321,6 +395,13 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);
+            if (result.error)
+                return Error(Nothing, charptr, result.as.error);
+
+            return Success(Nothing, charptr, {});
+        }
+        case AST_FUNC_CALL: {
+            ResultType(CometTypeValuePair, charptr) result = visitFuncCall(compiler, node);
             if (result.error)
                 return Error(Nothing, charptr, result.as.error);
 
