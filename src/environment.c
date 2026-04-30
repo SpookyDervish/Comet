@@ -1,4 +1,5 @@
 #include "environment.h"
+#include <llvm-c/Types.h>
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
@@ -11,7 +12,7 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     return env;
 }
 
-void defineVar(CometEnvironment* env, char* name, char* type) {
+void defineVar(CometEnvironment* env, char* name, LLVMValueRef ptr, LLVMTypeRef type) {
     Record* record;
     HASH_FIND_STR(env->records, name, record);
 
@@ -25,6 +26,7 @@ void defineVar(CometEnvironment* env, char* name, char* type) {
     record = malloc(sizeof(Record));
     record->name = strdup(name);
     record->type = type;
+    record->ptr = ptr;
 
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
 }

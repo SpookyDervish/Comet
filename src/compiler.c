@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "ast.h"
+#include "environment.h"
 #include "lexer.h"
 #include "parser.h"
 #include "token.h"
@@ -28,25 +29,50 @@ ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, Co
 
     switch (node->nodeType) {
         case AST_INT: {
-            LLVMTypeRef intType = getType(compiler, "int").as.success;
+            ResultType(LLVMTypeRef, charptr) intType = getType(compiler, "int");
+            if (intType.error)
+                return Error(CometTypeValuePair, charptr, intType.as.error);
+
             res = (CometTypeValuePair){
-                LLVMConstInt(intType, node->data.AST_INT.number, false),
-                intType
+                LLVMConstInt(intType.as.success, node->data.AST_INT.number, false),
+                intType.as.success
             };
             break;
         }
 
         case AST_DOUBLE: {
-            LLVMTypeRef doubleType = getType(compiler, "double").as.success;
+            ResultType(LLVMTypeRef, charptr) doubleType = getType(compiler, "double");
+            if (doubleType.error)
+                return Error(CometTypeValuePair, charptr, doubleType.as.error);
+
             res = (CometTypeValuePair){
-                LLVMConstReal(doubleType, node->data.AST_DOUBLE.number),
-                doubleType
+                LLVMConstReal(doubleType.as.success, node->data.AST_DOUBLE.number),
+                doubleType.as.success
             };
             break;
         }
 
         case AST_INFIX_EXPRESSION: {
             return visitInfixExpression(compiler, node);
+        }
+
+        case AST_IDENTIFIER: {
+            char* varName = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(compiler->env, varName);
+            if (!varRecord) {
+                Estr errMsg = CREATE_ESTR("Undefined variable \"");
+                APPEND_ESTR(errMsg, varName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometTypeValuePair, charptr, errMsg.str);
+            }
+
+            CometTypeValuePair result = {
+                .value = LLVMBuildLoad2(compiler->builder, varRecord->type, varRecord->ptr, varName),
+                .type = varRecord->type
+            };
+            return Success(CometTypeValuePair, charptr, result);
+
+            break;
         }
 
         default:
@@ -111,6 +137,35 @@ ResultType(Nothing, charptr) visitExpressionStatement(CometCompiler* compiler, C
     return compile(compiler, node->data.AST_EXPRESSION_STATEMENT.expression);
 }
 
+ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, CometASTNode* node) {
+    char* name = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+    CometASTNode* value = node->data.AST_ASSIGN_STATEMENT.expression;
+    char* type = node->data.AST_ASSIGN_STATEMENT.type->data.AST_TYPE_NAME.name;
+
+    ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
+    if (typeValuePair.error)
+        return Error(Nothing, charptr, typeValuePair.as.error);
+
+    ResultType(LLVMTypeRef, charptr) varAssignType = getType(compiler, type);
+    if (varAssignType.error)
+        return Error(Nothing, charptr, varAssignType.as.error);
+
+    if (varAssignType.as.success != typeValuePair.as.success.type) {
+        Estr errMsg = CREATE_ESTR("Type mismatch when defining variable \"");
+        APPEND_ESTR(errMsg, name);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(Nothing, charptr, errMsg.str);
+    }
+
+    if (!lookup(compiler->env, name)) {
+        LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varAssignType.as.success, name);
+        LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, ptr);
+        defineVar(compiler->env, name, ptr, varAssignType.as.success);
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
 // -- EXPRESSIONS -- //
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
     CometToken op = node->data.AST_INFIX_EXPRESSION.op;
@@ -121,10 +176,10 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
     if (right.error) return Error(CometTypeValuePair, charptr, right.as.error);
 
     // performing an operation on two ints
-    LLVMTypeRef type;
+    ResultType(LLVMTypeRef, charptr) type;
     LLVMValueRef value;
     if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
-        type = getType(compiler, "int").as.success;
+        type = getType(compiler, "int");
 
         switch (op.type) {
             case CT_PLUS: {
@@ -152,8 +207,11 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
         return Error(CometTypeValuePair, charptr, "Cannot perform operation on those types.");
     }
 
+    if (type.error)
+        return Error(CometTypeValuePair, charptr, type.as.error);
+
     CometTypeValuePair result = {
-        value, type
+        value, type.as.success
     };
     return Success(CometTypeValuePair, charptr, result);
 }
@@ -202,6 +260,9 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
         newCompiler->typeMap[i].llvmType = types[i];
     }
 
+    // set up env
+    newCompiler->env = newEnvironment("root", NULL);
+
     return Success(cometCompilerPtr, charptr, newCompiler);
 }
 
@@ -216,6 +277,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitReturnStatement(compiler, node);
         case AST_EXPRESSION_STATEMENT:
             return visitExpressionStatement(compiler, node);
+        case AST_ASSIGN_STATEMENT:
+            return visitAssignStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);
