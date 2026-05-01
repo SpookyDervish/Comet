@@ -21,7 +21,7 @@ comment
 ```
 
 ## Variables
-```cpp
+```lua
 small x = 123
 int y = 123456
 big z = 123123123123
@@ -113,7 +113,7 @@ player1 = new Player("Player1")
 ```
 
 ## Templates
-```cpp
+```lua
 struct List <T: Any> {
     T myField
 
@@ -139,7 +139,7 @@ struct Example2 <T: Number> { -- is numeric, we can also say Float, Int, or a sp
 ```
 
 ## Inheritance
-```py
+```lua
 struct Animal {
     func speak() -> void {
         print("...")
@@ -165,7 +165,7 @@ struct Dog : Animal {
 ```
 
 ## Enums
-```c
+```lua
 enum Colour : int {
     Red,
     Green,
@@ -183,7 +183,7 @@ List<int> my_list = new List<int>()
 ```
 
 ## Casting
-```cpp
+```lua
 struct MyStruct {    
     readonly test = 123
 
