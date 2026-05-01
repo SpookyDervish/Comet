@@ -573,9 +573,7 @@ ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
 
         appendStatement(program, stmt.as.success);
 
-        if (parser->currentToken->type != CT_CLOSE_CURLY) {
-            parserNextToken(parser);
-        }
+        parserNextToken(parser);
         
     }
 
@@ -616,7 +614,6 @@ ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser)
         stmt = block.as.success;
         
     }
-    printf("current token: %s\n", tokenToCStr(*parser->currentToken));
 
     return Success(astNodePtr, charptr, stmt);
 }

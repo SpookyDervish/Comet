@@ -303,6 +303,35 @@ ResultType(Nothing, charptr) visitIfStatement(CometCompiler* compiler, CometASTN
     return Success(Nothing, charptr, {});
 }
 
+ResultType(Nothing, charptr) visitWhileStatement(CometCompiler* compiler, CometASTNode* node) {
+    CometASTNode* condition = node->data.AST_WHILE_STATEMENT.expression;
+    CometASTNode* body = node->data.AST_WHILE_STATEMENT.program;
+
+    ResultType(CometTypeValuePair, charptr) beforeCheck = resolveValue(compiler, condition);
+    if (beforeCheck.error)
+        return Error(Nothing, charptr, beforeCheck.as.error);
+
+    LLVMBasicBlockRef whileLoopEntry = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "whileLoopEntry");
+    LLVMBasicBlockRef whileLoopOtherwise = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "whileLoopOtherwise");
+
+    LLVMBuildCondBr(compiler->builder, beforeCheck.as.success.value, whileLoopEntry, whileLoopOtherwise);
+
+    // build loop body
+    LLVMPositionBuilderAtEnd(compiler->builder, whileLoopEntry);
+    ResultType(Nothing, charptr) bodyResult = compileBlock(compiler, body);
+    if (bodyResult.error)
+        return bodyResult;
+
+    ResultType(CometTypeValuePair, charptr) afterCheck = resolveValue(compiler, condition);
+    if (afterCheck.error)
+        return Error(Nothing, charptr, afterCheck.as.error);
+
+    LLVMBuildCondBr(compiler->builder, afterCheck.as.success.value, whileLoopEntry, whileLoopOtherwise);
+    LLVMPositionBuilderAtEnd(compiler->builder, whileLoopOtherwise);
+
+    return Success(Nothing, charptr, {});
+}
+
 // -- EXPRESSIONS -- //
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
     CometToken op = node->data.AST_INFIX_EXPRESSION.op;
@@ -337,8 +366,30 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
                 break;
             }
 
+            // conditionals
             case CT_EQ_EQ: {
+                type = getType(compiler, "bool");
                 value = LLVMBuildICmp(compiler->builder, LLVMIntEQ, left.as.success.value, right.as.success.value, "tmp");
+                break;
+            }
+            case CT_LT: {
+                type = getType(compiler, "bool");
+                value = LLVMBuildICmp(compiler->builder, LLVMIntSLT, left.as.success.value, right.as.success.value, "tmp");
+                break;
+            }
+            case CT_LTE: {
+                type = getType(compiler, "bool");
+                value = LLVMBuildICmp(compiler->builder, LLVMIntULE, left.as.success.value, right.as.success.value, "tmp");
+                break;
+            }
+            case CT_GT: {
+                type = getType(compiler, "bool");
+                value = LLVMBuildICmp(compiler->builder, LLVMIntSGT, left.as.success.value, right.as.success.value, "tmp");
+                break;
+            }
+            case CT_GTE: {
+                type = getType(compiler, "bool");
+                value = LLVMBuildICmp(compiler->builder, LLVMIntUGE, left.as.success.value, right.as.success.value, "tmp");
                 break;
             }
 
@@ -457,6 +508,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitReassignStatement(compiler, node);
         case AST_IF_STATEMENT:
             return visitIfStatement(compiler, node);
+        case AST_WHILE_STATEMENT:
+            return visitWhileStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);

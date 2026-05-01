@@ -28,6 +28,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_RETURN_STATEMENT";
         case AST_IF_STATEMENT:
             return "AST_IF_STATEMENT";
+        case AST_WHILE_STATEMENT:
+            return "AST_WHILE_STATEMENT";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";
