@@ -87,6 +87,16 @@ ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, Co
     return Success(CometTypeValuePair, charptr, res);
 }
 
+ResultType(Nothing, charptr) compileBlock(CometCompiler* compiler, CometASTNode* block) {
+    for (size_t i = 0; i < block->data.AST_PROGRAM.numStatements; i++) {
+        ResultType(Nothing, charptr) result = compile(compiler, block->data.AST_PROGRAM.statements[i]);
+        if (result.error)
+            return result;
+    }
+
+    return Success(Nothing, charptr, {});
+}
+
 // -- STATEMENTS -- //
 ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode* node) {
     for (size_t i = 0; i < node->data.AST_PROGRAM.numStatements; i++) {
@@ -122,15 +132,16 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
     LLVMTypeRef funcType = LLVMFunctionType(returnType.as.success, argTypes.pointer, argTypes.count, false);
     LLVMValueRef function = LLVMAddFunction(compiler->module,funcName , funcType);
 
+    // set the current function
+    LLVMValueRef parentFunc = compiler->currentFunction;
+    compiler->currentFunction = function;
+
     // create function entry
     Estr entryName = CREATE_ESTR(funcName);
     APPEND_ESTR(entryName, "_entry");
 
     // define func in compilers current env
-    
     defineVar(compiler->env, funcName, function, funcType);
-
-    
 
     // create entry and compile func body
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(compiler->context, function, entryName.str);
@@ -155,11 +166,12 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
         defineVar(compiler->env, argName, argPtr, argType);
     }
 
-    for (size_t i = 0; i < funcDef.program->data.AST_PROGRAM.numStatements; i++) {
-        ResultType(Nothing, charptr) result = compile(compiler, funcDef.program->data.AST_PROGRAM.statements[i]);
-        if (result.error)
-            return result;
-    }
+    ResultType(Nothing, charptr) bodyResult = compileBlock(compiler, funcDef.program);
+    if (bodyResult.error)
+        return bodyResult;
+
+    // return to the old function
+    compiler->currentFunction = parentFunc;
 
     return Success(Nothing, charptr, {});
 }
@@ -245,6 +257,51 @@ ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, Com
     return Success(Nothing, charptr, {});
 }
 
+ResultType(Nothing, charptr) visitIfStatement(CometCompiler* compiler, CometASTNode* node) {
+    CometASTNode* condition = node->data.AST_IF_STATEMENT.expression;
+    CometASTNode* consequence = node->data.AST_IF_STATEMENT.program;
+    CometASTNode* otherwise = node->data.AST_IF_STATEMENT.elseProgram;
+
+    ResultType(CometTypeValuePair, charptr) result = resolveValue(compiler, condition);
+    if (result.error)
+        return Error(Nothing, charptr, result.as.error);
+
+    LLVMBasicBlockRef thenBB = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "then");
+    LLVMBasicBlockRef elseBB = NULL;
+    if (otherwise) {
+        elseBB = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "else");
+    }
+    LLVMBasicBlockRef mergeBB = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "merge");
+
+    if (elseBB) {
+        LLVMBuildCondBr(compiler->builder, result.as.success.value, thenBB, elseBB);
+    } else {
+        LLVMBuildCondBr(compiler->builder, result.as.success.value, thenBB, mergeBB);
+    }
+    
+
+    // build then block
+    LLVMPositionBuilderAtEnd(compiler->builder, thenBB);
+    ResultType(Nothing, charptr) bodyResult = compileBlock(compiler, consequence);
+    if (bodyResult.error)
+        return bodyResult;
+    LLVMBuildBr(compiler->builder, mergeBB);
+
+    // build else block
+    if (otherwise) {
+        LLVMPositionBuilderAtEnd(compiler->builder, elseBB);
+
+        ResultType(Nothing, charptr) elseResult = compileBlock(compiler, otherwise);
+        if (elseResult.error)
+            return elseResult;
+        LLVMBuildBr(compiler->builder, mergeBB);
+    }
+
+    // emit merge block
+    LLVMPositionBuilderAtEnd(compiler->builder, mergeBB);
+
+    return Success(Nothing, charptr, {});
+}
 
 // -- EXPRESSIONS -- //
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
@@ -277,6 +334,11 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
             }
             case CT_DIVIDE: {
                 value = LLVMBuildSDiv(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
+                break;
+            }
+
+            case CT_EQ_EQ: {
+                value = LLVMBuildICmp(compiler->builder, LLVMIntEQ, left.as.success.value, right.as.success.value, "tmp");
                 break;
             }
 
@@ -346,6 +408,7 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
     newCompiler->context = LLVMContextCreate();
     newCompiler->module = LLVMModuleCreateWithNameInContext("main", newCompiler->context);
     newCompiler->builder = LLVMCreateBuilderInContext(newCompiler->context);
+    newCompiler->currentFunction = NULL;
 
     // create type map
     newCompiler->typeMapSize = 7;
@@ -392,6 +455,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitAssignStatement(compiler, node);
         case AST_REASSIGN_STATEMENT:
             return visitReassignStatement(compiler, node);
+        case AST_IF_STATEMENT:
+            return visitIfStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);

@@ -21,14 +21,15 @@ const char* KEYWORDS[] = {
     "import",
     "step",
     "if",
+    "else",
     "break",
     "continue"
     
 };
 
 const char* BUILT_IN_TYPES[] = {
-    "int",
     "small",
+    "int",
     "big",
     "float",
     "double",

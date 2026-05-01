@@ -26,6 +26,8 @@ typedef struct {
     LLVMBuilderRef builder;
     CometLLVMTypePair* typeMap;
     size_t typeMapSize;
+
+    LLVMValueRef currentFunction;
 } CometCompiler;
 typedef CometCompiler* cometCompilerPtr;
 

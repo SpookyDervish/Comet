@@ -68,13 +68,18 @@ struct CometASTNode {
         struct AST_REASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; } AST_REASSIGN_STATEMENT;
         struct AST_WHILE_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_WHILE_STATEMENT;
         struct AST_FOR_STATEMENT {
+            CometASTNode* type;
             CometASTNode* ident;
             CometASTNode* start;
             CometASTNode* end;
             CometASTNode* step;
             CometASTNode* program;
         } AST_FOR_STATEMENT;
-        struct AST_IF_STATEMENT { CometASTNode* expression; CometASTNode* program; } AST_IF_STATEMENT;
+        struct AST_IF_STATEMENT {
+            CometASTNode* expression;
+            CometASTNode* program;
+            CometASTNode* elseProgram;
+        } AST_IF_STATEMENT;
         struct AST_BREAK_STATEMENT { } AST_BREAK_STATEMENT;
         struct AST_CONTINUE_STATEMENT { } AST_CONTINUE_STATEMENT;
         struct AST_FUNC_DEF_STATEMENT {

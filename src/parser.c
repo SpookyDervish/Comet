@@ -144,19 +144,27 @@ ResultType(int, charptr) expectPeek(CometParser* parser, CometTokenType tokenTyp
     return Success(int, charptr, 1);
 }
 
-ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keywrod) {
+ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keyword) {
     ResultType(int, charptr) next = expectPeek(parser, CT_KEYWORD);
     if (next.error) {
         return next;
     }
 
-    if (strcmp(parser->currentToken->value.literal, keywrod) != 0) {
+    if (strcmp(parser->peekToken->value.literal, keyword) != 0) {
         char* buffer = malloc(256);
-        sprintf(buffer, "Expected current token to be %s but got %s instead.", keywrod, parser->currentToken->value.literal);
+        sprintf(buffer, "Expected next token to be %s but got %s instead.", keyword, parser->peekToken->value.literal);
         return Error(int, charptr, buffer);
     }
 
     return Success(int, charptr, 1);
+}
+
+bool peekKeywordIs(CometParser* parser, const char* keyword) {
+    bool next = peekTokenIs(parser, CT_KEYWORD);
+    if (!next) {
+        return false;
+    }
+    return strcmp(parser->peekToken->value.literal, keyword) == 0;
 }
 
 CometPrecedenceType getPrecedence(CometTokenType tokenType) {
@@ -307,10 +315,20 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_IF_STATEMENT.expression);
             printf(" {\n");
             printNode(node->data.AST_IF_STATEMENT.program);
-            printf("       } :if");
+            printf("       } ");
+
+            if (node->data.AST_IF_STATEMENT.elseProgram) {
+                printf("else {\n");
+                printNode(node->data.AST_IF_STATEMENT.elseProgram);
+                printf("       } ");
+            }
+
+            printf(":if");
             break;
         case AST_FOR_STATEMENT:
             printf("for ");
+            printNode(node->data.AST_FOR_STATEMENT.type);
+            printf(" ");
             printNode(node->data.AST_FOR_STATEMENT.ident);
             printf(" in ");
             printNode(node->data.AST_FOR_STATEMENT.start);
@@ -546,7 +564,7 @@ ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
 
     while (parser->currentToken->type != CT_CLOSE_CURLY) {
         if (parser->currentToken->type == CT_EOF) {
-            return Error(astNodePtr, charptr, "While statement was not closed!");
+            return Error(astNodePtr, charptr, "Block statement was not closed!");
         }
 
         ResultType(astNodePtr, charptr) stmt = parseStatement(parser);
@@ -554,10 +572,53 @@ ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
             return stmt;
 
         appendStatement(program, stmt.as.success);
-        parserNextToken(parser);
+
+        if (parser->currentToken->type != CT_CLOSE_CURLY) {
+            parserNextToken(parser);
+        }
+        
     }
 
     return Success(astNodePtr, charptr, program);
+}
+
+ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser) {
+    // used for stuff like
+    // if x + 1 == 2
+    //     break
+
+    CometASTNode* stmt;
+    if (!peekTokenIs(parser, CT_OPEN_CURLY)) { // if 1+1 == 2 return
+
+        parserNextToken(parser);
+        ResultType(astNodePtr, charptr) innerStmt = parseStatement(parser);
+
+        if (innerStmt.error)
+            return innerStmt;
+
+        CometASTNode** statements = calloc(1, sizeof(CometASTNode*));
+        if (!statements) {
+            return Error(astNodePtr, charptr, "parseOptionalBlockStatement: failed to allocate memory for block statement!");
+        }
+
+        CometASTNode* program = AST_NODE(AST_PROGRAM, statements, 0, 1);
+        appendStatement(program, innerStmt.as.success);
+
+        stmt = program;
+    } else {                                             // if 1+1 == 2 { return }
+        
+        ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+        if (block.error) {
+            return block;
+        }
+
+        
+        stmt = block.as.success;
+        
+    }
+    printf("current token: %s\n", tokenToCStr(*parser->currentToken));
+
+    return Success(astNodePtr, charptr, stmt);
 }
 
 ResultType(astNodePtr, charptr) parseWhileStatement(CometParser* parser) {
@@ -571,7 +632,7 @@ ResultType(astNodePtr, charptr) parseWhileStatement(CometParser* parser) {
         return expression;
     }
 
-    ResultType(astNodePtr, charptr) program = parseBlockStatement(parser);
+    ResultType(astNodePtr, charptr) program = parseOptionalBlockStatement(parser);
     if (program.error) {
         return program;
     }
@@ -638,13 +699,14 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
         stepNode = Success(astNodePtr, charptr, AST_NODE(AST_INT, 1));
     }
 
-    ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+    ResultType(astNodePtr, charptr) block = parseOptionalBlockStatement(parser);
     if (block.error) {
         return block;
     }
 
     CometASTNode* stmt = AST_NODE(
         AST_FOR_STATEMENT,
+        type,
         ident,
         start.as.success,
         end.as.success,
@@ -672,13 +734,34 @@ ResultType(astNodePtr, charptr) parseIfStatement(CometParser* parser) {
     if (expr.error) {
         return expr;
     }
+    
+    ResultType(astNodePtr, charptr) body = parseOptionalBlockStatement(parser);
+    if (body.error)
+        return body;
 
-    ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
-    if (block.error) {
-        return block;
+    CometASTNode* elseBody = NULL;
+
+    bool elseKeyword = peekKeywordIs(parser, "else");
+
+    if (elseKeyword) {
+        parserNextToken(parser);
+        ResultType(astNodePtr, charptr) elseResult = parseOptionalBlockStatement(parser);
+        if (elseResult.error)
+            return elseResult;
+
+        elseBody = elseResult.as.success;
     }
 
-    CometASTNode* stmt = AST_NODE(AST_IF_STATEMENT, expr.as.success, block.as.success);
+    CometASTNode* stmt = AST_NODE(
+        AST_IF_STATEMENT,
+        expr.as.success,
+        body.as.success,
+        elseBody
+    );
+     
+    
+
+
     return Success(astNodePtr, charptr, stmt);
 }
 

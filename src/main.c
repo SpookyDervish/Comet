@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 int main() {
-    char* source = getFileContents("test.cmt");
+    char* source = getFileContents("test.comet");
 
     ResultType(CometLexer, charptr) lexer = newLexer(source);
     ResultType(tokenList, charptr) tokens = lex(&lexer.as.success);
@@ -26,6 +26,8 @@ int main() {
         printf("error while building ast: %s\n", ast.as.error);
         exit(1);
     }
+
+    printNode(ast.as.success);
 
     ResultType(cometCompilerPtr, charptr) compiler = createCompiler(parser.as.success);
     if (compiler.error) {
