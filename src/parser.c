@@ -221,6 +221,7 @@ void printNode(CometASTNode* node) {
             printf("Program:\n");
 
             CometASTNode** statements = node->data.AST_PROGRAM.statements;
+            
 
             for (size_t i = 0; i < node->data.AST_PROGRAM.numStatements; i++) {
                 printf("    %ld. ", i+1);
@@ -370,9 +371,12 @@ void printNode(CometASTNode* node) {
                 printf("\n");
             }
 
-            printf("\n");
-            printNode(node->data.AST_STRUCT_DEF_STATEMENT.constructor);
-            printf("\n");
+            
+            if (node->data.AST_STRUCT_DEF_STATEMENT.constructor) {
+                printf("\n");
+                printNode(node->data.AST_STRUCT_DEF_STATEMENT.constructor);
+                printf("\n");
+            }
 
             printf("       }");
             break;

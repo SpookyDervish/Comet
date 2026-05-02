@@ -1,3 +1,15 @@
+struct Vector3 {
+    int x
+    int y
+    int z
+
+    init(int x, int y, int z) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+}
+
 func main() -> int {
     return 0
 }
