@@ -27,16 +27,6 @@ const char* KEYWORDS[] = {
     
 };
 
-const char* BUILT_IN_TYPES[] = {
-    "small",
-    "int",
-    "big",
-    "float",
-    "double",
-    "bool",
-    "void",
-};
-
 #define TOKEN_LITERAL(tokType, tokValue) (CometToken){ .literalType = CL_STRING, .type = tokType, .value.literal = tokValue }
 
 /*
@@ -78,16 +68,6 @@ ResultType(char, charptr) lexerPeek(CometLexer* lexer) {
 bool isKeyword(char* buffer) {
     for (unsigned int i = 0; i < (sizeof(KEYWORDS) / sizeof(KEYWORDS[0])); i++) {
         if (strcmp(buffer, KEYWORDS[i]) == 0) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool isBuiltInType(char* buffer) {
-    for (unsigned int i = 0; i < (sizeof(BUILT_IN_TYPES) / sizeof(BUILT_IN_TYPES[0])); i++) {
-        if (strcmp(buffer, BUILT_IN_TYPES[i]) == 0) {
             return true;
         }
     }
@@ -137,8 +117,6 @@ ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
 
     if (isKeyword(buffer)) {
         tok.type = CT_KEYWORD;
-    } else if (isBuiltInType(buffer)) {
-        tok.type = CT_TYPE_NAME;
     } else {
         tok.type = CT_IDENT;
     }

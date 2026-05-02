@@ -6,8 +6,6 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_IDENT";
         case CT_KEYWORD:
             return "CT_KEYWORD";
-        case CT_TYPE_NAME:
-            return "CT_TYPE_NAME";
         case CT_INT_LITERAL:
             return "CT_INT_LITERAL";
         case CT_FLOAT_LITERAL:

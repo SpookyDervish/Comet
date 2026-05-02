@@ -13,6 +13,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+const char* BUILT_IN_TYPES[] = {
+    "small",
+    "int",
+    "big",
+
+    "float",
+    "double",
+
+    "bool",
+
+    "void"
+};
+
+
 // -- HELPER FUNCTIONS -- //
 ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName) {
     for (size_t i = 0; i < compiler->typeMapSize; i++) {
@@ -21,7 +35,10 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
         }
     }
 
-    return Error(LLVMTypeRef, charptr, "The type was not found!");
+    Estr errMsg = CREATE_ESTR("The type \"");
+    APPEND_ESTR(errMsg, typeName);
+    APPEND_ESTR(errMsg, "\" was not found!");
+    return Error(LLVMTypeRef, charptr, errMsg.str);
 }
 
 LLVMValuePair verifyInts(CometCompiler* compiler, LLVMValueRef a, LLVMValueRef b) {
@@ -515,6 +532,31 @@ ResultType(Nothing, charptr) visitForStatement(CometCompiler* compiler, CometAST
     return Success(Nothing, charptr, {});
 }
 
+ResultType(Nothing, charptr) visitStructDefStatement(CometCompiler* compiler, CometASTNode* node) {
+    struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
+
+    List(LLVMTypeRef) fieldTypes = newList(LLVMTypeRef);
+    for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
+        CometASTNode* fieldType = (*get(structDef.fieldDefs, i))->data.AST_ASSIGN_STATEMENT.type;
+        ResultType(LLVMTypeRef, charptr) llvmFieldType = getType(compiler, fieldType->data.AST_TYPE_NAME.name);
+        if (llvmFieldType.error)
+            return Error(Nothing, charptr, llvmFieldType.as.error);
+
+        append(fieldTypes, llvmFieldType.as.success);
+    }
+
+    LLVMTypeRef testStruct = LLVMStructCreateNamed(compiler->context, "myStruct");
+    LLVMStructSetBody(testStruct, fieldTypes.pointer, fieldTypes.count, false);
+    
+    CometLLVMTypePair newPair = {
+        .typeName = structDef.ident->data.AST_IDENTIFIER.ident,
+        .llvmType = testStruct
+    };
+    compiler->typeMap[compiler->typeMapSize] = newPair;
+
+    return Success(Nothing, charptr, {});
+}
+
 // -- EXPRESSIONS -- //
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
     CometToken op = node->data.AST_INFIX_EXPRESSION.op;
@@ -719,6 +761,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitWhileStatement(compiler, node);
         case AST_FOR_STATEMENT:
             return visitForStatement(compiler, node);
+        case AST_STRUCT_DEF_STATEMENT:
+            return visitStructDefStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);

@@ -5,5 +5,7 @@ declare i32 @printf(ptr, ...)
 
 define i32 @main() {
 main_entry:
+  %x = alloca i32, align 4
+  store i32 123, ptr %x, align 4
   ret i32 0
 }

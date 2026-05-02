@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "ast.h"
+#include "compiler.h"
 #include "lexer.h"
 #include "token.h"
 #include <stdbool.h>
@@ -39,7 +40,6 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_STRING_LITERAL, parseStringLiteral},
     {CT_IDENT, parseIdentifier},
     {CT_OPEN_PAREN, parseGroupedExpression},
-    {CT_TYPE_NAME, parseTypeName},
 };
 
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left);
@@ -482,7 +482,7 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
 
         
 
-        ResultType(int, charptr) expectType = expectPeek(parser, CT_TYPE_NAME);
+        ResultType(int, charptr) expectType = expectPeek(parser, CT_IDENT);
         if (expectType.error) {
             return Error(argList, charptr, expectType.as.error);
         }
@@ -588,12 +588,13 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser) {
     // basic format:
     // small myVar = 10
 
-    CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+    
 
-    ResultType(int, charptr) expectIdent = expectPeek(parser, CT_IDENT);
-    if (expectIdent.error) {
-        return Error(astNodePtr, charptr, expectIdent.as.error);
-    }
+    CometASTNode* type = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+    if (expectName.error)
+        return Error(astNodePtr, charptr, expectName.as.error);
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
@@ -716,7 +717,7 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
     // basic format
     // for int i in 0 .. 10 {}
 
-    ResultType(int, charptr) expectType = expectPeek(parser, CT_TYPE_NAME);
+    ResultType(int, charptr) expectType = expectPeek(parser, CT_IDENT);
     if (expectType.error) {
         return Error(astNodePtr, charptr, expectType.as.error);
     }
@@ -895,7 +896,7 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
         return Error(astNodePtr, charptr, expectArrow.as.error);
     }
 
-    ResultType(int, charptr) expectReturnType = expectPeek(parser, CT_TYPE_NAME);
+    ResultType(int, charptr) expectReturnType = expectPeek(parser, CT_IDENT);
     if (expectReturnType.error) {
         return Error(astNodePtr, charptr, expectReturnType.as.error);
     }
@@ -1063,11 +1064,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
 // -- PARSER HELPERS -- //
 ResultType(astNodePtr, charptr) parseStatement(CometParser* parser) {
     switch (parser->currentToken->type) {
-        case CT_TYPE_NAME:
-            return parseAssignmentStatement(parser);
-
         case CT_IDENT:
-            return parseExpressionStatement(parser);
+            return parseAssignmentStatement(parser);
 
         case CT_KEYWORD:
             return parseKeyword(parser);

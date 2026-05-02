@@ -8,7 +8,7 @@
 
 typedef enum {
     // words
-    CT_IDENT, CT_KEYWORD, CT_TYPE_NAME,
+    CT_IDENT, CT_KEYWORD,
 
     // literals
     CT_INT_LITERAL, CT_FLOAT_LITERAL, CT_BOOL_LITERAL, CT_STRING_LITERAL,

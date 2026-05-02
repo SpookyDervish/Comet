@@ -43,6 +43,5 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer);
 ResultType(CometToken, charptr) lexerParseString(CometLexer* lexer, char startingQuote);
 
 extern const char* KEYWORDS[];
-extern const char* BUILT_IN_TYPES[];
 
 #endif

@@ -9,6 +9,8 @@
 #include <stddef.h>
 #include <llvm-c/Core.h>
 
+extern const char* BUILT_IN_TYPES[];
+
 typedef struct {
     char* typeName;
     LLVMTypeRef llvmType;
