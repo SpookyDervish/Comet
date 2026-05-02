@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "parser.h"
 #include "token.h"
+#include "util.h"
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 #include <llvm-c/Analysis.h>
@@ -24,10 +25,28 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
 }
 
 ResultType(CometTypeValuePair, charptr) convertString(CometCompiler* compiler, char* str) {
-    LLVMValueRef llvmString = LLVMConstStringInContext(compiler->context, str, strlen(str), true);
+    // replace escape sequences
+    char* newStr = repl_str(str, "\\n", "\n");
+
+    LLVMValueRef strConst = LLVMConstStringInContext(compiler->context, newStr, strlen(newStr), false);
+
+    LLVMValueRef global = LLVMAddGlobal(compiler->module, LLVMTypeOf(strConst), "str");
+    LLVMSetInitializer(global, strConst);
+    LLVMSetGlobalConstant(global, true);
+    LLVMSetLinkage(global, LLVMPrivateLinkage);
+
+    LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
+    LLVMValueRef indices[] = { zero, zero };
+    LLVMValueRef ptr = LLVMConstGEP2(
+        LLVMTypeOf(strConst),
+        global,
+        indices,
+        2
+    );
+
     CometTypeValuePair res = {
-        .value = llvmString,
-        .type = LLVMTypeOf(llvmString)
+        .value = ptr,
+        .type = LLVMTypeOf(ptr)
     };
     return Success(CometTypeValuePair, charptr, res);
 }
@@ -527,6 +546,22 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     return Success(Nothing, charptr, {});
 }
 
+void defineInternalConstants(CometCompiler* compiler) {
+    // define print
+    LLVMTypeRef i8ptr = LLVMPointerType(LLVMInt8TypeInContext(compiler->context), 0);
+    LLVMTypeRef printfArgs[] = { i8ptr };
+    LLVMTypeRef printfType = LLVMFunctionType(
+        LLVMInt32TypeInContext(compiler->context),
+        printfArgs,
+        1,
+        true
+    );
+
+    LLVMValueRef printfFunc = LLVMAddFunction(compiler->module, "printf", printfType);
+
+    defineVar(compiler->env, "print", printfFunc, printfType);
+}
+
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
     CometCompiler* newCompiler = malloc(sizeof(CometCompiler));
     if (!newCompiler)
@@ -563,6 +598,9 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
 
     // set up env
     newCompiler->env = newEnvironment("root", NULL);
+
+    // define internal constants
+    defineInternalConstants(newCompiler);
 
     return Success(cometCompilerPtr, charptr, newCompiler);
 }
