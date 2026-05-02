@@ -1,9 +1,19 @@
 struct Vector3 {
     int x
+    int y
+    int z
+
+    init(int x, int y, int z) {
+        print("constructor called!\n")
+        print("self = 0x%x\n", self)
+        print("x = %d\n", x)
+        print("y = %d\n", y)
+        print("z = %d\n", z)
+        return self
+    }
 }
 
 func main() -> int {
-    Vector3 x
-
+    Vector3 myVector = new Vector3(1, 2, 3)
     return 0
 }

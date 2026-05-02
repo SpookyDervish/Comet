@@ -34,12 +34,14 @@ ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser);
 ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser);
 ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser);
+ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser);
 const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_INT_LITERAL, parseIntLiteral},
     {CT_FLOAT_LITERAL, parseFloatLiteral},
     {CT_STRING_LITERAL, parseStringLiteral},
     {CT_IDENT, parseIdentifier},
     {CT_OPEN_PAREN, parseGroupedExpression},
+    {CT_KEYWORD, parseStructCreateStatement}
 };
 
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left);
@@ -393,6 +395,20 @@ void printNode(CometASTNode* node) {
             printf("           }");
 
             break;
+        case AST_NEW_STATEMENT:
+            printf("new ");
+            printNode(node->data.AST_NEW_STATEMENT.structName);
+            printf("(");
+            for (size_t i = 0; i < node->data.AST_CONSTRUCTOR_DEF.args.count; i++) {
+                CometASTNode* arg = *get(node->data.AST_CONSTRUCTOR_DEF.args, i);
+                printNode(arg);
+
+                if (i < node->data.AST_CONSTRUCTOR_DEF.args.count-1)
+                    printf(", ");
+            }
+            printf(")");
+
+            break;
 
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
@@ -587,9 +603,10 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser) {
 
     CometASTNode* type = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
-    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
-    if (expectName.error)
-        return Error(astNodePtr, charptr, expectName.as.error);
+    bool expectName = peekTokenIs(parser, CT_IDENT);
+    if (!expectName)
+        return parseExpression(parser, PRECEDENCE_LOWEST);
+    parserNextToken(parser);
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
@@ -1028,6 +1045,25 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser) {
+    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+    if (expectName.error)
+        return Error(astNodePtr, charptr, expectName.as.error);
+
+    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+    parserNextToken(parser);
+    printf("%s\n", tokenToCStr(*parser->currentToken));
+
+    ResultType(argList, charptr) constructorArgs = parseFunctionCallArgs(parser);
+    if (constructorArgs.error)
+        return Error(astNodePtr, charptr, constructorArgs.as.error);
+
+    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, structName, constructorArgs.as.success);
+
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -1049,6 +1085,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
         return parseStructDefStatement(parser);
     } else if (strcmp(keyword, "init") == 0) {
         return parseConstructorDef(parser);
+    } else if (strcmp(keyword, "new") == 0) {
+        return parseStructCreateStatement(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);

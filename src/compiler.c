@@ -534,8 +534,97 @@ ResultType(Nothing, charptr) visitForStatement(CometCompiler* compiler, CometAST
     return Success(Nothing, charptr, {});
 }
 
+ResultType(Nothing, charptr) visitConstructorDefStatement(CometCompiler* compiler, CometASTNode* node, LLVMTypeRef structType, char* structName) {
+    struct AST_CONSTRUCTOR_DEF funcDef = node->data.AST_CONSTRUCTOR_DEF;
+
+    
+
+    // get func arg types
+    List(LLVMTypeRef) argTypes = newList(LLVMTypeRef);
+
+    // add self to args
+    append(argTypes, structType);
+
+    for (size_t i = 0; i < funcDef.args.count; i++) {
+        struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
+
+        ResultType(LLVMTypeRef, charptr) argType = getType(compiler, arg.type->data.AST_IDENTIFIER.ident);
+        if (argType.error)
+            return Error(Nothing, charptr, argType.as.error);
+
+        append(argTypes, argType.as.success);
+    }
+
+    // gen constructor name
+    Estr funcNameEstr = CREATE_ESTR(structName);
+    APPEND_ESTR(funcNameEstr, "_CONSTRUCTOR");
+    char* funcName = funcNameEstr.str;
+
+    // create function
+    
+
+    LLVMTypeRef funcType = LLVMFunctionType(structType, argTypes.pointer, argTypes.count, false);
+    LLVMValueRef function = LLVMAddFunction(compiler->module,funcName , funcType);
+
+    // set the current function
+    LLVMValueRef parentFunc = compiler->currentFunction;
+    compiler->currentFunction = function;
+
+    // create function entry
+    Estr entryName = CREATE_ESTR(funcName);
+    APPEND_ESTR(entryName, "_entry");
+
+    // define func in compilers current env
+    defineVar(compiler->env, funcName, function, funcType);
+
+    // create entry and compile func body
+    LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(compiler->context, function, entryName.str);
+    LLVMPositionBuilderAtEnd(compiler->builder, entry);
+
+    // setup func environment
+    CometEnvironment* oldEnv = compiler->env;
+    CometEnvironment* newEnv = newEnvironment(entryName.str, oldEnv);
+    compiler->env = newEnv;
+
+    // allocate self
+    LLVMValueRef selfValue = LLVMGetParam(function, 0);
+    LLVMValueRef selfPtr = LLVMBuildAlloca(compiler->builder, structType, "self");
+    LLVMBuildStore(compiler->builder, selfValue, selfPtr);
+    defineVar(compiler->env, "self", selfPtr, structType);
+
+    // allocate rest of args
+    for (size_t i = 0; i < funcDef.args.count; i++) {
+        // get arg and alloc space for it
+        struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
+        char* argName = arg.ident->data.AST_IDENTIFIER.ident;
+        
+
+        LLVMTypeRef argType = *get(argTypes, i+1);
+
+        LLVMValueRef argValue = LLVMGetParam(function, i);
+
+        LLVMValueRef argPtr = LLVMBuildAlloca(compiler->builder, argType, argName);
+        LLVMBuildStore(compiler->builder, argValue, argPtr);
+
+        // add env var for it
+        defineVar(compiler->env, argName, argPtr, argType);
+    }
+
+    ResultType(Nothing, charptr) bodyResult = compileBlock(compiler, funcDef.program);
+    if (bodyResult.error)
+        return bodyResult;
+
+    // return to the old function
+    compiler->currentFunction = parentFunc;
+    compiler->env = oldEnv;
+    free(newEnv);
+
+    return Success(Nothing, charptr, {});
+}
+
 ResultType(Nothing, charptr) visitStructDefStatement(CometCompiler* compiler, CometASTNode* node) {
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
+    char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
 
     List(LLVMTypeRef) fieldTypes = newList(LLVMTypeRef);
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
@@ -547,13 +636,20 @@ ResultType(Nothing, charptr) visitStructDefStatement(CometCompiler* compiler, Co
         append(fieldTypes, llvmFieldType.as.success);
     }
 
-    LLVMTypeRef testStruct = LLVMStructCreateNamed(compiler->context, "myStruct");
-    LLVMStructSetBody(testStruct, fieldTypes.pointer, fieldTypes.count, false);
+    LLVMTypeRef structType = LLVMStructCreateNamed(compiler->context, structName);
+    LLVMStructSetBody(structType, fieldTypes.pointer, fieldTypes.count, false);
     
     CometLLVMTypePair newPair = {
         .typeName = structDef.ident->data.AST_IDENTIFIER.ident,
-        .llvmType = testStruct
+        .llvmType = structType
     };
+
+    if (structDef.constructor) {
+        ResultType(Nothing, charptr) constructorResult = visitConstructorDefStatement(compiler, structDef.constructor, structType, structName);
+        if (constructorResult.error)
+            return constructorResult;
+    }
+
     append(compiler->typeMap, newPair);
 
     return Success(Nothing, charptr, {});
