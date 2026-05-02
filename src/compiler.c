@@ -29,9 +29,11 @@ const char* BUILT_IN_TYPES[] = {
 
 // -- HELPER FUNCTIONS -- //
 ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName) {
-    for (size_t i = 0; i < compiler->typeMapSize; i++) {
-        if (strcmp(compiler->typeMap[i].typeName, typeName) == 0) {
-            return Success(LLVMTypeRef, charptr, compiler->typeMap[i].llvmType);
+    for (size_t i = 0; i < compiler->typeMap.count; i++) {
+        CometLLVMTypePair type = *get(compiler->typeMap, i);
+
+        if (strcmp(type.typeName, typeName) == 0) {
+            return Success(LLVMTypeRef, charptr, type.llvmType);
         }
     }
 
@@ -552,7 +554,7 @@ ResultType(Nothing, charptr) visitStructDefStatement(CometCompiler* compiler, Co
         .typeName = structDef.ident->data.AST_IDENTIFIER.ident,
         .llvmType = testStruct
     };
-    compiler->typeMap[compiler->typeMapSize] = newPair;
+    append(compiler->typeMap, newPair);
 
     return Success(Nothing, charptr, {});
 }
@@ -708,10 +710,7 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
     newCompiler->currentFunction = NULL;
 
     // create type map
-    newCompiler->typeMapSize = 7;
-    newCompiler->typeMap = calloc(newCompiler->typeMapSize, sizeof(CometLLVMTypePair));
-    if (!newCompiler->typeMap)
-        return Error(cometCompilerPtr, charptr, "createCompiler: failed to allocate memory for compiler type map!");
+    newCompiler->typeMap = newList(CometLLVMTypePair);
 
     LLVMTypeRef types[] = {
         LLVMIntTypeInContext(newCompiler->context, 8),   // small
@@ -726,9 +725,13 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
         LLVMVoidTypeInContext(newCompiler->context)             // void
     };
     
-    for (size_t i = 0; i < newCompiler->typeMapSize; i++) {
-        newCompiler->typeMap[i].typeName = (char*)BUILT_IN_TYPES[i];
-        newCompiler->typeMap[i].llvmType = types[i];
+    for (size_t i = 0; i < sizeof(BUILT_IN_TYPES)/sizeof(BUILT_IN_TYPES[0]); i++) {
+        CometLLVMTypePair new = {
+            .typeName = (char*)BUILT_IN_TYPES[i],
+            .llvmType = types[i]
+        };
+
+        append(newCompiler->typeMap, new);
     }
 
     // set up env

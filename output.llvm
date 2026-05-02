@@ -1,11 +1,12 @@
 ; ModuleID = 'main'
 source_filename = "main"
 
+%myStruct = type { i32 }
+
 declare i32 @printf(ptr, ...)
 
 define i32 @main() {
 main_entry:
-  %x = alloca i32, align 4
-  store i32 123, ptr %x, align 4
+  %x = alloca %myStruct, align 8
   ret i32 0
 }
