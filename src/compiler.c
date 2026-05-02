@@ -353,9 +353,39 @@ ResultType(Nothing, charptr) visitForStatement(CometCompiler* compiler, CometAST
     if (startValue.error)
         return Error(Nothing, charptr, startValue.as.error);
 
+    ResultType(CometTypeValuePair, charptr) endValue = resolveValue(compiler, forLoop.end);
+    if (endValue.error)
+        return Error(Nothing, charptr, endValue.as.error);
+
+    ResultType(CometTypeValuePair, charptr) stepValue = resolveValue(compiler, forLoop.step);
+    if (stepValue.error)
+        return Error(Nothing, charptr, stepValue.as.error);
+
     LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varType.as.success, identName);
     LLVMBuildStore(compiler->builder, startValue.as.success.value, ptr);
     defineVar(compiler->env, identName, ptr, varType.as.success);
+
+    LLVMBasicBlockRef forLoopEntry = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "forLoopEntry");
+    LLVMBasicBlockRef forLoopOtherwise = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "forLoopOtherwise");
+
+    LLVMValueRef isNotEqual = LLVMBuildICmp(compiler->builder, LLVMIntNE, startValue.as.success.value, endValue.as.success.value, "tmp");
+    LLVMBuildCondBr(compiler->builder, isNotEqual, forLoopEntry, forLoopOtherwise);
+
+    LLVMPositionBuilderAtEnd(compiler->builder, forLoopEntry);
+    ResultType(Nothing, charptr) bodyResult = compileBlock(compiler, forLoop.program);
+    if (bodyResult.error)
+        return bodyResult;
+
+    
+
+    LLVMValueRef iteratorValue = LLVMBuildLoad2(compiler->builder, varType.as.success, ptr, identName);
+    LLVMValueRef afterAdd = LLVMBuildAdd(compiler->builder, iteratorValue, stepValue.as.success.value, "tmp");
+    isNotEqual = LLVMBuildICmp(compiler->builder, LLVMIntNE, afterAdd, endValue.as.success.value, "tmp");
+    LLVMBuildStore(compiler->builder, afterAdd, ptr);
+
+    LLVMBuildCondBr(compiler->builder, isNotEqual, forLoopEntry, forLoopOtherwise);
+
+    LLVMPositionBuilderAtEnd(compiler->builder, forLoopOtherwise);
 
     return Success(Nothing, charptr, {});
 }
@@ -538,6 +568,8 @@ ResultType(Nothing, charptr) compile(CometCompiler* compiler, CometASTNode* node
             return visitIfStatement(compiler, node);
         case AST_WHILE_STATEMENT:
             return visitWhileStatement(compiler, node);
+        case AST_FOR_STATEMENT:
+            return visitForStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);

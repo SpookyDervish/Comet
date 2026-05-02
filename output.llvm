@@ -3,20 +3,23 @@ source_filename = "main"
 
 define i32 @main() {
 main_entry:
-  %number = alloca i32, align 4
-  store i32 0, ptr %number, align 4
-  %number1 = load i32, ptr %number, align 4
-  %tmp = icmp slt i32 %number1, 100000
-  br i1 %tmp, label %whileLoopEntry, label %whileLoopOtherwise
+  %counter = alloca i32, align 4
+  store i32 0, ptr %counter, align 4
+  %i = alloca i32, align 4
+  store i32 0, ptr %i, align 4
+  br i1 true, label %forLoopEntry, label %forLoopOtherwise
 
-whileLoopEntry:                                   ; preds = %whileLoopEntry, %main_entry
-  %number2 = load i32, ptr %number, align 4
-  %tmp3 = add i32 %number2, 1
-  store i32 %tmp3, ptr %number, align 4
-  %number4 = load i32, ptr %number, align 4
-  %tmp5 = icmp slt i32 %number4, 100000
-  br i1 %tmp5, label %whileLoopEntry, label %whileLoopOtherwise
+forLoopEntry:                                     ; preds = %forLoopEntry, %main_entry
+  %counter1 = load i32, ptr %counter, align 4
+  %tmp = add i32 %counter1, 1
+  store i32 %tmp, ptr %counter, align 4
+  %i2 = load i32, ptr %i, align 4
+  %tmp3 = add i32 %i2, 1
+  %tmp4 = icmp ne i32 %tmp3, 10
+  store i32 %tmp3, ptr %i, align 4
+  br i1 %tmp4, label %forLoopEntry, label %forLoopOtherwise
 
-whileLoopOtherwise:                               ; preds = %whileLoopEntry, %main_entry
-  ret i32 0
+forLoopOtherwise:                                 ; preds = %forLoopEntry, %main_entry
+  %counter5 = load i32, ptr %counter, align 4
+  ret i32 %counter5
 }
