@@ -38,6 +38,7 @@ typedef enum {
     AST_CONTINUE_STATEMENT,
     AST_FUNC_DEF_STATEMENT,
     AST_RETURN_STATEMENT,
+    AST_STRUCT_DEF_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -93,6 +94,12 @@ struct CometASTNode {
             CometASTNode* inlineExpr;
         } AST_FUNC_DEF_STATEMENT;
         struct AST_RETURN_STATEMENT { CometASTNode* expression; } AST_RETURN_STATEMENT;
+        struct AST_STRUCT_DEF_STATEMENT {
+            CometASTNode* ident;
+            List(astNodePtr) fieldDefs;
+            CometASTNode* constructor;
+            CometASTNode* destructor;
+        } AST_STRUCT_DEF_STATEMENT;
 
     } data;  
 };

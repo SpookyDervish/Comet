@@ -345,6 +345,20 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_FOR_STATEMENT.program);
             printf("       } :for");
             break;
+        case AST_STRUCT_DEF_STATEMENT:
+            printf("struct ");
+            printNode(node->data.AST_STRUCT_DEF_STATEMENT.ident);
+            printf(" {\n");
+
+            List(astNodePtr) structDefs = node->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
+
+            for (size_t i = 0; i < structDefs.count; i++) {
+                printf("           ");
+                printNode(*get(structDefs, i));
+                printf("\n");
+            }
+            printf("       }");
+            break;
 
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
@@ -877,6 +891,8 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
 }
 
 ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
+    
+
     parserNextToken(parser);
     ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
     if (expr.error) {
@@ -884,6 +900,53 @@ ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
     }
 
     return Success(astNodePtr, charptr, AST_NODE(AST_RETURN_STATEMENT, expr.as.success));
+}
+
+ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
+    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+    if (expectName.error) {
+        return Error(astNodePtr, charptr, expectName.as.error);
+    }
+
+    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+
+    List(astNodePtr) fieldDefs = newList(astNodePtr);
+
+    ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+    if (block.error) {
+        return Error(astNodePtr, charptr, block.as.error);
+    }
+
+    struct AST_PROGRAM blockProgram = block.as.success->data.AST_PROGRAM;
+
+    for (size_t i = 0; i < blockProgram.numStatements; i++) {
+        CometASTNode* statement = blockProgram.statements[i];
+
+        switch (statement->nodeType) {
+            case AST_ASSIGN_STATEMENT: {
+                append(fieldDefs, statement);
+
+                break;
+            }
+
+            default: {
+                Estr errMsg = CREATE_ESTR("\"");
+                APPEND_ESTR(errMsg, ASTNodeTypeToCStr(statement->nodeType));
+                APPEND_ESTR(errMsg, "\" cannot be used in struct definition.");
+                return Error(astNodePtr, charptr, errMsg.str);
+                break;
+            }
+        }
+    }
+
+    CometASTNode* stmt = AST_NODE(
+        AST_STRUCT_DEF_STATEMENT,
+        structName,
+        fieldDefs,
+        NULL,
+        NULL
+    );
+    return Success(astNodePtr, charptr, stmt);
 }
 
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
@@ -903,6 +966,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
         return parseFunctionDefStatement(parser);
     } else if (strcmp(keyword, "return") == 0) {
         return parseReturnStatement(parser);
+    } else if (strcmp(keyword, "struct") == 0) {
+        return parseStructDefStatement(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
