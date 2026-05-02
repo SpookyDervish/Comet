@@ -227,7 +227,7 @@ ResultType(Nothing, charptr) visitProgram(CometCompiler* compiler, CometASTNode*
 ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, CometASTNode* node) {
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
 
-    ResultType(LLVMTypeRef, charptr) returnType = getType(compiler, funcDef.returnType->data.AST_TYPE_NAME.name);
+    ResultType(LLVMTypeRef, charptr) returnType = getType(compiler, funcDef.returnType->data.AST_IDENTIFIER.ident);
     if (returnType.error)
         return Error(Nothing, charptr, returnType.as.error);
 
@@ -236,7 +236,7 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
     for (size_t i = 0; i < funcDef.args.count; i++) {
         struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
 
-        ResultType(LLVMTypeRef, charptr) argType = getType(compiler, arg.type->data.AST_TYPE_NAME.name);
+        ResultType(LLVMTypeRef, charptr) argType = getType(compiler, arg.type->data.AST_IDENTIFIER.ident);
         if (argType.error)
             return Error(Nothing, charptr, argType.as.error);
 
@@ -326,7 +326,7 @@ ResultType(Nothing, charptr) visitExpressionStatement(CometCompiler* compiler, C
 ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, CometASTNode* node) {
     char* name = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
     CometASTNode* value = node->data.AST_ASSIGN_STATEMENT.expression;
-    char* type = node->data.AST_ASSIGN_STATEMENT.type->data.AST_TYPE_NAME.name;
+    char* type = node->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident;
 
     Record* varRecord = lookup(compiler->env, name);
     if (varRecord) {
@@ -487,7 +487,7 @@ ResultType(Nothing, charptr) visitForStatement(CometCompiler* compiler, CometAST
     struct AST_FOR_STATEMENT forLoop = node->data.AST_FOR_STATEMENT;
     char* identName = forLoop.ident->data.AST_IDENTIFIER.ident;
 
-    ResultType(LLVMTypeRef, charptr) varType = getType(compiler, forLoop.type->data.AST_TYPE_NAME.name);
+    ResultType(LLVMTypeRef, charptr) varType = getType(compiler, forLoop.type->data.AST_IDENTIFIER.ident);
     if (varType.error)
         return Error(Nothing, charptr, varType.as.error);
 
@@ -538,7 +538,7 @@ ResultType(Nothing, charptr) visitStructDefStatement(CometCompiler* compiler, Co
     List(LLVMTypeRef) fieldTypes = newList(LLVMTypeRef);
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldType = (*get(structDef.fieldDefs, i))->data.AST_ASSIGN_STATEMENT.type;
-        ResultType(LLVMTypeRef, charptr) llvmFieldType = getType(compiler, fieldType->data.AST_TYPE_NAME.name);
+        ResultType(LLVMTypeRef, charptr) llvmFieldType = getType(compiler, fieldType->data.AST_IDENTIFIER.ident);
         if (llvmFieldType.error)
             return Error(Nothing, charptr, llvmFieldType.as.error);
 

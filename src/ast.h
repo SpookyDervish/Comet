@@ -20,7 +20,6 @@ typedef enum {
     AST_DOUBLE,
     AST_STRING,
     AST_IDENTIFIER,
-    AST_TYPE_NAME,
     AST_FUNC_CALL,
 
     AST_ARG_DEF,
@@ -59,7 +58,6 @@ struct CometASTNode {
         struct AST_DOUBLE { double number; } AST_DOUBLE;
         struct AST_STRING { char* value; } AST_STRING;
         struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
-        struct AST_TYPE_NAME { char* name; } AST_TYPE_NAME;
         struct AST_FUNC_CALL { CometASTNode* ident; List(astNodePtr) args; } AST_FUNC_CALL;
 
         struct AST_ARG_DEF { CometASTNode* type; CometASTNode* ident; } AST_ARG_DEF;

@@ -234,7 +234,6 @@ void printNode(CometASTNode* node) {
         case AST_DOUBLE: printf("%f", node->data.AST_DOUBLE.number); break;
         case AST_STRING: printf("\"%s\"", node->data.AST_STRING.value); break;
         case AST_IDENTIFIER: printf("%s", node->data.AST_IDENTIFIER.ident); break;
-        case AST_TYPE_NAME: printf("%s", node->data.AST_TYPE_NAME.name); break;
             
         case AST_INFIX_EXPRESSION:
             printf("(");
@@ -486,7 +485,7 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
         if (expectType.error) {
             return Error(argList, charptr, expectType.as.error);
         }
-        CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+        CometASTNode* type = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
         ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
         if (expectArgName.error) {
@@ -545,10 +544,6 @@ ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser) {
 
 ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_STRING, parser->currentToken->value.literal));
-}
-
-ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal));
 }
 
 ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
@@ -722,7 +717,7 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
         return Error(astNodePtr, charptr, expectType.as.error);
     }
 
-    CometASTNode* type = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+    CometASTNode* type = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     ResultType(int, charptr) expectIdent = expectPeek(parser, CT_IDENT);
     if (expectIdent.error) {
@@ -901,7 +896,7 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
         return Error(astNodePtr, charptr, expectReturnType.as.error);
     }
 
-    CometASTNode* returnType = AST_NODE(AST_TYPE_NAME, parser->currentToken->value.literal);
+    CometASTNode* returnType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     isInline = peekTokenIs(parser, CT_INLINE_FUNC_ARROW);
 
