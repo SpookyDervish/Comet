@@ -1,13 +1,1 @@
-struct MyStruct {
-    int myField = 0
-    big blah = 123
-
-    init() {
-        print("init called!")
-    }
-}
-
-func main() -> int {
-    print("%lld\n", fib(6))
-    return 0
-}
+int x = test.x.y
