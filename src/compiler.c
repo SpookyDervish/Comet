@@ -319,28 +319,32 @@ ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, Comet
         return Error(Nothing, charptr, errMsg.str);
     }
 
-    ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
-    if (typeValuePair.error)
-        return Error(Nothing, charptr, typeValuePair.as.error);
+    
 
     ResultType(LLVMTypeRef, charptr) varAssignType = getType(compiler, type);
     if (varAssignType.error)
         return Error(Nothing, charptr, varAssignType.as.error);
 
-    if (varAssignType.as.success != typeValuePair.as.success.type) {
-        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varAssignType.as.success);
-        if (cast.error)
-            return Error(Nothing, charptr, cast.as.error);
 
-        typeValuePair.as.success.value = cast.as.success;
-        typeValuePair.as.success.type = varAssignType.as.success;
-    }
+    LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varAssignType.as.success, name);
 
-    if (!lookup(compiler->env, name)) {
-        LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varAssignType.as.success, name);
+    if (value) { // if we set an actual value or didnt assign one
+        ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
+        if (typeValuePair.error)
+            return Error(Nothing, charptr, typeValuePair.as.error);
+
+        if (varAssignType.as.success != typeValuePair.as.success.type) {
+            ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varAssignType.as.success);
+            if (cast.error)
+                return Error(Nothing, charptr, cast.as.error);
+
+            typeValuePair.as.success.value = cast.as.success;
+            typeValuePair.as.success.type = varAssignType.as.success;
+        }
         LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, ptr);
-        defineVar(compiler->env, name, ptr, varAssignType.as.success);
     }
+
+    defineVar(compiler->env, name, ptr, varAssignType.as.success);
 
     return Success(Nothing, charptr, {});
 }

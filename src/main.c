@@ -29,8 +29,6 @@ int main() {
 
     printNode(ast.as.success);
 
-    return 0;
-
     ResultType(cometCompilerPtr, charptr) compiler = createCompiler(parser.as.success);
     if (compiler.error) {
         printf("error while creating compiler: %s\n", compiler.as.error);

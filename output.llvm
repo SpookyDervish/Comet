@@ -1,45 +1,9 @@
 ; ModuleID = 'main'
 source_filename = "main"
 
-@str = private constant [6 x i8] c"%lld\0A\00"
-
 declare i32 @printf(ptr, ...)
-
-define i64 @fib(i64 %0) {
-fib_entry:
-  %n = alloca i64, align 8
-  store i64 %0, ptr %n, align 4
-  %n1 = load i64, ptr %n, align 4
-  %tmp = icmp eq i64 %n1, 0
-  br i1 %tmp, label %then, label %merge
-
-then:                                             ; preds = %fib_entry
-  ret i64 1
-  br label %merge
-
-merge:                                            ; preds = %then, %fib_entry
-  %n2 = load i64, ptr %n, align 4
-  %tmp3 = icmp eq i64 %n2, 1
-  br i1 %tmp3, label %then4, label %merge5
-
-then4:                                            ; preds = %merge
-  ret i64 1
-  br label %merge5
-
-merge5:                                           ; preds = %then4, %merge
-  %n6 = load i64, ptr %n, align 4
-  %tmp7 = sub i64 %n6, 1
-  %fib = call i64 @fib(i64 %tmp7)
-  %n8 = load i64, ptr %n, align 4
-  %tmp9 = sub i64 %n8, 2
-  %fib10 = call i64 @fib(i64 %tmp9)
-  %tmp11 = add i64 %fib, %fib10
-  ret i64 %tmp11
-}
 
 define i32 @main() {
 main_entry:
-  %fib = call i64 @fib(i32 6)
-  %print = call i32 (ptr, ...) @printf(ptr @str, i64 %fib)
   ret i32 0
 }
