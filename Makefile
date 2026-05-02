@@ -7,7 +7,7 @@ CXX=g++
 CFLAGS=-Wall -Wextra $(shell llvm-config --cflags)
 LDFLAGS=$(shell llvm-config --ldflags)
 LDLIBS=$(shell llvm-config --libs core) $(shell llvm-config --system-libs)
-DEBUG_CFLAGS=-Wall -Wextra -ggdb $(shell llvm-config --cflags)
+DEBUG_CFLAGS=-Wall -Wextra -ggdb $(shell llvm-config --cflags) -fsanitize=address -g
 
 TARGET=cometc
 

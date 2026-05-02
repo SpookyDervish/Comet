@@ -33,6 +33,7 @@ typedef CometCompiler* cometCompilerPtr;
 
 Result(CometTypeValuePair, charptr);
 Result(LLVMTypeRef, charptr);
+Result(LLVMValueRef, charptr);
 Result(cometCompilerPtr, charptr);
 
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser);

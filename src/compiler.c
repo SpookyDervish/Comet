@@ -24,6 +24,52 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
     return Error(LLVMTypeRef, charptr, "The type was not found!");
 }
 
+LLVMValueRef castInt(
+    LLVMBuilderRef builder,
+    LLVMValueRef value,
+    LLVMTypeRef targetType,
+    bool isSigned
+) {
+    LLVMTypeRef srcType = LLVMTypeOf(value);
+
+    unsigned srcBits = LLVMGetIntTypeWidth(srcType);
+    unsigned dstBits = LLVMGetIntTypeWidth(targetType);
+
+    if (srcBits == dstBits) {
+        return value;
+    }
+
+    if (srcBits < dstBits) {
+        return isSigned
+            ? LLVMBuildSExt(builder, value, targetType, "sext")
+            : LLVMBuildZExt(builder, value, targetType, "zext");
+    }
+
+    // narrowing
+    return LLVMBuildTrunc(builder, value, targetType, "trunc");
+}
+
+ResultType(LLVMValueRef, charptr) castToType(LLVMBuilderRef builder, LLVMValueRef value, LLVMTypeRef targetType) {
+    LLVMTypeRef srcType = LLVMTypeOf(value);
+    LLVMTypeKind srcTypeKind = LLVMGetTypeKind(srcType);
+
+    LLVMTypeKind targetTypeKind = LLVMGetTypeKind(targetType);
+
+    if (srcTypeKind == LLVMIntegerTypeKind) {
+        if (targetTypeKind == LLVMIntegerTypeKind)
+            return Success(LLVMValueRef, charptr, castInt(builder, value, targetType, true));
+        else if (targetTypeKind == LLVMFloatTypeKind || targetTypeKind == LLVMDoubleTypeKind) 
+            return Success(LLVMValueRef, charptr, LLVMBuildSIToFP(
+                builder,
+                value,
+                targetType,
+                "sitof"
+            ));
+    }
+
+    return Error(LLVMValueRef, charptr, "Cannot cast those types.");
+}
+
 ResultType(CometTypeValuePair, charptr) convertString(CometCompiler* compiler, char* str) {
     // replace escape sequences
     char* newStr = repl_str(str, "\\n", "\n");
@@ -219,6 +265,17 @@ ResultType(Nothing, charptr) visitReturnStatement(CometCompiler* compiler, Comet
     
     if (returnValue.error)
         return Error(Nothing, charptr, returnValue.as.error);
+
+    LLVMTypeRef funcType = LLVMGlobalGetValueType(compiler->currentFunction);
+    LLVMTypeRef returnType = LLVMGetReturnType(funcType);
+
+    if (returnValue.as.success.type != returnType) {
+        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, returnValue.as.success.value, returnType);
+        if (cast.error)
+            return Error(Nothing, charptr, cast.as.error);
+
+        returnValue.as.success.value = cast.as.success;
+    }
     
     LLVMBuildRet(compiler->builder, returnValue.as.success.value);
 
@@ -251,10 +308,12 @@ ResultType(Nothing, charptr) visitAssignStatement(CometCompiler* compiler, Comet
         return Error(Nothing, charptr, varAssignType.as.error);
 
     if (varAssignType.as.success != typeValuePair.as.success.type) {
-        Estr errMsg = CREATE_ESTR("Type mismatch when defining variable \"");
-        APPEND_ESTR(errMsg, name);
-        APPEND_ESTR(errMsg, "\"");
-        return Error(Nothing, charptr, errMsg.str);
+        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varAssignType.as.success);
+        if (cast.error)
+            return Error(Nothing, charptr, cast.as.error);
+
+        typeValuePair.as.success.value = cast.as.success;
+        typeValuePair.as.success.type = varAssignType.as.success;
     }
 
     if (!lookup(compiler->env, name)) {
@@ -283,10 +342,15 @@ ResultType(Nothing, charptr) visitReassignStatement(CometCompiler* compiler, Com
         return Error(Nothing, charptr, typeValuePair.as.error);
 
     if (typeValuePair.as.success.type != varRecord->type) {
-        Estr errMsg = CREATE_ESTR("You can't change the type of variable \"");
-        APPEND_ESTR(errMsg, name);
-        APPEND_ESTR(errMsg, "\" at runtime.");
-        return Error(Nothing, charptr, errMsg.str);
+        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varRecord->type);
+        if (cast.error) {
+            Estr errMsg = CREATE_ESTR("Attempt to change type of variable \"");
+            APPEND_ESTR(errMsg, name);
+            APPEND_ESTR(errMsg, "\" at runtime.");
+            return Error(Nothing, charptr, errMsg.str);
+        }
+
+        typeValuePair.as.success.value = cast.as.success;
     }
 
     LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, varRecord->ptr);
