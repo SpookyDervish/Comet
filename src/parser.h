@@ -42,7 +42,8 @@ typedef enum {
     PRECEDENCE_EXPONENT = 6,
     PRECEDENCE_PREFIX = 7,
     PRECEDENCE_CALL = 8,
-    PRECEDENCE_INDEX = 9,
+    PRECEDENCE_SET = 9,
+    PRECEDENCE_INDEX = 10
 } CometPrecedenceType;
 
 

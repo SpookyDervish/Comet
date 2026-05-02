@@ -1,1 +1,3 @@
-int x = test.x.y
+func main() -> int {
+    pos.pos2d.x = 123
+}
