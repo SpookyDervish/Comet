@@ -39,6 +39,8 @@ typedef enum {
     AST_FUNC_DEF_STATEMENT,
     AST_RETURN_STATEMENT,
     AST_STRUCT_DEF_STATEMENT,
+    AST_CONSTRUCTOR_DEF,
+    AST_AS_FUNC_DEV,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -100,6 +102,14 @@ struct CometASTNode {
             CometASTNode* constructor;
             CometASTNode* destructor;
         } AST_STRUCT_DEF_STATEMENT;
+        struct AST_CONSTRUCTOR_DEF {
+            CometASTNode* program;
+            List(astNodePtr) args;
+        } AST_CONSTRUCTOR_DEF;
+        struct AST_AS_FUNC_DEV {
+            CometASTNode* program;
+            CometASTNode* castType;
+        } AST_AS_FUNC_DEV;
 
     } data;  
 };

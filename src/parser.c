@@ -902,7 +902,32 @@ ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_RETURN_STATEMENT, expr.as.success));
 }
 
+ResultType(astNodePtr, charptr) parseConstructorDef(CometParser* parser) {
+    parserNextToken(parser);
+
+    ResultType(argList, charptr) constructorArgs = parseFunctionDefArgs(parser);
+    if (constructorArgs.error)
+        return Error(astNodePtr, charptr, constructorArgs.as.error);
+
+    ResultType(astNodePtr, charptr) body = parseBlockStatement(parser);
+    if (body.error)
+        return body;
+
+    CometASTNode* stmt = AST_NODE(AST_CONSTRUCTOR_DEF, body.as.success, constructorArgs.as.success);
+
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
+    // basic format:
+    // struct StructName {
+    //     int fieldName
+    //
+    //     init(int fieldName) {
+    //         self.fieldName = fieldName
+    //     }
+    // }
+
     ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error) {
         return Error(astNodePtr, charptr, expectName.as.error);
@@ -968,6 +993,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
         return parseReturnStatement(parser);
     } else if (strcmp(keyword, "struct") == 0) {
         return parseStructDefStatement(parser);
+    } else if (strcmp(keyword, "init") == 0) {
+        return parseConstructorDef(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);

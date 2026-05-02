@@ -1,6 +1,10 @@
 struct MyStruct {
     int myField = 0
     big blah = 123
+
+    init() {
+        
+    }
 }
 
 func main() -> int {

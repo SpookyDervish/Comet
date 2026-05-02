@@ -34,6 +34,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_WHILE_STATEMENT";
         case AST_FOR_STATEMENT:
             return "AST_FOR_STATEMENT";
+        case AST_CONSTRUCTOR_DEF:
+            return "AST_CONSTRUCTOR_DEF";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";
