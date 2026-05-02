@@ -3,7 +3,7 @@ struct MyStruct {
     big blah = 123
 
     init() {
-        
+        print("init called!")
     }
 }
 

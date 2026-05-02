@@ -345,6 +345,7 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_FOR_STATEMENT.program);
             printf("       } :for");
             break;
+
         case AST_STRUCT_DEF_STATEMENT:
             printf("struct ");
             printNode(node->data.AST_STRUCT_DEF_STATEMENT.ident);
@@ -357,7 +358,26 @@ void printNode(CometASTNode* node) {
                 printNode(*get(structDefs, i));
                 printf("\n");
             }
+
+            printf("\n");
+            printNode(node->data.AST_STRUCT_DEF_STATEMENT.constructor);
+            printf("\n");
+
             printf("       }");
+            break;
+        case AST_CONSTRUCTOR_DEF: 
+            printf("           init(");
+            for (size_t i = 0; i < node->data.AST_CONSTRUCTOR_DEF.args.count; i++) {
+                CometASTNode* arg = *get(node->data.AST_CONSTRUCTOR_DEF.args, i);
+                printNode(arg);
+
+                if (i < node->data.AST_CONSTRUCTOR_DEF.args.count-1)
+                    printf(", ");
+            }
+            printf(") {\n");
+            printNode(node->data.AST_CONSTRUCTOR_DEF.program);
+            printf("           }");
+
             break;
 
         default:
@@ -943,6 +963,7 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
     }
 
     struct AST_PROGRAM blockProgram = block.as.success->data.AST_PROGRAM;
+    CometASTNode* constructor = NULL;
 
     for (size_t i = 0; i < blockProgram.numStatements; i++) {
         CometASTNode* statement = blockProgram.statements[i];
@@ -950,6 +971,12 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         switch (statement->nodeType) {
             case AST_ASSIGN_STATEMENT: {
                 append(fieldDefs, statement);
+
+                break;
+            }
+
+            case AST_CONSTRUCTOR_DEF: {
+                constructor = statement;
 
                 break;
             }
@@ -968,7 +995,7 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         AST_STRUCT_DEF_STATEMENT,
         structName,
         fieldDefs,
-        NULL,
+        constructor,
         NULL
     );
     return Success(astNodePtr, charptr, stmt);
