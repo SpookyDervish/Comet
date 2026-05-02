@@ -37,6 +37,7 @@ char* getFileContents(const char* filename) {
 }
 
 
+// Thank you to https://creativeandcritical.net/str-replace-c for this function :)
 char *repl_str(const char *str, const char *from, const char *to) {
 
 	/* Adjust each of the below values to suit your needs. */
