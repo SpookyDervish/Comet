@@ -316,6 +316,11 @@ ResultType(Nothing, charptr) visitWhileStatement(CometCompiler* compiler, CometA
 
     LLVMBuildCondBr(compiler->builder, beforeCheck.as.success.value, whileLoopEntry, whileLoopOtherwise);
 
+    // create loop env
+    CometEnvironment* oldEnv = compiler->env;
+    CometEnvironment* newEnv = newEnvironment("loopEnv", compiler->env);
+    compiler->env = newEnv;
+
     // build loop body
     LLVMPositionBuilderAtEnd(compiler->builder, whileLoopEntry);
     ResultType(Nothing, charptr) bodyResult = compileBlock(compiler, body);
@@ -328,6 +333,29 @@ ResultType(Nothing, charptr) visitWhileStatement(CometCompiler* compiler, CometA
 
     LLVMBuildCondBr(compiler->builder, afterCheck.as.success.value, whileLoopEntry, whileLoopOtherwise);
     LLVMPositionBuilderAtEnd(compiler->builder, whileLoopOtherwise);
+
+    // reset env
+    compiler->env = oldEnv;
+    free(newEnv);
+
+    return Success(Nothing, charptr, {});
+}
+
+ResultType(Nothing, charptr) visitForStatement(CometCompiler* compiler, CometASTNode* node) {
+    struct AST_FOR_STATEMENT forLoop = node->data.AST_FOR_STATEMENT;
+    char* identName = forLoop.ident->data.AST_IDENTIFIER.ident;
+
+    ResultType(LLVMTypeRef, charptr) varType = getType(compiler, forLoop.type->data.AST_TYPE_NAME.name);
+    if (varType.error)
+        return Error(Nothing, charptr, varType.as.error);
+
+    ResultType(CometTypeValuePair, charptr) startValue = resolveValue(compiler, forLoop.start);
+    if (startValue.error)
+        return Error(Nothing, charptr, startValue.as.error);
+
+    LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varType.as.success, identName);
+    LLVMBuildStore(compiler->builder, startValue.as.success.value, ptr);
+    defineVar(compiler->env, identName, ptr, varType.as.success);
 
     return Success(Nothing, charptr, {});
 }

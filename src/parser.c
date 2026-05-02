@@ -134,7 +134,7 @@ ResultType(int, charptr) expectPeek(CometParser* parser, CometTokenType tokenTyp
         sprintf(buffer, "Expected next token to be %s but got <EOF> instead.", tokenTypeToCStr(tokenType));
         return Error(int, charptr, buffer);
     }
-    
+
     if (!peekTokenIs(parser, tokenType)) {
         char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got %s instead.", tokenTypeToCStr(tokenType), tokenTypeToCStr(parser->peekToken->type));
@@ -150,7 +150,9 @@ ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keyw
         return next;
     }
 
-    if (strcmp(parser->peekToken->value.literal, keyword) != 0) {
+    
+
+    if (strcmp(parser->currentToken->value.literal, keyword) != 0) {
         char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got %s instead.", keyword, parser->peekToken->value.literal);
         return Error(int, charptr, buffer);

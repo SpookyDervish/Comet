@@ -1,8 +1,7 @@
 func main() -> int {
-    int number = 0
-
-    while number < 10000
-        number = number + 1
+    for int i in 0..10 {
+        
+    }
     
     return 0
 }
