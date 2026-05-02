@@ -1,4 +1,0 @@
-func main() -> int {
-    int x = 123
-    return x
-}
