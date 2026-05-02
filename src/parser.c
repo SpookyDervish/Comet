@@ -27,11 +27,13 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
 ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser);
 ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser);
+ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser);
 ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser);
 const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_INT_LITERAL, parseIntLiteral},
     {CT_FLOAT_LITERAL, parseFloatLiteral},
+    {CT_STRING_LITERAL, parseStringLiteral},
     {CT_IDENT, parseIdentifier},
     {CT_OPEN_PAREN, parseGroupedExpression},
     {CT_TYPE_NAME, parseTypeName},
@@ -223,6 +225,7 @@ void printNode(CometASTNode* node) {
 
         case AST_INT: printf("%ld", node->data.AST_INT.number); break;
         case AST_DOUBLE: printf("%f", node->data.AST_DOUBLE.number); break;
+        case AST_STRING: printf("\"%s\"", node->data.AST_STRING.value); break;
         case AST_IDENTIFIER: printf("%s", node->data.AST_IDENTIFIER.ident); break;
         case AST_TYPE_NAME: printf("%s", node->data.AST_TYPE_NAME.name); break;
             
@@ -478,6 +481,10 @@ ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser) {
 
 ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_DOUBLE, parser->currentToken->value.doubleVal));
+}
+
+ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser) {
+    return Success(astNodePtr, charptr, AST_NODE(AST_STRING, parser->currentToken->value.literal));
 }
 
 ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser) {

@@ -23,6 +23,15 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
     return Error(LLVMTypeRef, charptr, "The type was not found!");
 }
 
+ResultType(CometTypeValuePair, charptr) convertString(CometCompiler* compiler, char* str) {
+    LLVMValueRef llvmString = LLVMConstStringInContext(compiler->context, str, strlen(str), true);
+    CometTypeValuePair res = {
+        .value = llvmString,
+        .type = LLVMTypeOf(llvmString)
+    };
+    return Success(CometTypeValuePair, charptr, res);
+}
+
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
 ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node);
 ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
@@ -50,6 +59,15 @@ ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, Co
                 LLVMConstReal(doubleType.as.success, node->data.AST_DOUBLE.number),
                 doubleType.as.success
             };
+            break;
+        }
+
+        case AST_STRING: {
+            ResultType(CometTypeValuePair, charptr) stringType = convertString(compiler, node->data.AST_STRING.value);
+            if (stringType.error)
+                return stringType;
+
+            res = stringType.as.success;
             break;
         }
 

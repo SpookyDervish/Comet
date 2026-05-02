@@ -248,7 +248,12 @@ ResultType(CometToken, charptr) lexerParseString(CometLexer* lexer, char startin
             buffer = newPtr;
         }
 
-        lexerConsume(lexer);
+        char peek = lexer->source[lexer->pos+1];
+        if (peek != startingQuote) {
+            lexerConsume(lexer);
+        } else {
+            break;
+        }
     }
     buffer[bufferPos] = 0;
 

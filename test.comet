@@ -1,8 +1,4 @@
 func main() -> int {
-    int counter = 0
-    for int i in 0..10 {
-        counter = counter + 1
-    }
-    
-    return counter
+    print("hi")
+    return 0
 }

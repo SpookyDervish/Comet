@@ -3,23 +3,38 @@ source_filename = "main"
 
 define i32 @main() {
 main_entry:
-  %counter = alloca i32, align 4
-  store i32 0, ptr %counter, align 4
+  %a = alloca i32, align 4
+  store i32 0, ptr %a, align 4
+  %b = alloca i32, align 4
+  store i32 1, ptr %b, align 4
+  %n = alloca i32, align 4
+  store i32 92, ptr %n, align 4
+  %n1 = load i32, ptr %n, align 4
   %i = alloca i32, align 4
   store i32 0, ptr %i, align 4
-  br i1 true, label %forLoopEntry, label %forLoopOtherwise
+  %tmp = icmp ne i32 0, %n1
+  br i1 %tmp, label %forLoopEntry, label %forLoopOtherwise
 
 forLoopEntry:                                     ; preds = %forLoopEntry, %main_entry
-  %counter1 = load i32, ptr %counter, align 4
-  %tmp = add i32 %counter1, 1
-  store i32 %tmp, ptr %counter, align 4
-  %i2 = load i32, ptr %i, align 4
-  %tmp3 = add i32 %i2, 1
-  %tmp4 = icmp ne i32 %tmp3, 10
-  store i32 %tmp3, ptr %i, align 4
-  br i1 %tmp4, label %forLoopEntry, label %forLoopOtherwise
+  %a2 = load i32, ptr %a, align 4
+  %b3 = load i32, ptr %b, align 4
+  %tmp4 = add i32 %a2, %b3
+  %temp = alloca i32, align 4
+  store i32 %tmp4, ptr %temp, align 4
+  %b5 = load i32, ptr %b, align 4
+  store i32 %b5, ptr %a, align 4
+  %temp6 = load i32, ptr %temp, align 4
+  store i32 %temp6, ptr %b, align 4
+  %i7 = load i32, ptr %i, align 4
+  %tmp8 = add i32 %i7, 1
+  store i32 %tmp8, ptr %i, align 4
+  %i9 = load i32, ptr %i, align 4
+  %tmp10 = add i32 %i9, 1
+  %tmp11 = icmp ne i32 %tmp10, %n1
+  store i32 %tmp10, ptr %i, align 4
+  br i1 %tmp11, label %forLoopEntry, label %forLoopOtherwise
 
 forLoopOtherwise:                                 ; preds = %forLoopEntry, %main_entry
-  %counter5 = load i32, ptr %counter, align 4
-  ret i32 %counter5
+  %a12 = load i32, ptr %a, align 4
+  ret i32 %a12
 }
