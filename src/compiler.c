@@ -24,6 +24,22 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
     return Error(LLVMTypeRef, charptr, "The type was not found!");
 }
 
+LLVMValuePair verifyInts(CometCompiler* compiler, LLVMValueRef a, LLVMValueRef b) {
+    LLVMTypeRef aType = LLVMTypeOf(a);
+    LLVMTypeRef bType = LLVMTypeOf(b);
+
+    unsigned aWidth = LLVMGetIntTypeWidth(aType);
+    unsigned bWidth = LLVMGetIntTypeWidth(bType);
+
+    if (aWidth < bWidth) {
+        a = LLVMBuildSExt(compiler->builder, a, bType, "cast");
+    } else {
+        b = LLVMBuildSExt(compiler->builder, b, aType, "cast");
+    }
+
+    return (LLVMValuePair){a, b};
+}
+
 LLVMValueRef castInt(
     LLVMBuilderRef builder,
     LLVMValueRef value,
@@ -231,7 +247,9 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
     LLVMPositionBuilderAtEnd(compiler->builder, entry);
 
     // setup func environment
-    compiler->env = newEnvironment(entryName.str, compiler->env);
+    CometEnvironment* oldEnv = compiler->env;
+    CometEnvironment* newEnv = newEnvironment(entryName.str, oldEnv);
+    compiler->env = newEnv;
     for (size_t i = 0; i < funcDef.args.count; i++) {
         // get arg and alloc space for it
         struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
@@ -255,6 +273,8 @@ ResultType(Nothing, charptr) visitFuncDefStatement(CometCompiler* compiler, Come
 
     // return to the old function
     compiler->currentFunction = parentFunc;
+    compiler->env = oldEnv;
+    free(newEnv);
 
     return Success(Nothing, charptr, {});
 }
@@ -500,11 +520,16 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
     ResultType(CometTypeValuePair, charptr) right = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.right);
     if (right.error) return Error(CometTypeValuePair, charptr, right.as.error);
 
+
     // performing an operation on two ints
     ResultType(LLVMTypeRef, charptr) type;
     LLVMValueRef value;
     if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
         type = getType(compiler, "int");
+
+        LLVMValuePair verified = verifyInts(compiler, left.as.success.value, right.as.success.value);
+        left.as.success.value = verified.a;
+        right.as.success.value = verified.b;
 
         switch (op.type) {
             case CT_PLUS: {
