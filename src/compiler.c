@@ -219,9 +219,9 @@ ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNo
             }
 
             CometValue result = {
-                .pointer = LLVMBuildLoad2(compiler->builder, varRecord->type, varRecord->ptr, varName),
+                .value = LLVMBuildLoad2(compiler->builder, varRecord->type, varRecord->ptr, varName),
                 .type = varRecord->type,
-                .isPointer = true
+                .isPointer = false
             };
             return Success(CometValue, charptr, result);
 
@@ -236,7 +236,30 @@ ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNo
 }
 
 ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, CometASTNode* node) {
-    
+    switch (node->nodeType) {
+        case AST_INFIX_EXPRESSION: {
+            return visitInfixExpression(compiler, node);
+        }
+
+        case AST_IDENTIFIER: {
+            char* varName = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(compiler->env, varName);
+            if (!varRecord) {
+                Estr errMsg = CREATE_ESTR("Undefined variable \"");
+                APPEND_ESTR(errMsg, varName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometValue, charptr, errMsg.str);
+            }
+
+            CometValue result = {
+                .pointer = varRecord->ptr,
+                .type = varRecord->type,
+                .isPointer = true
+            };
+            return Success(CometValue, charptr, result);
+            break;
+        }
+    }
 }
 
 ResultType(int, charptr) compileBlock(CometCompiler* compiler, CometASTNode* block) {
@@ -438,7 +461,7 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
             return Error(int, charptr, typeValuePair.as.error);
 
     if (left->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        ResultType(CometValue, charptr) structToChange = resolveValue(compiler, left->data.AST_INFIX_EXPRESSION.left);
+        ResultType(CometValue, charptr) structToChange = resolvePointerValue(compiler, left->data.AST_INFIX_EXPRESSION.left);
         if (structToChange.error)
             return Error(int, charptr, structToChange.as.error);
 
