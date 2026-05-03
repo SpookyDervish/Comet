@@ -5,11 +5,9 @@ struct Vector3 {
 
     init(int x, int y, int z) {
         print("constructor called!\n")
-        print("self = 0x%x\n", self)
         print("x = %d\n", x)
         print("y = %d\n", y)
         print("z = %d\n", z)
-        return self
     }
 }
 
