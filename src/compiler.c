@@ -9,6 +9,7 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 #include <llvm-c/Analysis.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -126,7 +127,7 @@ ResultType(LLVMValueRef, charptr) castToType(LLVMBuilderRef builder, LLVMValueRe
     return Error(LLVMValueRef, charptr, errMsg.str);
 }
 
-ResultType(CometTypeValuePair, charptr) convertString(CometCompiler* compiler, char* str) {
+ResultType(CometValue, charptr) convertString(CometCompiler* compiler, char* str) {
     // replace escape sequences
     char* newStr = repl_str(str, "\\n", "\n");
 
@@ -146,28 +147,29 @@ ResultType(CometTypeValuePair, charptr) convertString(CometCompiler* compiler, c
         2
     );
 
-    CometTypeValuePair res = {
+    CometValue res = {
         .value = ptr,
         .type = LLVMTypeOf(ptr)
     };
-    return Success(CometTypeValuePair, charptr, res);
+    return Success(CometValue, charptr, res);
 }
 
-ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
-ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node);
-ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compiler, CometASTNode* node);
-ResultType(CometTypeValuePair, charptr)resolveValue(CometCompiler* compiler, CometASTNode* node) {
-    CometTypeValuePair res;
+ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
+ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node);
+ResultType(CometValue, charptr) visitNewStatement(CometCompiler* compiler, CometASTNode* node);
+ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
+    CometValue res;
 
     switch (node->nodeType) {
         case AST_INT: {
             ResultType(LLVMTypeRef, charptr) intType = getType(compiler, "int");
             if (intType.error)
-                return Error(CometTypeValuePair, charptr, intType.as.error);
+                return Error(CometValue, charptr, intType.as.error);
 
-            res = (CometTypeValuePair){
+            res = (CometValue){
                 LLVMConstInt(intType.as.success, node->data.AST_INT.number, false),
-                intType.as.success
+                intType.as.success,
+                .isPointer = false
             };
             break;
         }
@@ -175,17 +177,18 @@ ResultType(CometTypeValuePair, charptr)resolveValue(CometCompiler* compiler, Com
         case AST_DOUBLE: {
             ResultType(LLVMTypeRef, charptr) doubleType = getType(compiler, "double");
             if (doubleType.error)
-                return Error(CometTypeValuePair, charptr, doubleType.as.error);
+                return Error(CometValue, charptr, doubleType.as.error);
 
-            res = (CometTypeValuePair){
+            res = (CometValue){
                 LLVMConstReal(doubleType.as.success, node->data.AST_DOUBLE.number),
-                doubleType.as.success
+                doubleType.as.success,
+                .isPointer = false
             };
             break;
         }
 
         case AST_STRING: {
-            ResultType(CometTypeValuePair, charptr) stringType = convertString(compiler, node->data.AST_STRING.value);
+            ResultType(CometValue, charptr) stringType = convertString(compiler, node->data.AST_STRING.value);
             if (stringType.error)
                 return stringType;
 
@@ -212,23 +215,28 @@ ResultType(CometTypeValuePair, charptr)resolveValue(CometCompiler* compiler, Com
                 Estr errMsg = CREATE_ESTR("Undefined variable \"");
                 APPEND_ESTR(errMsg, varName);
                 APPEND_ESTR(errMsg, "\"");
-                return Error(CometTypeValuePair, charptr, errMsg.str);
+                return Error(CometValue, charptr, errMsg.str);
             }
 
-            CometTypeValuePair result = {
-                .value = LLVMBuildLoad2(compiler->builder, varRecord->type, varRecord->ptr, varName),
-                .type = varRecord->type
+            CometValue result = {
+                .pointer = LLVMBuildLoad2(compiler->builder, varRecord->type, varRecord->ptr, varName),
+                .type = varRecord->type,
+                .isPointer = true
             };
-            return Success(CometTypeValuePair, charptr, result);
+            return Success(CometValue, charptr, result);
 
             break;
         }
 
         default:
-            return Error(CometTypeValuePair, charptr, "Unkown expression type.");
+            return Error(CometValue, charptr, "Unkown expression type.");
     }
 
-    return Success(CometTypeValuePair, charptr, res);
+    return Success(CometValue, charptr, res);
+}
+
+ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, CometASTNode* node) {
+    
 }
 
 ResultType(int, charptr) compileBlock(CometCompiler* compiler, CometASTNode* block) {
@@ -351,7 +359,7 @@ ResultType(int, charptr) visitFuncDefStatement(CometCompiler* compiler, CometAST
 
 ResultType(int, charptr) visitReturnStatement(CometCompiler* compiler, CometASTNode* node) {
     
-    ResultType(CometTypeValuePair, charptr) returnValue = resolveValue(compiler, node->data.AST_RETURN_STATEMENT.expression);
+    ResultType(CometValue, charptr) returnValue = resolveValue(compiler, node->data.AST_RETURN_STATEMENT.expression);
     
     if (returnValue.error)
         return Error(int, charptr, returnValue.as.error);
@@ -399,7 +407,7 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
     LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varAssignType.as.success, name);
 
     if (value) { // if we set an actual value or didnt assign one
-        ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
+        ResultType(CometValue, charptr) typeValuePair = resolveValue(compiler, value);
         if (typeValuePair.error)
             return Error(int, charptr, typeValuePair.as.error);
 
@@ -425,20 +433,14 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
 
     
 
-    ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
+    ResultType(CometValue, charptr) typeValuePair = resolveValue(compiler, value);
         if (typeValuePair.error)
             return Error(int, charptr, typeValuePair.as.error);
 
     if (left->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        ResultType(CometTypeValuePair, charptr) structToChange = resolveValue(compiler, left->data.AST_INFIX_EXPRESSION.left);
+        ResultType(CometValue, charptr) structToChange = resolveValue(compiler, left->data.AST_INFIX_EXPRESSION.left);
         if (structToChange.error)
             return Error(int, charptr, structToChange.as.error);
-
-        printf("left node = ");
-        printNode(left->data.AST_INFIX_EXPRESSION.left);
-        printf("\n");
-
-        printf("structToChange = %s\n", LLVMPrintValueToString(structToChange.as.success.value));
 
         char* fieldName = left->data.AST_INFIX_EXPRESSION.right->data.AST_IDENTIFIER.ident;
         StructInfo* structInfo = getStruct(compiler, structToChange.as.success.type);
@@ -460,16 +462,13 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
         LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
         LLVMValueRef index = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
-        LLVMValueRef structPtr = LLVMBuildAlloca(compiler->builder, structToChange.as.success.type, "");
-        LLVMBuildStore(compiler->builder, structToChange.as.success.value,  structPtr);
-
         Estr ptrName = CREATE_ESTR(fieldName);
         APPEND_ESTR(ptrName, "FieldPtr");
 
         LLVMValueRef ptr = LLVMBuildGEP2(
             compiler->builder,
             structToChange.as.success.type,
-            structPtr,
+            structToChange.as.success.pointer,
             (LLVMValueRef[]){ zero, index },
             2,
             ptrName.str
@@ -477,7 +476,7 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
 
         LLVMBuildStore(
             compiler->builder,
-            typeValuePair.as.success.value,
+            typeValuePair.as.success.pointer,
             ptr
         );
 
@@ -517,7 +516,7 @@ ResultType(int, charptr) visitIfStatement(CometCompiler* compiler, CometASTNode*
     CometASTNode* consequence = node->data.AST_IF_STATEMENT.program;
     CometASTNode* otherwise = node->data.AST_IF_STATEMENT.elseProgram;
 
-    ResultType(CometTypeValuePair, charptr) result = resolveValue(compiler, condition);
+    ResultType(CometValue, charptr) result = resolveValue(compiler, condition);
     if (result.error)
         return Error(int, charptr, result.as.error);
 
@@ -564,7 +563,7 @@ ResultType(int, charptr) visitWhileStatement(CometCompiler* compiler, CometASTNo
     CometASTNode* condition = node->data.AST_WHILE_STATEMENT.expression;
     CometASTNode* body = node->data.AST_WHILE_STATEMENT.program;
 
-    ResultType(CometTypeValuePair, charptr) beforeCheck = resolveValue(compiler, condition);
+    ResultType(CometValue, charptr) beforeCheck = resolveValue(compiler, condition);
     if (beforeCheck.error)
         return Error(int, charptr, beforeCheck.as.error);
 
@@ -584,7 +583,7 @@ ResultType(int, charptr) visitWhileStatement(CometCompiler* compiler, CometASTNo
     if (bodyResult.error)
         return Error(int, charptr, bodyResult.as.error);
 
-    ResultType(CometTypeValuePair, charptr) afterCheck = resolveValue(compiler, condition);
+    ResultType(CometValue, charptr) afterCheck = resolveValue(compiler, condition);
     if (afterCheck.error)
         return Error(int, charptr, afterCheck.as.error);
 
@@ -606,15 +605,15 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
     if (varType.error)
         return Error(int, charptr, varType.as.error);
 
-    ResultType(CometTypeValuePair, charptr) startValue = resolveValue(compiler, forLoop.start);
+    ResultType(CometValue, charptr) startValue = resolveValue(compiler, forLoop.start);
     if (startValue.error)
         return Error(int, charptr, startValue.as.error);
 
-    ResultType(CometTypeValuePair, charptr) endValue = resolveValue(compiler, forLoop.end);
+    ResultType(CometValue, charptr) endValue = resolveValue(compiler, forLoop.end);
     if (endValue.error)
         return Error(int, charptr, endValue.as.error);
 
-    ResultType(CometTypeValuePair, charptr) stepValue = resolveValue(compiler, forLoop.step);
+    ResultType(CometValue, charptr) stepValue = resolveValue(compiler, forLoop.step);
     if (stepValue.error)
         return Error(int, charptr, stepValue.as.error);
 
@@ -703,7 +702,6 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
 
     // allocate self
     LLVMValueRef selfValue = LLVMGetParam(function, 0);
-    printf("selfValue = %s\n", LLVMPrintValueToString(selfValue));
     LLVMValueRef selfPtr = LLVMBuildAlloca(compiler->builder, structType, "self");
     LLVMBuildStore(compiler->builder, selfValue, selfPtr);
     defineVar(compiler->env, "self", selfPtr, structType);
@@ -767,7 +765,8 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
         StructField fieldInfo = {
             .index = i,
             .llvmType = llvmFieldType.as.success,
-            .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident
+            .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident,
+            .isPointer = false
         };
         append(structInfoFields, fieldInfo);
     }
@@ -801,24 +800,25 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
 }
 
 // -- EXPRESSIONS -- //
-ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
+ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node) {
     CometToken op = node->data.AST_INFIX_EXPRESSION.op;
 
-    ResultType(CometTypeValuePair, charptr) left = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
-    if (left.error) return Error(CometTypeValuePair, charptr, left.as.error);
-    ResultType(CometTypeValuePair, charptr) right = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.right);
+    ResultType(CometValue, charptr) left = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
+    if (left.error) return Error(CometValue, charptr, left.as.error);
+    ResultType(CometValue, charptr) right = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.right);
 
 
     // performing an operation on two ints
     ResultType(LLVMTypeRef, charptr) type;
     LLVMValueRef value;
+    bool isPointer = false;
 
     if (LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind) {
         switch (op.type) {
             case CT_DOT: {
                 StructInfo* structInfo = getStruct(compiler, left.as.success.type);
                 if (structInfo == NULL) {
-                    return Error(CometTypeValuePair, charptr, "Attempt to get field of something that isn't a struct.");
+                    return Error(CometValue, charptr, "Attempt to get field of something that isn't a struct.");
                 }
 
                 char* fieldName = node->data.AST_INFIX_EXPRESSION.right->data.AST_IDENTIFIER.ident;
@@ -830,19 +830,18 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
                     APPEND_ESTR(errMsg, fieldName);
                     APPEND_ESTR(errMsg, "\"");
 
-                    return Error(CometTypeValuePair, charptr, errMsg.str);
+                    return Error(CometValue, charptr, errMsg.str);
                 }
 
                 LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
                 LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
-                LLVMValueRef structPtr = LLVMBuildAlloca(compiler->builder, left.as.success.type, "");
-                LLVMBuildStore(compiler->builder, left.as.success.value, structPtr);
+                printf("ptr = %s\n", LLVMPrintValueToString(left.as.success.pointer));
 
                 LLVMValueRef ptr = LLVMBuildGEP2(
                     compiler->builder,
                     left.as.success.type,
-                    structPtr,
+                    left.as.success.pointer,
                     (LLVMValueRef[]){ zero, index },
                     2,
                     "structAccess"
@@ -854,6 +853,8 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
                     ptr,
                     ""
                 );
+                
+                isPointer = true;
 
                 type = Success(LLVMTypeRef, charptr, fieldInfo->llvmType);
 
@@ -865,13 +866,13 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
                 APPEND_ESTR(errMsg, LLVMPrintTypeToString(right.as.success.type));
                 APPEND_ESTR(errMsg, "!");
 
-                return Error(CometTypeValuePair, charptr, errMsg.str);
+                return Error(CometValue, charptr, errMsg.str);
             }
         }
     } else {
         if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
 
-            if (right.error) return Error(CometTypeValuePair, charptr, right.as.error);
+            if (right.error) return Error(CometValue, charptr, right.as.error);
 
             type = getType(compiler, "int");
 
@@ -926,23 +927,35 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
                 }
 
                 default:
-                    return Error(CometTypeValuePair, charptr, "Unexpected operator for int and int!");
+                    return Error(CometValue, charptr, "Unexpected operator for int and int!");
             }
         } else {
-            return Error(CometTypeValuePair, charptr, "Cannot perform operation on those types.");
+            return Error(CometValue, charptr, "Cannot perform operation on those types.");
         }
     }
 
     if (type.error)
-        return Error(CometTypeValuePair, charptr, type.as.error);
+        return Error(CometValue, charptr, type.as.error);
 
-    CometTypeValuePair result = {
-        value, type.as.success
-    };
-    return Success(CometTypeValuePair, charptr, result);
+    CometValue result;
+    if (!isPointer) {
+        result = (CometValue){
+            .value = value,
+            .type = type.as.success,
+            .isPointer = false
+        };
+    } else {
+        result = (CometValue){
+            .pointer = value,
+            .type = type.as.success,
+            .isPointer = true
+        };
+    }
+
+    return Success(CometValue, charptr, result);
 }
 
-ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node) {
+ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node) {
     struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
     char* funcName = funcCall.ident->data.AST_IDENTIFIER.ident;
 
@@ -952,12 +965,12 @@ ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, C
         APPEND_ESTR(errMsg, funcName);
         APPEND_ESTR(errMsg, "\"");
 
-        return Error(CometTypeValuePair, charptr, errMsg.str);
+        return Error(CometValue, charptr, errMsg.str);
     }
 
     List(LLVMValueRef) argValues = newList(LLVMValueRef);
     for (size_t i = 0; i < funcCall.args.count; i++) {
-        ResultType(CometTypeValuePair, charptr) arg = resolveValue(compiler, *get(funcCall.args, i));
+        ResultType(CometValue, charptr) arg = resolveValue(compiler, *get(funcCall.args, i));
         if (arg.error)
             return arg;
 
@@ -965,22 +978,22 @@ ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, C
     }
 
     LLVMValueRef returnValue = LLVMBuildCall2(compiler->builder, funcRecord->type, funcRecord->ptr, argValues.pointer, argValues.count, funcName);
-    CometTypeValuePair result = {
+    CometValue result = {
         .value = returnValue,
         .type = LLVMGetReturnType(funcRecord->type)
     };
 
-    return Success(CometTypeValuePair, charptr, result);
+    return Success(CometValue, charptr, result);
 }
 
 
-ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compiler, CometASTNode* node) {
+ResultType(CometValue, charptr) visitNewStatement(CometCompiler* compiler, CometASTNode* node) {
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
     char* structName = newStmt.structName->data.AST_IDENTIFIER.ident;
 
     ResultType(LLVMTypeRef, charptr) structType = getType(compiler, structName);
     if (structType.error)
-        return Error(CometTypeValuePair, charptr, structType.as.error);
+        return Error(CometValue, charptr, structType.as.error);
 
     // get constructor
     Estr constructorName = CREATE_ESTR(structName);
@@ -991,7 +1004,7 @@ ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compile
         Estr errMsg = CREATE_ESTR("Cannot use new on the struct \"");
         APPEND_ESTR(errMsg, structName);
         APPEND_ESTR(errMsg, "\" because it has no constructor.");
-        return Error(CometTypeValuePair, charptr, errMsg.str);
+        return Error(CometValue, charptr, errMsg.str);
     }
 
     // get constructor info
@@ -1007,7 +1020,7 @@ ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compile
     append(argValues, self);
 
     for (size_t i = 0; i < newStmt.args.count; i++) {
-        ResultType(CometTypeValuePair, charptr) arg = resolveValue(compiler, *get(newStmt.args, i));
+        ResultType(CometValue, charptr) arg = resolveValue(compiler, *get(newStmt.args, i));
         if (arg.error)
             return arg;
 
@@ -1015,12 +1028,12 @@ ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compile
     }
 
     LLVMValueRef returnValue = LLVMBuildCall2(compiler->builder, constructorType, constructor, argValues.pointer, argValues.count, "");
-    CometTypeValuePair result = {
+    CometValue result = {
         .value = self,
         .type = structType.as.success
     };
 
-    return Success(CometTypeValuePair, charptr, result);
+    return Success(CometValue, charptr, result);
 }
  
 // -- MAIN --//
@@ -1122,14 +1135,14 @@ ResultType(int, charptr) compile(CometCompiler* compiler, CometASTNode* node) {
             return visitStructDefStatement(compiler, node);
 
         case AST_INFIX_EXPRESSION: {
-            ResultType(CometTypeValuePair, charptr) result = visitInfixExpression(compiler, node);
+            ResultType(CometValue, charptr) result = visitInfixExpression(compiler, node);
             if (result.error)
                 return Error(int, charptr, result.as.error);
 
             return Success(int, charptr, false);
         }
         case AST_FUNC_CALL: {
-            ResultType(CometTypeValuePair, charptr) result = visitFuncCall(compiler, node);
+            ResultType(CometValue, charptr) result = visitFuncCall(compiler, node);
             if (result.error)
                 return Error(int, charptr, result.as.error);
 

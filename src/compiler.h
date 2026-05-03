@@ -20,8 +20,9 @@ typedef struct {
 typedef struct {
     LLVMValueRef value;
     LLVMTypeRef type;
+    LLVMValueRef pointer;
     bool isPointer;
-} CometTypeValuePair;
+} CometValue;
 
 typedef struct {
     LLVMValueRef a;
@@ -44,7 +45,7 @@ typedef struct {
 } CometCompiler;
 typedef CometCompiler* cometCompilerPtr;
 
-Result(CometTypeValuePair, charptr);
+Result(CometValue, charptr);
 Result(LLVMTypeRef, charptr);
 Result(LLVMValueRef, charptr);
 Result(cometCompilerPtr, charptr);
