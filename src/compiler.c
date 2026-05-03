@@ -316,7 +316,6 @@ ResultType(int, charptr) visitFuncDefStatement(CometCompiler* compiler, CometAST
     if (bodyResult.error)
         return Error(int, charptr, bodyResult.as.error);
     doesReturn = bodyResult.as.success;
-    printf("doesReturn = %d\n", doesReturn);
 
     // make sure the function returns
     if (!doesReturn) {
