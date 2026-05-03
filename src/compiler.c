@@ -3,6 +3,7 @@
 #include "environment.h"
 #include "lexer.h"
 #include "parser.h"
+#include "struct.h"
 #include "token.h"
 #include "util.h"
 #include <llvm-c/Core.h>
@@ -41,6 +42,18 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
     APPEND_ESTR(errMsg, typeName);
     APPEND_ESTR(errMsg, "\" was not found!");
     return Error(LLVMTypeRef, charptr, errMsg.str);
+}
+
+StructInfo* getStruct(CometCompiler* compiler, LLVMTypeRef structType) {
+    for (size_t i = 0; i < compiler->structs.count; i++) {
+        StructInfo* structInfo = get(compiler->structs, i);
+
+        if (structInfo->llvmType == structType) {
+            return structInfo;
+        }
+    }
+
+    return NULL;
 }
 
 LLVMValuePair verifyInts(CometCompiler* compiler, LLVMValueRef a, LLVMValueRef b) {
@@ -143,7 +156,7 @@ ResultType(CometTypeValuePair, charptr) convertString(CometCompiler* compiler, c
 ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* compiler, CometASTNode* node);
 ResultType(CometTypeValuePair, charptr) visitFuncCall(CometCompiler* compiler, CometASTNode* node);
 ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compiler, CometASTNode* node);
-ResultType(CometTypeValuePair, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node) {
+ResultType(CometTypeValuePair, charptr)resolveValue(CometCompiler* compiler, CometASTNode* node) {
     CometTypeValuePair res;
 
     switch (node->nodeType) {
@@ -304,7 +317,6 @@ ResultType(int, charptr) visitFuncDefStatement(CometCompiler* compiler, CometAST
         LLVMTypeRef argType = *get(argTypes, i);
 
         LLVMValueRef argValue = LLVMGetParam(function, i);
-
         LLVMValueRef argPtr = LLVMBuildAlloca(compiler->builder, argType, argName);
         LLVMBuildStore(compiler->builder, argValue, argPtr);
 
@@ -408,34 +420,94 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
 }
 
 ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometASTNode* node) {
-    char* name = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-    CometASTNode* value = node->data.AST_ASSIGN_STATEMENT.expression;
+    CometASTNode* left = node->data.AST_REASSIGN_STATEMENT.ident;
+    CometASTNode* value = node->data.AST_REASSIGN_STATEMENT.expression;
 
-    Record* varRecord = lookup(compiler->env, name);
-    if (!varRecord) {
-        Estr errMsg = CREATE_ESTR("Undefined variable \"");
-        APPEND_ESTR(errMsg, name);
-        APPEND_ESTR(errMsg, "\"");
-        return Error(int, charptr, errMsg.str);
-    }
+    
 
     ResultType(CometTypeValuePair, charptr) typeValuePair = resolveValue(compiler, value);
-    if (typeValuePair.error)
-        return Error(int, charptr, typeValuePair.as.error);
+        if (typeValuePair.error)
+            return Error(int, charptr, typeValuePair.as.error);
 
-    if (typeValuePair.as.success.type != varRecord->type) {
-        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varRecord->type);
-        if (cast.error) {
-            Estr errMsg = CREATE_ESTR("Attempt to change type of variable \"");
-            APPEND_ESTR(errMsg, name);
-            APPEND_ESTR(errMsg, "\" at runtime.");
+    if (left->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
+        ResultType(CometTypeValuePair, charptr) structToChange = resolveValue(compiler, left->data.AST_INFIX_EXPRESSION.left);
+        if (structToChange.error)
+            return Error(int, charptr, structToChange.as.error);
+
+        printf("left node = ");
+        printNode(left->data.AST_INFIX_EXPRESSION.left);
+        printf("\n");
+
+        printf("structToChange = %s\n", LLVMPrintValueToString(structToChange.as.success.value));
+
+        char* fieldName = left->data.AST_INFIX_EXPRESSION.right->data.AST_IDENTIFIER.ident;
+        StructInfo* structInfo = getStruct(compiler, structToChange.as.success.type);
+        if (structInfo == NULL) {
+            return Error(int, charptr, "Attempt to get field of something that isn't a struct.");
+        }
+
+        StructField* fieldInfo = findField(*structInfo, fieldName);
+        if (fieldInfo == NULL) {
+            Estr errMsg = CREATE_ESTR("The struct \"");
+            APPEND_ESTR(errMsg, structInfo->name);
+            APPEND_ESTR(errMsg, "\" does not have the field \"");
+            APPEND_ESTR(errMsg, fieldName);
+            APPEND_ESTR(errMsg, "\"");
+
             return Error(int, charptr, errMsg.str);
         }
 
-        typeValuePair.as.success.value = cast.as.success;
-    }
+        LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
+        LLVMValueRef index = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
-    LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, varRecord->ptr);
+        LLVMValueRef structPtr = LLVMBuildAlloca(compiler->builder, structToChange.as.success.type, "");
+        LLVMBuildStore(compiler->builder, structToChange.as.success.value,  structPtr);
+
+        Estr ptrName = CREATE_ESTR(fieldName);
+        APPEND_ESTR(ptrName, "FieldPtr");
+
+        LLVMValueRef ptr = LLVMBuildGEP2(
+            compiler->builder,
+            structToChange.as.success.type,
+            structPtr,
+            (LLVMValueRef[]){ zero, index },
+            2,
+            ptrName.str
+        );
+
+        LLVMBuildStore(
+            compiler->builder,
+            typeValuePair.as.success.value,
+            ptr
+        );
+
+    } else { // var reassign
+        char* name = left->data.AST_IDENTIFIER.ident;
+        Record* varRecord = lookup(compiler->env, name);
+        if (!varRecord) {
+            Estr errMsg = CREATE_ESTR("Undefined variable \"");
+            APPEND_ESTR(errMsg, name);
+            APPEND_ESTR(errMsg, "\"");
+            return Error(int, charptr, errMsg.str);
+        }
+
+        if (typeValuePair.as.success.type != varRecord->type) {
+            ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varRecord->type);
+            if (cast.error) {
+                Estr errMsg = CREATE_ESTR("Attempt to change type of variable \"");
+                APPEND_ESTR(errMsg, name);
+                APPEND_ESTR(errMsg, "\" at runtime.");
+                return Error(int, charptr, errMsg.str);
+            }
+
+            typeValuePair.as.success.value = cast.as.success;
+        }
+
+        LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, varRecord->ptr);
+    }
+    
+
+    
 
     return Success(int, charptr, false);
 }
@@ -553,7 +625,7 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
     LLVMBasicBlockRef forLoopEntry = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "forLoopEntry");
     LLVMBasicBlockRef forLoopOtherwise = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "forLoopOtherwise");
 
-    LLVMValueRef isNotEqual = LLVMBuildICmp(compiler->builder, LLVMIntNE, startValue.as.success.value, endValue.as.success.value, "tmp");
+    LLVMValueRef isNotEqual = LLVMBuildICmp(compiler->builder, LLVMIntNE, startValue.as.success.value, endValue.as.success.value, "");
     LLVMBuildCondBr(compiler->builder, isNotEqual, forLoopEntry, forLoopOtherwise);
 
     LLVMPositionBuilderAtEnd(compiler->builder, forLoopEntry);
@@ -564,8 +636,8 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
     
 
     LLVMValueRef iteratorValue = LLVMBuildLoad2(compiler->builder, varType.as.success, ptr, identName);
-    LLVMValueRef afterAdd = LLVMBuildAdd(compiler->builder, iteratorValue, stepValue.as.success.value, "tmp");
-    isNotEqual = LLVMBuildICmp(compiler->builder, LLVMIntNE, afterAdd, endValue.as.success.value, "tmp");
+    LLVMValueRef afterAdd = LLVMBuildAdd(compiler->builder, iteratorValue, stepValue.as.success.value, "");
+    isNotEqual = LLVMBuildICmp(compiler->builder, LLVMIntNE, afterAdd, endValue.as.success.value, "");
     LLVMBuildStore(compiler->builder, afterAdd, ptr);
 
     LLVMBuildCondBr(compiler->builder, isNotEqual, forLoopEntry, forLoopOtherwise);
@@ -631,9 +703,12 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
 
     // allocate self
     LLVMValueRef selfValue = LLVMGetParam(function, 0);
+    printf("selfValue = %s\n", LLVMPrintValueToString(selfValue));
     LLVMValueRef selfPtr = LLVMBuildAlloca(compiler->builder, structType, "self");
     LLVMBuildStore(compiler->builder, selfValue, selfPtr);
     defineVar(compiler->env, "self", selfPtr, structType);
+
+    
 
     // allocate rest of args
     for (size_t i = 0; i < funcDef.args.count; i++) {
@@ -648,6 +723,8 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
 
         LLVMValueRef argPtr = LLVMBuildAlloca(compiler->builder, argType, argName);
         LLVMBuildStore(compiler->builder, argValue, argPtr);
+
+        
 
         // add env var for it
         defineVar(compiler->env, argName, argPtr, argType);
@@ -674,19 +751,39 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
     char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
 
+    List(StructField) structInfoFields = newList(StructField);
     List(LLVMTypeRef) fieldTypes = newList(LLVMTypeRef);
+
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
-        CometASTNode* fieldType = (*get(structDef.fieldDefs, i))->data.AST_ASSIGN_STATEMENT.type;
+        CometASTNode* fieldNode = (*get(structDef.fieldDefs, i));
+        CometASTNode* fieldType = fieldNode->data.AST_ASSIGN_STATEMENT.type;
+
         ResultType(LLVMTypeRef, charptr) llvmFieldType = getType(compiler, fieldType->data.AST_IDENTIFIER.ident);
         if (llvmFieldType.error)
             return Error(int, charptr, llvmFieldType.as.error);
 
         append(fieldTypes, llvmFieldType.as.success);
+
+        StructField fieldInfo = {
+            .index = i,
+            .llvmType = llvmFieldType.as.success,
+            .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident
+        };
+        append(structInfoFields, fieldInfo);
     }
+
+    
 
     LLVMTypeRef structType = LLVMStructCreateNamed(compiler->context, structName);
     LLVMStructSetBody(structType, fieldTypes.pointer, fieldTypes.count, false);
     
+    StructInfo structInfo = {
+        .llvmType = structType,
+        .name = structName,
+        .fields = structInfoFields
+    };
+    append(compiler->structs, structInfo);
+
     CometLLVMTypePair newPair = {
         .typeName = structDef.ident->data.AST_IDENTIFIER.ident,
         .llvmType = structType
@@ -710,70 +807,130 @@ ResultType(CometTypeValuePair, charptr) visitInfixExpression(CometCompiler* comp
     ResultType(CometTypeValuePair, charptr) left = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
     if (left.error) return Error(CometTypeValuePair, charptr, left.as.error);
     ResultType(CometTypeValuePair, charptr) right = resolveValue(compiler, node->data.AST_INFIX_EXPRESSION.right);
-    if (right.error) return Error(CometTypeValuePair, charptr, right.as.error);
 
 
     // performing an operation on two ints
     ResultType(LLVMTypeRef, charptr) type;
     LLVMValueRef value;
-    if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
-        type = getType(compiler, "int");
 
-        LLVMValuePair verified = verifyInts(compiler, left.as.success.value, right.as.success.value);
-        left.as.success.value = verified.a;
-        right.as.success.value = verified.b;
-
+    if (LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind) {
         switch (op.type) {
-            case CT_PLUS: {
-                // we pass NULL to let LLVM decide the name of the SSA output
-                value = LLVMBuildAdd(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_MINUS: {
-                value = LLVMBuildSub(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_TIMES: {
-                value = LLVMBuildMul(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_DIVIDE: {
-                value = LLVMBuildSDiv(compiler->builder, left.as.success.value, right.as.success.value, "tmp");
+            case CT_DOT: {
+                StructInfo* structInfo = getStruct(compiler, left.as.success.type);
+                if (structInfo == NULL) {
+                    return Error(CometTypeValuePair, charptr, "Attempt to get field of something that isn't a struct.");
+                }
+
+                char* fieldName = node->data.AST_INFIX_EXPRESSION.right->data.AST_IDENTIFIER.ident;
+                StructField* fieldInfo = findField(*structInfo, fieldName);
+                if (fieldInfo == NULL) {
+                    Estr errMsg = CREATE_ESTR("The struct \"");
+                    APPEND_ESTR(errMsg, structInfo->name);
+                    APPEND_ESTR(errMsg, "\" does not have the field \"");
+                    APPEND_ESTR(errMsg, fieldName);
+                    APPEND_ESTR(errMsg, "\"");
+
+                    return Error(CometTypeValuePair, charptr, errMsg.str);
+                }
+
+                LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
+                LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
+
+                LLVMValueRef structPtr = LLVMBuildAlloca(compiler->builder, left.as.success.type, "");
+                LLVMBuildStore(compiler->builder, left.as.success.value, structPtr);
+
+                LLVMValueRef ptr = LLVMBuildGEP2(
+                    compiler->builder,
+                    left.as.success.type,
+                    structPtr,
+                    (LLVMValueRef[]){ zero, index },
+                    2,
+                    "structAccess"
+                );
+
+                value = LLVMBuildLoad2(
+                    compiler->builder,
+                    fieldInfo->llvmType,
+                    ptr,
+                    ""
+                );
+
+                type = Success(LLVMTypeRef, charptr, fieldInfo->llvmType);
+
                 break;
             }
 
-            // conditionals
-            case CT_EQ_EQ: {
-                type = getType(compiler, "bool");
-                value = LLVMBuildICmp(compiler->builder, LLVMIntEQ, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_LT: {
-                type = getType(compiler, "bool");
-                value = LLVMBuildICmp(compiler->builder, LLVMIntSLT, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_LTE: {
-                type = getType(compiler, "bool");
-                value = LLVMBuildICmp(compiler->builder, LLVMIntULE, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_GT: {
-                type = getType(compiler, "bool");
-                value = LLVMBuildICmp(compiler->builder, LLVMIntSGT, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
-            case CT_GTE: {
-                type = getType(compiler, "bool");
-                value = LLVMBuildICmp(compiler->builder, LLVMIntUGE, left.as.success.value, right.as.success.value, "tmp");
-                break;
-            }
+            default: {
+                Estr errMsg = CREATE_ESTR("Unexpected operator for struct and ");
+                APPEND_ESTR(errMsg, LLVMPrintTypeToString(right.as.success.type));
+                APPEND_ESTR(errMsg, "!");
 
-            default:
-                return Error(CometTypeValuePair, charptr, "Unexpected operator for int and int!");
+                return Error(CometTypeValuePair, charptr, errMsg.str);
+            }
         }
     } else {
-        return Error(CometTypeValuePair, charptr, "Cannot perform operation on those types.");
+        if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
+
+            if (right.error) return Error(CometTypeValuePair, charptr, right.as.error);
+
+            type = getType(compiler, "int");
+
+            LLVMValuePair verified = verifyInts(compiler, left.as.success.value, right.as.success.value);
+            left.as.success.value = verified.a;
+            right.as.success.value = verified.b;
+
+            switch (op.type) {
+                case CT_PLUS: {
+                    // we pass NULL to let LLVM decide the name of the SSA output
+                    value = LLVMBuildAdd(compiler->builder, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_MINUS: {
+                    value = LLVMBuildSub(compiler->builder, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_TIMES: {
+                    value = LLVMBuildMul(compiler->builder, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_DIVIDE: {
+                    value = LLVMBuildSDiv(compiler->builder, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+
+                // conditionals
+                case CT_EQ_EQ: {
+                    type = getType(compiler, "bool");
+                    value = LLVMBuildICmp(compiler->builder, LLVMIntEQ, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_LT: {
+                    type = getType(compiler, "bool");
+                    value = LLVMBuildICmp(compiler->builder, LLVMIntSLT, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_LTE: {
+                    type = getType(compiler, "bool");
+                    value = LLVMBuildICmp(compiler->builder, LLVMIntULE, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_GT: {
+                    type = getType(compiler, "bool");
+                    value = LLVMBuildICmp(compiler->builder, LLVMIntSGT, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+                case CT_GTE: {
+                    type = getType(compiler, "bool");
+                    value = LLVMBuildICmp(compiler->builder, LLVMIntUGE, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
+
+                default:
+                    return Error(CometTypeValuePair, charptr, "Unexpected operator for int and int!");
+            }
+        } else {
+            return Error(CometTypeValuePair, charptr, "Cannot perform operation on those types.");
+        }
     }
 
     if (type.error)
@@ -846,7 +1003,7 @@ ResultType(CometTypeValuePair, charptr) visitNewStatement(CometCompiler* compile
     List(LLVMValueRef) argValues = newList(LLVMValueRef);
 
     // create self
-    LLVMValueRef self = LLVMBuildAlloca(compiler->builder, structType.as.success, "self");
+    LLVMValueRef self = LLVMBuildAlloca(compiler->builder, structType.as.success, "");
     append(argValues, self);
 
     for (size_t i = 0; i < newStmt.args.count; i++) {
@@ -927,6 +1084,9 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
 
         append(newCompiler->typeMap, new);
     }
+
+    // define structs list
+    newCompiler->structs = newList(StructInfo);
 
     // set up env
     newCompiler->env = newEnvironment("root", NULL);

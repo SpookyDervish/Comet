@@ -4,14 +4,11 @@ struct Vector3 {
     int z
 
     init(int x, int y, int z) {
-        print("constructor called!\n")
-        print("x = %d\n", x)
-        print("y = %d\n", y)
-        print("z = %d\n", z)
+        self.x = x
     }
 }
 
 func main() -> int {
     Vector3 myVector = new Vector3(1, 2, 3)
-    return 0
+    return myVector.x
 }

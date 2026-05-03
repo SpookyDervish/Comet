@@ -3,6 +3,7 @@
 
 #include "../include/error.h"
 #include "ast.h"
+#include "struct.h"
 #include "environment.h"
 #include "parser.h"
 #include <llvm-c/Types.h>
@@ -19,6 +20,7 @@ typedef struct {
 typedef struct {
     LLVMValueRef value;
     LLVMTypeRef type;
+    bool isPointer;
 } CometTypeValuePair;
 
 typedef struct {
@@ -36,6 +38,7 @@ typedef struct {
     LLVMModuleRef module;
     LLVMBuilderRef builder;
     List(CometLLVMTypePair) typeMap;
+    List(StructInfo) structs;
 
     LLVMValueRef currentFunction;
 } CometCompiler;

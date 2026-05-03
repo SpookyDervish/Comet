@@ -1053,7 +1053,6 @@ ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser) 
     CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     parserNextToken(parser);
-    printf("%s\n", tokenToCStr(*parser->currentToken));
 
     ResultType(argList, charptr) constructorArgs = parseFunctionCallArgs(parser);
     if (constructorArgs.error)
