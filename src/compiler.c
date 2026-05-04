@@ -290,10 +290,13 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                     );
                     
                     printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
-                    LLVMTypeKind isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
+                    bool isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
+
+                    LLVMValueRef temp = LLVMBuildAlloca(compiler->builder, fieldInfo->llvmType, "tmp");
+                    LLVMBuildStore(compiler->builder, value, temp);
 
                     CometValue result = (CometValue){
-                        .pointer = value,
+                        .pointer = temp,
                         .type = fieldInfo->llvmType,
                         .isPointer = true
                     };
@@ -980,6 +983,12 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                     return Error(CometValue, charptr, errMsg.str);
                 }
 
+                bool fieldIsStruct = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
+
+                if (fieldIsStruct) {
+                    return resolvePointerValue(compiler, node);
+                }
+
                 LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
                 LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
@@ -1007,8 +1016,7 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                     ptr,
                     valueName.str
                 );
-                
-                printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
+
                 isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
 
                 type = Success(LLVMTypeRef, charptr, fieldInfo->llvmType);

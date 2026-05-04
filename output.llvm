@@ -1,45 +1,47 @@
 ; ModuleID = 'main'
 source_filename = "main"
 
-%Test = type { i32 }
-
-@str = private constant [11 x i8] c"test = %d\0A\00"
+%A = type { i32 }
+%B = type { %A }
 
 declare i32 @printf(ptr, ...)
 
-define void @Test_CONSTRUCTOR(ptr %0, i32 %1) {
-Test_CONSTRUCTOR_entry:
+define void @A_CONSTRUCTOR(ptr %0, i32 %1) {
+A_CONSTRUCTOR_entry:
   %x = alloca i32, align 4
   store i32 %1, ptr %x, align 4
   %x1 = load i32, ptr %x, align 4
-  %xFieldPtr = getelementptr %Test, ptr %0, i32 0, i32 0
+  %xFieldPtr = getelementptr %A, ptr %0, i32 0, i32 0
   store i32 %x1, ptr %xFieldPtr, align 4
   ret void
 }
 
-define i32 @add(i32 %0, i32 %1) {
-add_entry:
-  %a = alloca i32, align 4
-  store i32 %0, ptr %a, align 4
-  %b = alloca i32, align 4
-  store i32 %1, ptr %b, align 4
-  %a1 = load i32, ptr %a, align 4
-  %b2 = load i32, ptr %b, align 4
-  %2 = add i32 %a1, %b2
-  ret i32 %2
+define void @B_CONSTRUCTOR(ptr %0, %A %1) {
+B_CONSTRUCTOR_entry:
+  %a = alloca %A, align 8
+  store %A %1, ptr %a, align 4
+  %a1 = load %A, ptr %a, align 4
+  %aFieldPtr = getelementptr %B, ptr %0, i32 0, i32 0
+  store %A %a1, ptr %aFieldPtr, align 4
+  ret void
 }
 
 define i32 @main() {
 main_entry:
-  %test = alloca %Test, align 8
-  %selfTmp = alloca %Test, align 8
-  call void @Test_CONSTRUCTOR(ptr %selfTmp, i32 123)
-  %selfVal = load %Test, ptr %selfTmp, align 4
-  store %Test %selfVal, ptr %test, align 4
-  %test1 = load %Test, ptr %test, align 4
-  %Test_access = getelementptr %Test, ptr %test, i32 0, i32 0
-  %x_field = load i32, ptr %Test_access, align 4
-  %print = call i32 (ptr, ...) @printf(ptr @str, i32 %x_field)
-  %add = call i32 @add(i32 1, i32 2)
-  ret i32 %add
+  %myStruct = alloca %B, align 8
+  %selfTmp = alloca %B, align 8
+  %selfTmp1 = alloca %A, align 8
+  call void @A_CONSTRUCTOR(ptr %selfTmp1, i32 123)
+  %selfVal = load %A, ptr %selfTmp1, align 4
+  call void @B_CONSTRUCTOR(ptr %selfTmp, %A %selfVal)
+  %selfVal2 = load %B, ptr %selfTmp, align 4
+  store %B %selfVal2, ptr %myStruct, align 4
+  %myStruct3 = load %B, ptr %myStruct, align 4
+  %B_access = getelementptr %B, ptr %myStruct, i32 0, i32 0
+  %a_field = load %A, ptr %B_access, align 4
+  %tmp = alloca %A, align 8
+  store %A %a_field, ptr %tmp, align 4
+  %A_access = getelementptr %A, ptr %tmp, i32 0, i32 0
+  %x_field = load i32, ptr %A_access, align 4
+  ret i32 %x_field
 }
