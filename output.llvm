@@ -17,6 +17,18 @@ Test_CONSTRUCTOR_entry:
   ret void
 }
 
+define i32 @add(i32 %0, i32 %1) {
+add_entry:
+  %a = alloca i32, align 4
+  store i32 %0, ptr %a, align 4
+  %b = alloca i32, align 4
+  store i32 %1, ptr %b, align 4
+  %a1 = load i32, ptr %a, align 4
+  %b2 = load i32, ptr %b, align 4
+  %2 = add i32 %a1, %b2
+  ret i32 %2
+}
+
 define i32 @main() {
 main_entry:
   %test = alloca %Test, align 8
@@ -28,5 +40,6 @@ main_entry:
   %Test_access = getelementptr %Test, ptr %test, i32 0, i32 0
   %x_field = load i32, ptr %Test_access, align 4
   %print = call i32 (ptr, ...) @printf(ptr @str, i32 %x_field)
-  ret i32 0
+  %add = call i32 @add(i32 1, i32 2)
+  ret i32 %add
 }

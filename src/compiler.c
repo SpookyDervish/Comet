@@ -1132,6 +1132,35 @@ ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTN
         append(argValues, arg.as.success.value);
     }
 
+    
+
+    // ensure number of args passed to function is correct
+    if (!LLVMIsFunctionVarArg(funcRecord->type)) {
+        unsigned paramCount = LLVMCountParams(funcRecord->ptr);
+
+        if (argValues.count < paramCount) {
+            Estr errMsg = CREATE_ESTR("Not enough params passed to function \"");
+            APPEND_ESTR(errMsg, funcName);
+            APPEND_ESTR(errMsg, "\" (expects ");
+
+            char* buffer = malloc(128);
+            sprintf(buffer, "%d, passed %zu)", paramCount, argValues.count);
+            APPEND_ESTR(errMsg, buffer);
+
+            return Error(CometValue, charptr, errMsg.str);
+        } else if (argValues.count > paramCount) {
+            Estr errMsg = CREATE_ESTR("Too many params passed to function \"");
+            APPEND_ESTR(errMsg, funcName);
+            APPEND_ESTR(errMsg, "\" (expects ");
+
+            char* buffer = malloc(128);
+            sprintf(buffer, "%d, passed %zu)", paramCount, argValues.count);
+
+            APPEND_ESTR(errMsg, buffer);
+            return Error(CometValue, charptr, errMsg.str);
+        }
+    }
+
     LLVMValueRef returnValue = LLVMBuildCall2(compiler->builder, funcRecord->type, funcRecord->ptr, argValues.pointer, argValues.count, funcName);
     CometValue result = {
         .value = returnValue,
