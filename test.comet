@@ -1,22 +1,3 @@
-struct Child {
-    int x
-
-    init(int x) {
-        self.x = x
-    }
-}
-
-struct Parent {
-    Child child
-
-    init(Child child) {
-        self.child = child
-    }
-}
-
 func main() -> int {
-    Parent testParent = new Parent(new Child(123))
-    Child child = testParent.child
-
-    return child.x
+    return 0
 }

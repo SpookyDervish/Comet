@@ -682,6 +682,24 @@ ResultType(int, charptr) visitWhileStatement(CometCompiler* compiler, CometASTNo
     if (beforeCheck.error)
         return Error(int, charptr, beforeCheck.as.error);
 
+    ResultType(LLVMTypeRef, charptr) boolType = getType(compiler, "bool");
+    if (boolType.error)
+        return Error(int, charptr, boolType.as.error);
+
+    if (beforeCheck.as.success.type != boolType.as.success) {
+        ResultType(LLVMValueRef, charptr) casted = castToType(compiler->builder, beforeCheck.as.success.isPointer ? beforeCheck.as.success.pointer : beforeCheck.as.success.value, boolType.as.success);
+        if (casted.error)
+            return Error(int, charptr, casted.as.error);
+
+        if (beforeCheck.as.success.isPointer) {
+            beforeCheck.as.success.pointer = casted.as.success;
+        } else {
+            beforeCheck.as.success.value = casted.as.success;
+        }
+        beforeCheck.as.success.type = boolType.as.success;
+        
+    }
+
     LLVMBasicBlockRef whileLoopEntry = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "whileLoopEntry");
     LLVMBasicBlockRef whileLoopOtherwise = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "whileLoopOtherwise");
 

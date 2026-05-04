@@ -1,48 +1,9 @@
 ; ModuleID = 'main'
 source_filename = "main"
 
-%Child = type { i32 }
-%Parent = type { %Child }
-
 declare i32 @printf(ptr, ...)
-
-define void @Child_CONSTRUCTOR(ptr %0, i32 %1) {
-Child_CONSTRUCTOR_entry:
-  %x = alloca i32, align 4
-  store i32 %1, ptr %x, align 4
-  %x1 = load i32, ptr %x, align 4
-  %xFieldPtr = getelementptr %Child, ptr %0, i32 0, i32 0
-  store i32 %x1, ptr %xFieldPtr, align 4
-  ret void
-}
-
-define void @Parent_CONSTRUCTOR(ptr %0, %Child %1) {
-Parent_CONSTRUCTOR_entry:
-  %child = alloca %Child, align 8
-  store %Child %1, ptr %child, align 4
-  %child1 = load %Child, ptr %child, align 4
-  %childFieldPtr = getelementptr %Parent, ptr %0, i32 0, i32 0
-  store %Child %child1, ptr %childFieldPtr, align 4
-  ret void
-}
 
 define i32 @main() {
 main_entry:
-  %testParent = alloca %Parent, align 8
-  %selfTmp = alloca %Parent, align 8
-  %selfTmp1 = alloca %Child, align 8
-  call void @Child_CONSTRUCTOR(ptr %selfTmp1, i32 123)
-  %selfVal = load %Child, ptr %selfTmp1, align 4
-  call void @Parent_CONSTRUCTOR(ptr %selfTmp, %Child %selfVal)
-  %selfVal2 = load %Parent, ptr %selfTmp, align 4
-  store %Parent %selfVal2, ptr %testParent, align 4
-  %child = alloca %Child, align 8
-  %testParent3 = load %Parent, ptr %testParent, align 4
-  %Parent_access = getelementptr %Parent, ptr %testParent, i32 0, i32 0
-  %child_field = load %Child, ptr %Parent_access, align 4
-  store %Child %child_field, ptr %child, align 4
-  %child4 = load %Child, ptr %child, align 4
-  %Child_access = getelementptr %Child, ptr %child, i32 0, i32 0
-  %x_field = load i32, ptr %Child_access, align 4
-  ret i32 %x_field
+  ret i32 0
 }
