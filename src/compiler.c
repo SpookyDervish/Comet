@@ -422,21 +422,32 @@ ResultType(int, charptr) visitFuncDefStatement(CometCompiler* compiler, CometAST
         defineVar(compiler->env, argName, argPtr, argType);
     }
 
-    ResultType(int, charptr) bodyResult = compileBlock(compiler, funcDef.program);
-    if (bodyResult.error)
-        return Error(int, charptr, bodyResult.as.error);
-    doesReturn = bodyResult.as.success;
+    if (!funcDef.isInline) {
+        ResultType(int, charptr) bodyResult = compileBlock(compiler, funcDef.program);
+        if (bodyResult.error)
+            return Error(int, charptr, bodyResult.as.error);
+        doesReturn = bodyResult.as.success;
 
-    // make sure the function returns
-    if (!doesReturn) {
-        printf("return type = %s\n", LLVMPrintTypeToString(returnType.as.success));
-        if (LLVMGetTypeKind(returnType.as.success) == LLVMVoidTypeKind) {
-            LLVMBuildRetVoid(compiler->builder);
+        // make sure the function returns
+        if (!doesReturn) {
+            if (LLVMGetTypeKind(returnType.as.success) == LLVMVoidTypeKind) {
+                LLVMBuildRetVoid(compiler->builder);
+            } else {
+                Estr errMsg = CREATE_ESTR("Non-void function \"");
+                APPEND_ESTR(errMsg, funcName);
+                APPEND_ESTR(errMsg, "\" does not return!");
+                return Error(int, charptr, errMsg.str);
+            }
+        }
+    } else { // is inline func
+        ResultType(CometValue, charptr) inlineBody = visitInfixExpression(compiler, funcDef.inlineExpr);
+        if (inlineBody.error)
+            return Error(int, charptr, inlineBody.as.error);
+
+        if (inlineBody.as.success.isPointer) {
+            LLVMBuildRet(compiler->builder, inlineBody.as.success.pointer);
         } else {
-            Estr errMsg = CREATE_ESTR("Non-void function \"");
-            APPEND_ESTR(errMsg, funcName);
-            APPEND_ESTR(errMsg, "\" does not return!");
-            return Error(int, charptr, errMsg.str);
+            LLVMBuildRet(compiler->builder, inlineBody.as.success.value);
         }
     }
 
