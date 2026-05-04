@@ -11,7 +11,7 @@ A_CONSTRUCTOR_entry:
   %x = alloca i32, align 4
   store i32 %1, ptr %x, align 4
   %x1 = load i32, ptr %x, align 4
-  %xFieldPtr = getelementptr %A, ptr %0, i32 0, i32 0
+  %xFieldPtr = getelementptr %A, ptr %0, i32 0
   store i32 %x1, ptr %xFieldPtr, align 4
   ret void
 }
@@ -21,7 +21,7 @@ B_CONSTRUCTOR_entry:
   %a = alloca %A, align 8
   store %A %1, ptr %a, align 4
   %a1 = load %A, ptr %a, align 4
-  %aFieldPtr = getelementptr %B, ptr %0, i32 0, i32 0
+  %aFieldPtr = getelementptr %B, ptr %0, i32 0
   store %A %a1, ptr %aFieldPtr, align 4
   ret void
 }
@@ -36,12 +36,12 @@ main_entry:
   call void @B_CONSTRUCTOR(ptr %selfTmp, %A %selfVal)
   %selfVal2 = load %B, ptr %selfTmp, align 4
   store %B %selfVal2, ptr %myStruct, align 4
-  %myStruct3 = load %B, ptr %myStruct, align 4
   %B_access = getelementptr %B, ptr %myStruct, i32 0, i32 0
-  %a_field = load %A, ptr %B_access, align 4
-  %tmp = alloca %A, align 8
-  store %A %a_field, ptr %tmp, align 4
-  %A_access = getelementptr %A, ptr %tmp, i32 0, i32 0
+  %xFieldPtr = getelementptr %A, ptr %B_access, i32 0
+  store i32 456, ptr %xFieldPtr, align 4
+  %myStruct3 = load %B, ptr %myStruct, align 4
+  %B_access4 = getelementptr %B, ptr %myStruct, i32 0, i32 0
+  %A_access = getelementptr %A, ptr %B_access4, i32 0, i32 0
   %x_field = load i32, ptr %A_access, align 4
   ret i32 %x_field
 }

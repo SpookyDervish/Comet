@@ -16,5 +16,7 @@ struct B {
 
 func main() -> int {
     B myStruct = new B(new A(123))
+    myStruct.a.x = 456
+
     return myStruct.a.x
 }

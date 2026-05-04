@@ -279,7 +279,7 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                         ptrName.str
                     );
 
-                    Estr valueName = CREATE_ESTR(fieldName);
+                    /*Estr valueName = CREATE_ESTR(fieldName);
                     APPEND_ESTR(valueName, "_field");
 
                     LLVMValueRef value = LLVMBuildLoad2(
@@ -287,18 +287,21 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                         fieldInfo->llvmType,
                         ptr,
                         valueName.str
-                    );
+                    );*/
                     
-                    printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
+                    //printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
                     bool isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
 
-                    LLVMValueRef temp = LLVMBuildAlloca(compiler->builder, fieldInfo->llvmType, "tmp");
-                    LLVMBuildStore(compiler->builder, value, temp);
+                    //Estr tempName = CREATE_ESTR(fieldName);
+                    //APPEND_ESTR(tempName, "_tmp");
+
+                    //LLVMValueRef temp = LLVMBuildAlloca(compiler->builder, fieldInfo->llvmType, tempName.str);
+                    //LLVMBuildStore(compiler->builder, value, temp);
 
                     CometValue result = (CometValue){
-                        .pointer = temp,
+                        .pointer = ptr,
                         .type = fieldInfo->llvmType,
-                        .isPointer = true
+                        .isPointer = isPointer
                     };
                     return Success(CometValue, charptr, result);
                 }
@@ -591,6 +594,8 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
 
         Estr ptrName = CREATE_ESTR(fieldName);
         APPEND_ESTR(ptrName, "FieldPtr");
+
+        //pprintf("structToChange = %s\n", LLVMPrintValueToString(structToChange.as.success.pointer));
 
         LLVMValueRef ptr = LLVMBuildGEP2(
             compiler->builder,
@@ -992,8 +997,8 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                 LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
                 LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
-                printf("left type = %s\n", LLVMPrintTypeToString(left.as.success.type));
-                printf("left value = %s\n", LLVMPrintValueToString(left.as.success.pointer));
+                //printf("left type = %s\n", LLVMPrintTypeToString(left.as.success.type));
+                //printf("left value = %s\n", LLVMPrintValueToString(left.as.success.pointer));
 
                 Estr ptrName = CREATE_ESTR(structInfo->name);
                 APPEND_ESTR(ptrName, "_access");
