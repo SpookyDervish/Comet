@@ -238,6 +238,73 @@ ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNo
 ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_INFIX_EXPRESSION: {
+
+            switch (node->data.AST_INFIX_EXPRESSION.op.type) {
+                case CT_DOT: {
+                    ResultType(CometValue, charptr) left = resolvePointerValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
+                    if (left.error) return Error(CometValue, charptr, left.as.error);
+
+                    if (node->data.AST_INFIX_EXPRESSION.right->nodeType != AST_IDENTIFIER) {
+                        return Error(CometValue, charptr, "Huh?");
+                    }
+
+                    printf("left = %s\n", LLVMPrintValueToString(left.as.success.pointer));
+
+                    StructInfo* structInfo = getStruct(compiler, left.as.success.type);
+                    if (structInfo == NULL) {
+                        return Error(CometValue, charptr, "Attempt to get field of something that isn't a struct.");
+                    }
+
+                    char* fieldName = node->data.AST_INFIX_EXPRESSION.right->data.AST_IDENTIFIER.ident;
+                    StructField* fieldInfo = findField(*structInfo, fieldName);
+                    if (fieldInfo == NULL) {
+                        Estr errMsg = CREATE_ESTR("The struct \"");
+                        APPEND_ESTR(errMsg, structInfo->name);
+                        APPEND_ESTR(errMsg, "\" does not have the field \"");
+                        APPEND_ESTR(errMsg, fieldName);
+                        APPEND_ESTR(errMsg, "\"");
+
+                        return Error(CometValue, charptr, errMsg.str);
+                    }
+
+                    LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
+                    LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
+
+                    Estr ptrName = CREATE_ESTR(structInfo->name);
+                    APPEND_ESTR(ptrName, "_access (resolve pointer)");
+                    LLVMValueRef ptr = LLVMBuildGEP2(
+                        compiler->builder,
+                        left.as.success.type,
+                        left.as.success.pointer,
+                        (LLVMValueRef[]){ zero, index },
+                        2,
+                        ptrName.str
+                    );
+
+                    Estr valueName = CREATE_ESTR(fieldName);
+                    APPEND_ESTR(valueName, "_field");
+
+                    LLVMValueRef value = LLVMBuildLoad2(
+                        compiler->builder,
+                        fieldInfo->llvmType,
+                        ptr,
+                        valueName.str
+                    );
+                    
+                    printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
+                    LLVMTypeKind isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
+
+                    CometValue result = (CometValue){
+                        .pointer = value,
+                        .type = fieldInfo->llvmType,
+                        .isPointer = true
+                    };
+                    return Success(CometValue, charptr, result);
+                }
+
+                default:
+                    return Error(CometValue, charptr, "Attempt to use dot operator on something that isn't a struct.");
+            }
             return visitInfixExpression(compiler, node);
         }
 
@@ -257,7 +324,6 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                 .isPointer = true
             };
             return Success(CometValue, charptr, result);
-            break;
         }
 
         default:
@@ -395,13 +461,7 @@ ResultType(int, charptr) visitReturnStatement(CometCompiler* compiler, CometASTN
     LLVMTypeRef returnType = LLVMGetReturnType(funcType);
 
 
-    if (returnValue.as.success.type != returnType) {
-        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, returnValue.as.success.value, returnType);
-        if (cast.error)
-            return Error(int, charptr, cast.as.error);
-
-        returnValue.as.success.value = cast.as.success;
-    } else if (returnValue.as.success.isPointer &&
+    if (returnValue.as.success.isPointer &&
                LLVMPointerType(returnValue.as.success.type, 0) != returnType) {
         
         Estr errMsg = CREATE_ESTR("Attempt to return ptr ");
@@ -411,6 +471,12 @@ ResultType(int, charptr) visitReturnStatement(CometCompiler* compiler, CometASTN
         APPEND_ESTR(errMsg, ".");
         
         return Error(int, charptr, errMsg.str);
+    } else if (returnValue.as.success.type != returnType) {
+        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, returnValue.as.success.value, returnType);
+        if (cast.error)
+            return Error(int, charptr, cast.as.error);
+
+        returnValue.as.success.value = cast.as.success;
     }
     
     if (returnValue.as.success.isPointer) {
@@ -462,7 +528,13 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
             typeValuePair.as.success.value = cast.as.success;
             typeValuePair.as.success.type = varAssignType.as.success;
         }
-        LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, ptr);
+
+        if (typeValuePair.as.success.isPointer) {
+            LLVMBuildStore(compiler->builder, typeValuePair.as.success.pointer, ptr);
+        } else {
+            LLVMBuildStore(compiler->builder, typeValuePair.as.success.value, ptr);
+        }
+        
     }
 
     defineVar(compiler->env, name, ptr, varAssignType.as.success);
@@ -859,8 +931,10 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
     if (LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind) {
         switch (op.type) {
             case CT_DOT: {
-                left = resolvePointerValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
-                if (left.error) return Error(CometValue, charptr, left.as.error);
+                if (!left.as.success.isPointer) {
+                    left = resolvePointerValue(compiler, node->data.AST_INFIX_EXPRESSION.left);
+                    if (left.error) return Error(CometValue, charptr, left.as.error);
+                }
 
                 StructInfo* structInfo = getStruct(compiler, left.as.success.type);
                 if (structInfo == NULL) {
@@ -882,23 +956,33 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                 LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
                 LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
+                printf("left type = %s\n", LLVMPrintTypeToString(left.as.success.type));
+                printf("left value = %s\n", LLVMPrintValueToString(left.as.success.pointer));
+
+                Estr ptrName = CREATE_ESTR(structInfo->name);
+                APPEND_ESTR(ptrName, "_access");
+
                 LLVMValueRef ptr = LLVMBuildGEP2(
                     compiler->builder,
                     left.as.success.type,
                     left.as.success.pointer,
                     (LLVMValueRef[]){ zero, index },
                     2,
-                    "structAccess"
+                    ptrName.str
                 );
+
+                Estr valueName = CREATE_ESTR(fieldName);
+                APPEND_ESTR(valueName, "_field");
 
                 value = LLVMBuildLoad2(
                     compiler->builder,
                     fieldInfo->llvmType,
                     ptr,
-                    ""
+                    valueName.str
                 );
                 
-                isPointer = false;
+                printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
+                isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
 
                 type = Success(LLVMTypeRef, charptr, fieldInfo->llvmType);
 

@@ -1,16 +1,22 @@
-struct Vector3 {
+struct Child {
     int x
-    int y
-    int z
 
-    init(int x, int y, int z) {
+    init(int x) {
         self.x = x
-        self.y = y
-        self.z = z
+    }
+}
+
+struct Parent {
+    Child child
+
+    init(Child child) {
+        self.child = child
     }
 }
 
 func main() -> int {
-    Vector3 x = new Vector3(1, 2, 3)
-    return x.z
+    Parent testParent = new Parent(new Child(123))
+    Child child = testParent.child
+
+    return child.x
 }
