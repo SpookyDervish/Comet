@@ -1,5 +1,13 @@
-func add(int a, int b) -> int => a + b
+struct Test {
+    int x
+
+    init(int x) {
+        self.x = x
+    }
+}
 
 func main() -> int {
-    return add(1, 2)
+    Test test = new Test(123)
+    print("test = %d\n", test.x)
+    return 0
 }

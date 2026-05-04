@@ -1182,6 +1182,29 @@ ResultType(CometValue, charptr) visitNewStatement(CometCompiler* compiler, Comet
         append(argValues, arg.as.success.value);
     }
 
+    // ensure number of args passed to constructor is correct
+    if (newStmt.args.count < numParams-1) {
+        Estr errMsg = CREATE_ESTR("Not enough params passed to constructor of struct \"");
+        APPEND_ESTR(errMsg, structName);
+        APPEND_ESTR(errMsg, "\" (expects ");
+
+        char* buffer = malloc(128);
+        sprintf(buffer, "%d, passed %zu)", numParams-1, newStmt.args.count);
+        APPEND_ESTR(errMsg, buffer);
+
+        return Error(CometValue, charptr, errMsg.str);
+    } else if (newStmt.args.count > numParams-1) {
+        Estr errMsg = CREATE_ESTR("Too many params passed to constructor of struct \"");
+        APPEND_ESTR(errMsg, structName);
+        APPEND_ESTR(errMsg, "\" (expects ");
+
+        char* buffer = malloc(128);
+        sprintf(buffer, "%d, passed %zu)", numParams-1, newStmt.args.count);
+
+        APPEND_ESTR(errMsg, buffer);
+        return Error(CometValue, charptr, errMsg.str);
+    }
+
     LLVMBuildCall2(compiler->builder, constructorType, constructor, argValues.pointer, argValues.count, "");
     LLVMValueRef selfVal = LLVMBuildLoad2(compiler->builder, structType.as.success, self, "selfVal");
     
