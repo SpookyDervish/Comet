@@ -5,10 +5,12 @@ struct Vector3 {
 
     init(int x, int y, int z) {
         self.x = x
+        self.y = y
+        self.z = z
     }
 }
 
 func main() -> int {
-    Vector3 myVector = new Vector3(1, 2, 3)
-    return myVector.x
+    Vector3 x = new Vector3(1, 2, 3)
+    return x.z
 }
