@@ -248,8 +248,6 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                         return Error(CometValue, charptr, "Huh?");
                     }
 
-                    printf("left = %s\n", LLVMPrintValueToString(left.as.success.pointer));
-
                     StructInfo* structInfo = getStruct(compiler, left.as.success.type);
                     if (structInfo == NULL) {
                         return Error(CometValue, charptr, "Attempt to get field of something that isn't a struct.");
@@ -271,7 +269,7 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                     LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
                     Estr ptrName = CREATE_ESTR(structInfo->name);
-                    APPEND_ESTR(ptrName, "_access (resolve pointer)");
+                    APPEND_ESTR(ptrName, "_access");
                     LLVMValueRef ptr = LLVMBuildGEP2(
                         compiler->builder,
                         left.as.success.type,
