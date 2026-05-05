@@ -13,6 +13,7 @@ typedef struct {
     UT_hash_handle hh;
     LLVMTypeRef type;
     LLVMValueRef ptr;
+    bool isConst;
 } Record;
 
 typedef struct CometEnvironment CometEnvironment;

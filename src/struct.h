@@ -7,11 +7,19 @@
 #include <stdbool.h>
 #include <llvm-c/Types.h>
 
+typedef enum {
+    FIELD_PRIVATE,
+    FIELD_PROTECTED,
+    FIELD_READ_ONLY,
+} FieldAttribute;
+
 typedef struct {
     LLVMTypeRef llvmType;
     unsigned index;
     char* name;
     bool isPointer;
+    FieldAttribute attrib;
+    bool isConst;
 } StructField;
 
 UseList(StructField);
