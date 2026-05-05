@@ -402,7 +402,7 @@ ResultType(int, charptr) visitFuncDefStatement(CometCompiler* compiler, CometAST
     APPEND_ESTR(entryName, "_entry");
 
     // define func in compilers current env
-    defineVar(compiler->env, funcName, function, funcType);
+    defineVar(compiler->env, funcName, function, funcType, false);
 
     // create entry and compile func body
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(compiler->context, function, entryName.str);
@@ -425,7 +425,7 @@ ResultType(int, charptr) visitFuncDefStatement(CometCompiler* compiler, CometAST
         LLVMBuildStore(compiler->builder, argValue, argPtr);
 
         // add env var for it
-        defineVar(compiler->env, argName, argPtr, argType);
+        defineVar(compiler->env, argName, argPtr, argType, false);
     }
 
     if (!funcDef.isInline) {
@@ -552,7 +552,7 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
         
     }
 
-    defineVar(compiler->env, name, ptr, varAssignType.as.success);
+    defineVar(compiler->env, name, ptr, varAssignType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
 
     return Success(int, charptr, false);
 }
@@ -619,6 +619,13 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
             Estr errMsg = CREATE_ESTR("Undefined variable \"");
             APPEND_ESTR(errMsg, name);
             APPEND_ESTR(errMsg, "\"");
+            return Error(int, charptr, errMsg.str);
+        }
+
+        if (!varRecord->isMutable) {
+            Estr errMsg = CREATE_ESTR("Attempt to change value of immutable variable \"");
+            APPEND_ESTR(errMsg, name);
+            APPEND_ESTR(errMsg, "\", did you forget \"mut\"?.");
             return Error(int, charptr, errMsg.str);
         }
 
@@ -769,7 +776,7 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
 
     LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varType.as.success, identName);
     LLVMBuildStore(compiler->builder, startValue.as.success.value, ptr);
-    defineVar(compiler->env, identName, ptr, varType.as.success);
+    defineVar(compiler->env, identName, ptr, varType.as.success, false);
 
     LLVMBasicBlockRef forLoopEntry = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "forLoopEntry");
     LLVMBasicBlockRef forLoopOtherwise = LLVMAppendBasicBlockInContext(compiler->context, compiler->currentFunction, "forLoopOtherwise");
@@ -839,7 +846,7 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
     APPEND_ESTR(entryName, "_entry");
 
     // define func in compilers current env
-    defineVar(compiler->env, funcName, function, funcType);
+    defineVar(compiler->env, funcName, function, funcType, false);
 
     // create entry and compile func body
     LLVMBasicBlockRef entry = LLVMAppendBasicBlockInContext(compiler->context, function, entryName.str);
@@ -854,7 +861,7 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
     LLVMValueRef selfValue = LLVMGetParam(function, 0);
     //LLVMValueRef selfPtr = LLVMBuildAlloca(compiler->builder, structType, "self");
     //LLVMBuildStore(compiler->builder, selfValue, selfPtr);
-    defineVar(compiler->env, "self", selfValue, structType);
+    defineVar(compiler->env, "self", selfValue, structType, false);
 
     
 
@@ -875,7 +882,7 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
         
 
         // add env var for it
-        defineVar(compiler->env, argName, argPtr, argType);
+        defineVar(compiler->env, argName, argPtr, argType, false);
     }
 
     ResultType(int, charptr) bodyResult = compileBlock(compiler, funcDef.program);
@@ -1283,7 +1290,7 @@ void defineInternalConstants(CometCompiler* compiler) {
 
     LLVMValueRef printfFunc = LLVMAddFunction(compiler->module, "printf", printfType);
 
-    defineVar(compiler->env, "print", printfFunc, printfType);
+    defineVar(compiler->env, "print", printfFunc, printfType, false);
 }
 
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {

@@ -7,6 +7,7 @@ const char* KEYWORDS[] = {
     "while",
     "func",
     "struct",
+    "mut",
     "private",
     "protected",
     "const",

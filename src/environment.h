@@ -13,7 +13,7 @@ typedef struct {
     UT_hash_handle hh;
     LLVMTypeRef type;
     LLVMValueRef ptr;
-    bool isConst;
+    bool isMutable;
 } Record;
 
 typedef struct CometEnvironment CometEnvironment;
@@ -25,5 +25,5 @@ struct CometEnvironment {
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent);
-void defineVar(CometEnvironment* env, char* name, LLVMValueRef ptr, LLVMTypeRef type);
+void defineVar(CometEnvironment* env, char* name, LLVMValueRef ptr, LLVMTypeRef type, bool isMutable);
 Record* lookup(CometEnvironment* env, char* name);

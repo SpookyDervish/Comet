@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "compiler.h"
 #include "lexer.h"
+#include "struct.h"
 #include "token.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -595,11 +596,32 @@ ResultType(astNodePtr, charptr) parseExpressionStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser) {
+ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bool isMutable, FieldAttribute fieldAttrib) {
     // basic format:
     // small myVar = 10
 
-    
+    if (currentTokenIs(parser, CT_KEYWORD)) {
+        char* keyword = parser->currentToken->value.literal;
+
+        if (strcmp(keyword, "mut") == 0) {
+            if (isMutable) {
+                return Error(astNodePtr, charptr, "\"mut\" keyword appears twice in variable declaration.");
+            }
+            
+            parserNextToken(parser);
+            return parseAssignmentStatement(parser, true, fieldAttrib);
+        } else if (
+            strcmp(keyword, "private") == 0 ||
+            strcmp(keyword, "protected") == 0 ||
+            strcmp(keyword, "readonly") == 0) {
+            if (fieldAttrib != FIELD_PUBLIC) {
+                return Error(astNodePtr, charptr, "Cannot set multiple attributes to struct field.");
+            }
+
+            parserNextToken(parser);
+            return parseAssignmentStatement(parser, isMutable, attribStringToFieldAttrib(keyword));
+        }
+    }
 
     CometASTNode* type = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
@@ -610,7 +632,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser) {
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
-    CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type);
+    CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type, isMutable);
 
     bool hasValue = peekTokenIs(parser, CT_EQ);
     
@@ -1086,6 +1108,12 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
         return parseConstructorDef(parser);
     } else if (strcmp(keyword, "new") == 0) {
         return parseStructCreateStatement(parser);
+    } else if (strcmp(keyword, "mut") == 0       ||
+               strcmp(keyword, "public") == 0    ||
+               strcmp(keyword, "private") == 0   ||
+               strcmp(keyword, "protected") == 0   ) {
+        return parseAssignmentStatement(parser, false, FIELD_PUBLIC);
+    
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
@@ -1097,7 +1125,7 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
 ResultType(astNodePtr, charptr) parseStatement(CometParser* parser) {
     switch (parser->currentToken->type) {
         case CT_IDENT:
-            return parseAssignmentStatement(parser);
+            return parseAssignmentStatement(parser, false, FIELD_PUBLIC);
 
         case CT_KEYWORD:
             return parseKeyword(parser);

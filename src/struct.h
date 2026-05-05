@@ -11,6 +11,7 @@ typedef enum {
     FIELD_PRIVATE,
     FIELD_PROTECTED,
     FIELD_READ_ONLY,
+    FIELD_PUBLIC,
 } FieldAttribute;
 
 typedef struct {
@@ -33,5 +34,13 @@ typedef struct {
 UseList(StructInfo);
 
 StructField* findField(StructInfo structInfo, char* fieldName);
+
+typedef struct {
+    char* fieldName;
+    FieldAttribute attribType;
+} FieldNameAttributePair;
+
+extern const FieldNameAttributePair FIELD_STRING_MAP[];
+FieldAttribute attribStringToFieldAttrib(char* keyword);
 
 #endif
