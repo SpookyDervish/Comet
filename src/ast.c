@@ -38,6 +38,10 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_FOR_STATEMENT";
         case AST_CONSTRUCTOR_DEF:
             return "AST_CONSTRUCTOR_DEF";
+        case AST_STRUCT_DEF_STATEMENT:
+            return "AST_STRUCT_DEF_STATEMENT";
+        case AST_FUNC_DEF_STATEMENT:
+            return "AST_FUNC_DEF_STATEMENT";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";

@@ -8,10 +8,20 @@ struct Vector {
         self.y = y
         self.z = z
     }
+
+    func add(Vector other) -> void {
+        self.x = 456
+        print("add lol %x\n", self)
+    }
 }
 
 func main() -> int {
     Vector myVector = new Vector(1, 2, 3)
     print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
-    return myVector.y != 2
+
+    myVector.add(new Vector(1, 2, 3))
+
+    print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+
+    return myVector.y != 4
 }

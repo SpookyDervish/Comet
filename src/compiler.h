@@ -34,6 +34,8 @@ UseList(LLVMTypeRef);
 UseList(LLVMValueRef);
 UseList(CometLLVMTypePair);
 
+typedef List(LLVMTypeRef) argTypeList;
+
 typedef struct {
     CometEnvironment* env;
     LLVMContextRef context;
@@ -50,6 +52,7 @@ Result(CometValue, charptr);
 Result(LLVMTypeRef, charptr);
 Result(LLVMValueRef, charptr);
 Result(cometCompilerPtr, charptr);
+Result(argTypeList, charptr);
 
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser);
 ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, CometArgs args);

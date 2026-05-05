@@ -1015,13 +1015,18 @@ ResultType(astNodePtr, charptr) parseConstructorDef(CometParser* parser) {
 
 ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
     // basic format:
-    // struct StructName {
-    //     int fieldName
-    //
-    //     init(int fieldName) {
-    //         self.fieldName = fieldName
-    //     }
-    // }
+    /*
+    struct Animal {
+        int age
+
+        init() {
+            self.age = 0
+        }
+
+        func speak() {
+            print("...")
+        }
+    }*/
 
     ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error) {
@@ -1046,13 +1051,16 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         switch (statement->nodeType) {
             case AST_ASSIGN_STATEMENT: {
                 append(fieldDefs, statement);
+                break;
+            }
 
+            case AST_FUNC_DEF_STATEMENT: {
+                append(fieldDefs, statement);
                 break;
             }
 
             case AST_CONSTRUCTOR_DEF: {
                 constructor = statement;
-
                 break;
             }
 

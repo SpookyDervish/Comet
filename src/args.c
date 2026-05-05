@@ -1,12 +1,13 @@
 #include "args.h"
 #include "compiler.h"
+#include <argp.h>
 
 // define command line args
 const struct argp_option options[] = {
     { "file", 'f', "FILE", 0, "input file to compile", 0 },
     { "output", 'o', "OUTPUT", 0, "output path", 0 },
-    { "llvm", 'l', "LLVM", 0, "output llvm IR instead of an object file", 0 },
-    { "asm", 'a', "ASM", 0, "output assembly instead of an object file", 0 },
+    { "llvm", 'l', 0, 0, "output llvm IR instead of an object file", 0 },
+    { "asm", 'a', 0, 0, "output assembly instead of an object file", 0 },
     { "optimisation", 'O', "OPTIMISATION", 0, "the level of optimisation (0 - 3, default is 2)", 0 },
     { 0 }
 };
@@ -21,7 +22,14 @@ error_t parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
         
         case 'O':
             args->optimisation = atoi(arg);
-            
+            break;
+
+        case 'l':
+            args->outputLLVMIr = true;
+            break;
+
+        case 'a':
+            args->outputASM = true;
             break;
 
         case ARGP_KEY_ARG:
