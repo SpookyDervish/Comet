@@ -278,6 +278,29 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '\n':
             case '\r':
                 break;
+            case '!': {
+                ResultType(char, charptr) next = lexerPeek(lexer);
+
+                if (next.error) {
+                    append(tokens, TOKEN_LITERAL(CT_NOT, "!"));
+                    break;
+                }
+                lexerConsume(lexer);
+
+                if (next.as.success == '=') {
+                    
+                    append(tokens, TOKEN_LITERAL(CT_NOT_EQ, "!="));
+                } else {
+                    if (isspace(next.as.success)) {
+                        append(tokens, TOKEN_LITERAL(CT_NOT, "!"))
+                        break;
+                    }  
+
+                    return Error(tokenList, charptr, "Expected '=' after '!'.");
+                }
+
+                break;
+            }
             case '=': {
                 ResultType(char, charptr) next = lexerPeek(lexer);
 

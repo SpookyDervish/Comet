@@ -720,7 +720,8 @@ ResultType(int, charptr) visitIfStatement(CometCompiler* compiler, CometASTNode*
     ResultType(int, charptr) bodyResult = compileBlock(compiler, consequence);
     if (bodyResult.error)
         return Error(int, charptr, bodyResult.as.error);
-    LLVMBuildBr(compiler->builder, mergeBB);
+    if (!bodyResult.as.success)
+        LLVMBuildBr(compiler->builder, mergeBB);
 
     // build else block
     bool elseReturns = false;
@@ -730,7 +731,8 @@ ResultType(int, charptr) visitIfStatement(CometCompiler* compiler, CometASTNode*
         ResultType(int, charptr) elseResult = compileBlock(compiler, otherwise);
         if (elseResult.error)
             return Error(int, charptr, elseResult.as.error);
-        LLVMBuildBr(compiler->builder, mergeBB);
+        if (!elseResult.as.success)
+            LLVMBuildBr(compiler->builder, mergeBB);
         elseReturns = elseResult.as.success;
     }
 
@@ -1123,6 +1125,11 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                     value = LLVMBuildICmp(compiler->builder, LLVMIntEQ, left.as.success.value, right.as.success.value, "");
                     break;
                 }
+                case CT_NOT_EQ: {
+                    type = getType(compiler, "bool");
+                    value = LLVMBuildICmp(compiler->builder, LLVMIntNE, left.as.success.value, right.as.success.value, "");
+                    break;
+                }
                 case CT_LT: {
                     type = getType(compiler, "bool");
                     value = LLVMBuildICmp(compiler->builder, LLVMIntSLT, left.as.success.value, right.as.success.value, "");
@@ -1327,6 +1334,7 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
 
     // verify IR
     if (LLVMVerifyModule(compiler->module, LLVMReturnStatusAction, &error) != 0) {
+        printf("Module:\n%s\n", LLVMPrintModuleToString(compiler->module));
         return Error(Nothing, charptr, error);
     }
 

@@ -23,8 +23,17 @@ class CometTester(unittest.TestCase):
         
         for case in cases:
             with self.subTest():
-                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"])
-                self.assertEqual(result.returncode, 0, f"{case} did not compile successfully!")
+                obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"
+                program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
+                
+                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", obj_name])
+                self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (comet)!")
+                
+                gcc_result = subprocess.run(["gcc", obj_name, "-o", program_name, "-no-pie"])
+                self.assertEqual(gcc_result.returncode, 0, f"{case} did not link successfully (gcc)!")
+                
+                program_result = subprocess.run([program_name])
+                self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
         
 
 if __name__ == "__main__":

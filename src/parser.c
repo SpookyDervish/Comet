@@ -24,6 +24,7 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_LTE, PRECEDENCE_LESSGREATER},
     {CT_GTE, PRECEDENCE_LESSGREATER},
     {CT_EQ_EQ, PRECEDENCE_EQUALS},
+    {CT_NOT_EQ, PRECEDENCE_EQUALS},
     {CT_DOT, PRECEDENCE_INDEX},
     {CT_EQ, PRECEDENCE_SET}
 };
@@ -61,6 +62,7 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_LTE, parseInfixExpression},
     {CT_GTE, parseInfixExpression},
     {CT_EQ_EQ, parseInfixExpression},
+    {CT_NOT_EQ, parseInfixExpression},
     {CT_DOT, parseInfixExpression},
     {CT_EQ, parseInfixExpression}
 };
