@@ -31,7 +31,7 @@ double hi = 0.123123123123
 
 bool my_bool = true -- can also be false
 
-const bool MY_CONSTANT = true -- constants are all capitals, can not be changed at runtime
+bool mut MY_CONSTANT = true -- values must have the "mut" keyword to be able to be changed
 ```
 
 ## If-Statements
@@ -190,10 +190,10 @@ struct MyStruct {
     init() {} :init
 
     to string {
-        return "<MyStruct test=" + self.test as string + ">"
+        return "<MyStruct test=" + self.test to string + ">"
     }
 } :MyStruct
 
 MyStruct new_struct = new MyStruct()
-print(new_struct as string) -- "<MyStruct test=123>"
+print(new_struct to string) -- "<MyStruct test=123>"
 ```
