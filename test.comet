@@ -1,22 +1,21 @@
-struct A {
-    int x
+struct Child {
+    mut int x
 
     init(int x) {
         self.x = x
     }
 }
 
-struct B {
-    A a
+struct Parent {
+    mut Child c
 
-    init (A a) {
-        self.a = a
+    init(Child c) {
+        self.c = c
     }
 }
 
 func main() -> int {
-    B myStruct = new B(new A(123))
-    myStruct.a.x = 456
-
-    return myStruct.a.x
+    Parent parent = new Parent(new Child(123))
+    parent.c.x = 124
+    return parent.c.x
 }
