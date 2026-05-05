@@ -22,7 +22,7 @@ class CometTester(unittest.TestCase):
         
         for case in cases:
             with self.subTest():
-                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}"])
+                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", f"{TESTS_FOLDER_NAME}/{case}.obj"])
                 self.assertEqual(result.returncode, 0, f"{case} did not compile successfully!")
         
 

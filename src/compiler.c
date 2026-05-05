@@ -9,6 +9,8 @@
 #include <llvm-c/Core.h>
 #include <llvm-c/Types.h>
 #include <llvm-c/Analysis.h>
+#include <llvm-c/Target.h>
+#include <llvm-c/TargetMachine.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -1277,12 +1279,70 @@ ResultType(CometValue, charptr) visitNewStatement(CometCompiler* compiler, Comet
 }
  
 // -- MAIN --//
-ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName) {
+ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName, bool outputLLVMIr, bool outputASM) {
     ResultType(int, charptr) compilerResult = compile(compiler, root);
     if (compilerResult.error)
         return Error(Nothing, charptr, compilerResult.as.error);
 
-    LLVMPrintModuleToFile(compiler->module, outputName, NULL);
+    // just output the IR
+    if (outputLLVMIr) {
+        LLVMPrintModuleToFile(compiler->module, outputName, NULL);
+        return Success(Nothing, charptr, {});
+    }
+
+    // === build obj for the given architecture == //
+
+    char* error = NULL; // used for error messages
+
+    // verify IR
+    if (LLVMVerifyModule(compiler->module, LLVMReturnStatusAction, &error) != 0) {
+        return Error(Nothing, charptr, error);
+    }
+
+    // init llvm backends
+    LLVMInitializeNativeTarget();
+    LLVMInitializeAllAsmPrinters();
+    LLVMInitializeAllAsmParsers();
+
+    // get target triple
+    char* triple = LLVMGetDefaultTargetTriple();
+
+    // create target + machine
+    LLVMTargetRef target;
+
+    if (LLVMGetTargetFromTriple(triple, &target, &error) != 0) {
+        return Error(Nothing, charptr, error);
+    }
+
+    LLVMTargetMachineRef targetMachine = LLVMCreateTargetMachine(
+        target,
+        triple,
+        "generic",
+        "",
+        LLVMCodeGenLevelAggressive, // oh yeah baby max optimization :)
+        LLVMRelocDefault,
+        LLVMCodeModelDefault
+    );
+
+    // attach model to target machine
+    LLVMSetTarget(compiler->module, triple);
+
+    LLVMTargetDataRef dataLayout = LLVMCreateTargetDataLayout(targetMachine);
+    char* layoutStr = LLVMCopyStringRepOfTargetData(dataLayout);
+    LLVMSetDataLayout(compiler->module, layoutStr);
+
+    // cleanup temp string
+    LLVMDisposeMessage(layoutStr);
+
+    // emit object file
+    if (LLVMTargetMachineEmitToFile(
+        targetMachine,
+        compiler->module,
+        outputName, 
+        outputASM ? LLVMAssemblyFile : LLVMObjectFile,
+        &error) != 0) {
+        return Error(Nothing, charptr, error);
+    }
 
     return Success(Nothing, charptr, {});
 }

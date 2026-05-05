@@ -51,7 +51,7 @@ Result(LLVMValueRef, charptr);
 Result(cometCompilerPtr, charptr);
 
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser);
-ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName);
+ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName, bool outputLLVMIr, bool outputASM);
 ResultType(int, charptr) compile(CometCompiler* compiler, CometASTNode* node);
 
 #endif
