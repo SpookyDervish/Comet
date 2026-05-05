@@ -31,7 +31,7 @@ double hi = 0.123123123123
 
 bool my_bool = true -- can also be false
 
-bool mut MY_CONSTANT = true -- values must have the "mut" keyword to be able to be changed
+bool mut my_bool2 = true -- values must have the "mut" keyword to be able to be changed
 ```
 
 ## If-Statements

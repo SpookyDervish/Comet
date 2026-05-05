@@ -1,0 +1,17 @@
+struct Vector {
+    int x
+    int y
+    int z
+
+    init(int x, int y, int z) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+}
+
+func main() -> int {
+    Vector myVector = new Vector(1, 2, 3)
+    print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+    return 0
+}
