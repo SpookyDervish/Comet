@@ -252,7 +252,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '\n':
             case '\r':
                 break;
-            case '=':
+            case '=': {
                 ResultType(char, charptr) next = lexerPeek(lexer);
 
                 if (next.error) {
@@ -276,11 +276,12 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                  }
 
                 break; 
+            }
             case '{': append(tokens, TOKEN_LITERAL(CT_OPEN_CURLY, "{")); break;
             case '}': append(tokens, TOKEN_LITERAL(CT_CLOSE_CURLY, "}")); break;
             case '(': append(tokens, TOKEN_LITERAL(CT_OPEN_PAREN, "(")); break;
             case ')': append(tokens, TOKEN_LITERAL(CT_CLOSE_PAREN, ")")); break;
-            case ':':
+            case ':': {
 
                 ResultType(char, charptr) labelStart = lexerPeek(lexer);
                 
@@ -302,7 +303,8 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 }
 
                 break;
-            case '.':
+            }
+            case '.': {
                 ResultType(char, charptr) nextDot = lexerPeek(lexer);
 
                 if (!nextDot.error && nextDot.as.success == '.') {
@@ -313,8 +315,9 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                  }
 
                 break; 
+            }
             case '"':
-            case '\'':
+            case '\'': {
                 
                 ResultType(CometToken, charptr) stringTok = lexerParseString(lexer, lexer->currentChar);
 
@@ -325,10 +328,10 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 append(tokens, stringTok.as.success);
 
                 break; 
-
+            }
 
             case '+': append(tokens, TOKEN_LITERAL(CT_PLUS, "+")); break;
-            case '-':
+            case '-': {
                 ResultType(char, charptr) arrow = lexerPeek(lexer);
 
                 if (!arrow.error && arrow.as.success == '>') {
@@ -339,6 +342,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                  }
 
                 break; 
+            }
             case '*': append(tokens, TOKEN_LITERAL(CT_TIMES, "*")); break;
             case '/': append(tokens, TOKEN_LITERAL(CT_DIVIDE, "/")); break;
             case '%': append(tokens, TOKEN_LITERAL(CT_MOD, "%")); break;
@@ -346,7 +350,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
             case ',': append(tokens, TOKEN_LITERAL(CT_COMMA, ",")) break;
 
-            case '<':
+            case '<': {
                 ResultType(char, charptr) ltEq = lexerPeek(lexer);
 
                 if (!ltEq.error && ltEq.as.success == '=') {
@@ -357,7 +361,8 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                  }
 
                 break; 
-            case '>':
+            }
+            case '>': {
                 ResultType(char, charptr) gtEq = lexerPeek(lexer);
 
                 if (!gtEq.error && gtEq.as.success == '=') {
@@ -368,8 +373,9 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                  }
 
                 break; 
+            }
             
-            default:
+            default: {
                 if (isdigit(lexer->currentChar)) {
                     ResultType(CometToken, charptr) token = lexerParseNumber(lexer);
 
@@ -394,6 +400,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                     return Error(tokenList, charptr, buffer.str);
                 }
+            }
         }
 
         lexerConsume(lexer);

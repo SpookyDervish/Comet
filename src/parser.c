@@ -232,7 +232,7 @@ void printNode(CometASTNode* node) {
             }
             break;
 
-        case AST_INT: printf("%ld", node->data.AST_INT.number); break;
+        case AST_INT: printf("%lld", node->data.AST_INT.number); break;
         case AST_DOUBLE: printf("%f", node->data.AST_DOUBLE.number); break;
         case AST_STRING: printf("\"%s\"", node->data.AST_STRING.value); break;
         case AST_IDENTIFIER: printf("%s", node->data.AST_IDENTIFIER.ident); break;
