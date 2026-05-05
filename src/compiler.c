@@ -1317,14 +1317,14 @@ ResultType(CometValue, charptr) visitNewStatement(CometCompiler* compiler, Comet
 }
  
 // -- MAIN --//
-ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, const char* outputName, bool outputLLVMIr, bool outputASM) {
+ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, CometArgs args) {
     ResultType(int, charptr) compilerResult = compile(compiler, root);
     if (compilerResult.error)
         return Error(Nothing, charptr, compilerResult.as.error);
 
     // just output the IR
-    if (outputLLVMIr) {
-        LLVMPrintModuleToFile(compiler->module, outputName, NULL);
+    if (args.outputLLVMIr) {
+        LLVMPrintModuleToFile(compiler->module, args.outputPath, NULL);
         return Success(Nothing, charptr, {});
     }
 
@@ -1353,12 +1353,20 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
         return Error(Nothing, charptr, error);
     }
 
+    LLVMCodeGenOptLevel optLevel;
+    switch (args.optimisation) {
+        case 0: optLevel = LLVMCodeGenLevelNone; break;
+        case 1: optLevel = LLVMCodeGenLevelLess; break;
+        case 2: optLevel = LLVMCodeGenLevelDefault; break;
+        case 3: optLevel = LLVMCodeGenLevelAggressive; break; // oh yeah baby max optimization :)
+    }
+
     LLVMTargetMachineRef targetMachine = LLVMCreateTargetMachine(
         target,
         triple,
         "generic",
         "",
-        LLVMCodeGenLevelAggressive, // oh yeah baby max optimization :)
+        optLevel,
         LLVMRelocDefault,
         LLVMCodeModelDefault
     );
@@ -1377,8 +1385,8 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     if (LLVMTargetMachineEmitToFile(
         targetMachine,
         compiler->module,
-        outputName, 
-        outputASM ? LLVMAssemblyFile : LLVMObjectFile,
+        args.outputPath, 
+        args.outputASM ? LLVMAssemblyFile : LLVMObjectFile,
         &error) != 0) {
         return Error(Nothing, charptr, error);
     }

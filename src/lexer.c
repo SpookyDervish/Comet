@@ -196,7 +196,7 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
         }
 
         char peek = lexer->source[lexer->pos+1];
-        if (isdigit(peek) && !isspace(peek) || peek == '.') {
+        if ((isdigit(peek) && !isspace(peek)) || peek == '.') {
             lexerConsume(lexer);
         } else {
             break;
