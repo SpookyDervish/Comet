@@ -632,7 +632,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
-    CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type, isMutable);
+    CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type, isMutable, fieldAttrib);
 
     bool hasValue = peekTokenIs(parser, CT_EQ);
     
@@ -1111,6 +1111,7 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     } else if (strcmp(keyword, "mut") == 0       ||
                strcmp(keyword, "public") == 0    ||
                strcmp(keyword, "private") == 0   ||
+               strcmp(keyword, "readonly") == 0  ||
                strcmp(keyword, "protected") == 0   ) {
         return parseAssignmentStatement(parser, false, FIELD_PUBLIC);
     

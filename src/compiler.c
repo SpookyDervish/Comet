@@ -589,6 +589,15 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
             return Error(int, charptr, errMsg.str);
         }
 
+        if (fieldInfo->isConst) {
+            Estr errMsg = CREATE_ESTR("Attempt to change constant field \"");
+            APPEND_ESTR(errMsg, fieldName);
+            APPEND_ESTR(errMsg, "\" of struct \"");
+            APPEND_ESTR(errMsg, structInfo->name);
+            APPEND_ESTR(errMsg, "\"");
+            return Error(int, charptr, errMsg.str);
+        }
+
         LLVMValueRef zero = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
         LLVMValueRef index = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
@@ -923,7 +932,8 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
             .index = i,
             .llvmType = llvmFieldType.as.success,
             .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident,
-            .isPointer = false
+            .isPointer = LLVMGetTypeKind(llvmFieldType.as.success) == LLVMStructTypeKind,
+            .isConst = !fieldNode->data.AST_ASSIGN_STATEMENT.isMutable
         };
         append(structInfoFields, fieldInfo);
     }
