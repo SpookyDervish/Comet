@@ -12,6 +12,7 @@ import subprocess
 
 
 TESTS_FOLDER_NAME = "tests"
+TESTS_OBJ_FOLDER_NAME = "test_objs"
 
 
 class CometTester(unittest.TestCase):
@@ -22,7 +23,7 @@ class CometTester(unittest.TestCase):
         
         for case in cases:
             with self.subTest():
-                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", f"{TESTS_FOLDER_NAME}/{case}.obj"])
+                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"])
                 self.assertEqual(result.returncode, 0, f"{case} did not compile successfully!")
         
 

@@ -8,7 +8,7 @@ func main() -> int {
 
     bool my_bool = true
 
-    bool mut my_bool2 = true
+    mut bool my_bool2 = true
     my_bool2 = false
 
     return 0

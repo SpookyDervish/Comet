@@ -205,6 +205,19 @@ ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNo
             break;
         }
 
+        case AST_BOOL: {
+            ResultType(LLVMTypeRef, charptr) boolType = getType(compiler, "bool");
+            if (boolType.error)
+                return Error(CometValue, charptr, boolType.as.error);
+
+            res = (CometValue){
+                LLVMConstInt(boolType.as.success, node->data.AST_BOOL.value, 0),
+                boolType.as.success,
+                .isPointer = false
+            };
+            break;
+        }
+
         case AST_STRING: {
             ResultType(CometValue, charptr) stringType = convertString(compiler, node->data.AST_STRING.value);
             if (stringType.error)
@@ -245,6 +258,8 @@ ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNo
 
             break;
         }
+
+        
 
         default:
             return Error(CometValue, charptr, "Unkown expression type.");
@@ -1363,7 +1378,7 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     return Success(Nothing, charptr, {});
 }
 
-void defineInternalConstants(CometCompiler* compiler) {
+ResultType(Nothing, charptr) defineInternalConstants(CometCompiler* compiler) {
     // define print
     LLVMTypeRef i8ptr = LLVMPointerType(LLVMInt8TypeInContext(compiler->context), 0);
     LLVMTypeRef printfArgs[] = { i8ptr };
@@ -1377,6 +1392,8 @@ void defineInternalConstants(CometCompiler* compiler) {
     LLVMValueRef printfFunc = LLVMAddFunction(compiler->module, "printf", printfType);
 
     defineVar(compiler->env, "print", printfFunc, printfType, false);
+
+    return Success(Nothing, charptr, {});
 }
 
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
@@ -1400,7 +1417,7 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
         LLVMFloatTypeInContext(newCompiler->context),            // float
         LLVMDoubleTypeInContext(newCompiler->context),           // double
 
-        LLVMIntTypeInContext(newCompiler->context, 8),  // bool
+        LLVMInt1TypeInContext(newCompiler->context),             // bool
 
         LLVMVoidTypeInContext(newCompiler->context)             // void
     };

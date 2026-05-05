@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include "token.h"
 #include <ctype.h>
+#include <string.h>
 
 const char* KEYWORDS[] = {
     "for",
@@ -76,6 +77,24 @@ bool isKeyword(char* buffer) {
     return false;
 }
 
+bool isBoolean(char* buffer) {
+    if (strcmp(buffer, "true") == 0 || strcmp(buffer, "false") == 0) {
+        return true;
+    }
+
+    return false;
+}
+
+ResultType(CometToken, charptr) booleanToken(char* buffer) {
+    CometToken tok = {
+        .literalType = CL_BOOL,
+        .value.boolVal = strcmp(buffer, "true") == 0,
+        .type = CT_BOOL_LITERAL
+    };
+
+    return Success(CometToken, charptr, tok);
+}
+
 ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
     CometToken tok;
 
@@ -118,6 +137,12 @@ ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
 
     if (isKeyword(buffer)) {
         tok.type = CT_KEYWORD;
+    } else if (isBoolean(buffer)) {
+
+        ResultType(CometToken, charptr) boolTok = booleanToken(buffer);
+        free(buffer);
+        return boolTok;
+
     } else {
         tok.type = CT_IDENT;
     }
