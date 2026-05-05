@@ -933,7 +933,7 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
             .llvmType = llvmFieldType.as.success,
             .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident,
             .isPointer = LLVMGetTypeKind(llvmFieldType.as.success) == LLVMStructTypeKind,
-            .isConst = !fieldNode->data.AST_ASSIGN_STATEMENT.isMutable
+            .isConst = false,
         };
         append(structInfoFields, fieldInfo);
     }
