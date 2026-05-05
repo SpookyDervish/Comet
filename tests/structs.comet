@@ -13,6 +13,5 @@ struct Vector {
 func main() -> int {
     Vector myVector = new Vector(1, 2, 3)
     print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
-    print("%d\n", myVector.y != 2)
     return myVector.y != 2
 }
