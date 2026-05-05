@@ -116,6 +116,22 @@ ResultType(LLVMValueRef, charptr) castToType(LLVMBuilderRef builder, LLVMValueRe
                 targetType,
                 "sitof"
             ));
+    } else if (srcTypeKind == LLVMFloatTypeKind) {
+        if (targetTypeKind == LLVMDoubleTypeKind) 
+            return Success(LLVMValueRef, charptr, LLVMBuildFPExt(
+                builder, 
+                value,
+                targetType,
+                ""
+            ));
+    } else if (srcTypeKind == LLVMDoubleTypeKind) {
+        if (targetTypeKind == LLVMFloatTypeKind)
+            return Success(LLVMValueRef, charptr, LLVMBuildFPTrunc(
+                builder, 
+                value,
+                targetType,
+                ""
+            ));
     }
 
     char* srcTypeStr = LLVMPrintTypeToString(srcType);
