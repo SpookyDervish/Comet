@@ -2,7 +2,6 @@
 #define ARGS_H
 
 #include <argp.h>
-#include <bits/types/error_t.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include "../include/error.h"

@@ -4,7 +4,7 @@ SRC_FILES=$(wildcard $(SRC)/*.c)
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -Wextra $(shell llvm-config --cflags)
+CFLAGS=-Wall -Wextra $(shell llvm-config --cflags) -I/Users/nathaniel.chandler/.brew/opt/uthash/include
 LDFLAGS=$(shell llvm-config --ldflags)
 LDLIBS=$(shell llvm-config --libs all) $(shell llvm-config --system-libs)
 DEBUG_CFLAGS=-Wall -Wextra -ggdb $(shell llvm-config --cflags) -fsanitize=address -g

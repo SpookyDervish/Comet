@@ -1,5 +1,4 @@
 #include "args.h"
-#include "compiler.h"
 #include <argp.h>
 
 // define command line args
@@ -12,7 +11,7 @@ const struct argp_option options[] = {
     { 0 }
 };
 
-error_t parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
+int parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
     CometArgs* args = state->input;
 
     switch (key) {
