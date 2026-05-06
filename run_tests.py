@@ -26,7 +26,7 @@ class CometTester(unittest.TestCase):
                 obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"
                 program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
                 
-                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", obj_name])
+                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-O0", "-o", obj_name])
                 self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (comet)!")
                 
                 gcc_result = subprocess.run(["gcc", obj_name, "-o", program_name, "-no-pie"])
