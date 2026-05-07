@@ -1109,9 +1109,12 @@ ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTy
 
     if (!funcDef.isInline) {
         ResultType(int, charptr) bodyResult = compileBlock(compiler, funcDef.program);
+        
         if (bodyResult.error)
             return Error(int, charptr, bodyResult.as.error);
         doesReturn = bodyResult.as.success;
+
+        printf("does return? %d\n", doesReturn);
 
         // make sure the function returns
         if (!doesReturn) {
@@ -1227,7 +1230,9 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
             append(structInfoFields, fieldInfo);
 
             // visit func def
-            visitMethodDefStatement(compiler, funcType.as.success, fieldNode, structType, structInfo, funcDef);
+            ResultType(int, charptr) methodResult = visitMethodDefStatement(compiler, funcType.as.success, fieldNode, structType, structInfo, funcDef);
+            if (methodResult.error)
+                return methodResult;
         }
 
         
@@ -1357,9 +1362,17 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
             }
         }
     } else {
-        if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
+        printf("left = ");
+        printNode(node->data.AST_INFIX_EXPRESSION.left);
+        printf("\n");
+        printf("right = ");
+        printNode(node->data.AST_INFIX_EXPRESSION.right);
+        printf("\n");
+        printf("right.error: %d\n", right.error);
+        if (right.error)
+            printf("right.as.error: %s\n", right.as.error);
 
-            if (right.error) return Error(CometValue, charptr, right.as.error);
+        if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
 
             type = getType(compiler, "int");
 
@@ -1422,7 +1435,13 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                     return Error(CometValue, charptr, "Unexpected operator for int and int!");
             }
         } else {
-            return Error(CometValue, charptr, "Cannot perform operation on those types.");
+            Estr errMsg = CREATE_ESTR("Cannot use operator ");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(node->data.AST_INFIX_EXPRESSION.op.type));
+            APPEND_ESTR(errMsg, " on ");
+            APPEND_ESTR(errMsg, LLVMPrintTypeToString(left.as.success.type));
+            APPEND_ESTR(errMsg, " and ");
+            APPEND_ESTR(errMsg, LLVMPrintTypeToString(right.as.success.type));
+            return Error(CometValue, charptr, errMsg.str);
         }
     }
 
