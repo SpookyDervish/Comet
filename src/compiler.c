@@ -1055,9 +1055,12 @@ ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTy
 
     LLVMTypeRef returnType = LLVMGetReturnType(funcType);
 
+    printf("funcType = %s\n", LLVMPrintTypeToString(funcType));
+
     // get arg info
-    LLVMTypeRef* argTypes;
-    size_t numArgs = LLVMCountParams(function);;
+    
+    size_t numArgs = LLVMCountParams(function);
+    LLVMTypeRef argTypes[numArgs];
     LLVMGetParamTypes(funcType, argTypes);
 
     // set the current function
@@ -1198,6 +1201,7 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
         .name = structName,
         .fields = structInfoFields
     };
+    size_t structIndex = compiler->structs.count;
     append(compiler->structs, structInfo);
 
 
@@ -1220,15 +1224,16 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
                 .isPointer = true,
                 .isConst = true,
             };
+            append(structInfoFields, fieldInfo);
 
             // visit func def
             visitMethodDefStatement(compiler, funcType.as.success, fieldNode, structType, structInfo, funcDef);
         }
+
+        
     }
 
-    for (size_t i = 0; i < structInfoFields.count; i++) {
-        printf("%s\n", (*get(structInfoFields, i)).name);
-    }
+    
 
     LLVMStructSetBody(structType, fieldTypes.pointer, fieldTypes.count, false);
     
@@ -1241,6 +1246,8 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
         if (constructorResult.error)
             return constructorResult;
     }
+
+    get(compiler->structs, structIndex)->fields = structInfoFields;
 
     return Success(int, charptr, false);
 }
@@ -1722,8 +1729,6 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
 }
 
 ResultType(int, charptr) compile(CometCompiler* compiler, CometASTNode* node) {
-    printf("%s, %d\n", ASTNodeTypeToCStr(node->nodeType), node->nodeType);
-
     switch (node->nodeType) {
         case AST_PROGRAM:
             return visitProgram(compiler, node);
