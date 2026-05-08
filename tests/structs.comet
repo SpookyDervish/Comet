@@ -10,8 +10,7 @@ struct Vector {
     }
 
     func add(Vector other) -> void {
-        self.x = 456
-        print("add lol %x\n", self)
+        self.x = self.x + other.x
     }
 }
 
