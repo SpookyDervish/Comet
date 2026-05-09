@@ -21,6 +21,7 @@ typedef struct {
     bool isPointer;
     FieldAttribute attrib;
     bool isConst;
+    LLVMValueRef defaultValue;
 } StructField;
 
 UseList(StructField);

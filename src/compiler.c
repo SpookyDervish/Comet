@@ -923,7 +923,7 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
     return Success(int, charptr, false);
 }
 
-ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, CometASTNode* node, LLVMTypeRef structType, char* structName) {
+ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, CometASTNode* node, StructInfo structInfo) {
     struct AST_CONSTRUCTOR_DEF funcDef = node->data.AST_CONSTRUCTOR_DEF;
 
     
@@ -932,7 +932,7 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
     List(LLVMTypeRef) argTypes = newList(LLVMTypeRef);
 
     // add self to args
-    append(argTypes, LLVMPointerType(structType, 0));
+    append(argTypes, LLVMPointerType(structInfo.llvmType, 0));
 
     for (size_t i = 0; i < funcDef.args.count; i++) {
         struct AST_ARG_DEF arg = (*get(funcDef.args, i))->data.AST_ARG_DEF;
@@ -945,7 +945,7 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
     }
 
     // gen constructor name
-    Estr funcNameEstr = CREATE_ESTR(structName);
+    Estr funcNameEstr = CREATE_ESTR(structInfo.name);
     APPEND_ESTR(funcNameEstr, "_CONSTRUCTOR");
     char* funcName = funcNameEstr.str;
 
@@ -979,7 +979,7 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
 
     // allocate self
     LLVMValueRef selfValue = LLVMGetParam(function, 0);
-    defineVar(compiler->env, "self", selfValue, structType, false);
+    defineVar(compiler->env, "self", selfValue, structInfo.llvmType, false);
 
     
 
@@ -1003,6 +1003,29 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
         defineVar(compiler->env, argName, argPtr, argType, false);
     }
 
+    // fill in default fields
+    for (size_t i = 0; i < structInfo.fields.count; i++) {
+        StructField field = *get(structInfo.fields, i);
+        if (field.defaultValue != NULL) {
+            LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
+            LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), field.index, false);
+
+            Estr name = CREATE_ESTR(field.name);
+            APPEND_ESTR(name, "_default");
+
+            LLVMValueRef fieldPtr = LLVMBuildGEP2(
+                compiler->builder,
+                structInfo.llvmType,
+                selfValue,
+                (LLVMValueRef[]){ zero, index },
+                2,
+                name.str
+            );
+
+            LLVMBuildStore(compiler->builder, field.defaultValue, fieldPtr);
+        }
+    }
+
     ResultType(int, charptr) bodyResult = compileBlock(compiler, funcDef.program);
     if (bodyResult.error)
         return Error(int, charptr, bodyResult.as.error);
@@ -1021,10 +1044,6 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
 }
 
 ResultType(LLVMTypeRef, charptr) getMethodType(CometCompiler* compiler, LLVMTypeRef structType, StructInfo structInfo, struct AST_FUNC_DEF_STATEMENT funcDef) {
-    char* structName = structInfo.name;
-
-    bool doesReturn = false;
-
     ResultType(LLVMTypeRef, charptr) returnType = getType(compiler, funcDef.returnType->data.AST_IDENTIFIER.ident);
     if (returnType.error)
         return Error(LLVMTypeRef, charptr, returnType.as.error);
@@ -1050,8 +1069,6 @@ ResultType(LLVMTypeRef, charptr) getMethodType(CometCompiler* compiler, LLVMType
 } 
 
 ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTypeRef funcType, CometASTNode* node, LLVMTypeRef structType, StructInfo structInfo, struct AST_FUNC_DEF_STATEMENT funcDef) {
-    char* funcIdent = funcDef.ident->data.AST_IDENTIFIER.ident;
-
     // gen func name
     Estr funcName = CREATE_ESTR(structInfo.name);
     APPEND_ESTR(funcName, "_");
@@ -1173,12 +1190,21 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
 
                 append(fieldTypes, llvmFieldType.as.success);
 
+                CometValue defaultValue = {.value = NULL};
+                if (fieldNode->data.AST_ASSIGN_STATEMENT.expression) {
+                    ResultType(CometValue, charptr) defaultValueResult = resolveValue(compiler, fieldNode->data.AST_ASSIGN_STATEMENT.expression);
+                    if (defaultValueResult.error)
+                        return Error(int, charptr, defaultValueResult.as.error);
+                    defaultValue = defaultValueResult.as.success;
+                }
+
                 StructField fieldInfo = {
                     .index = i,
                     .llvmType = llvmFieldType.as.success,
                     .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident,
                     .isPointer = LLVMGetTypeKind(llvmFieldType.as.success) == LLVMStructTypeKind,
                     .isConst = false,
+                    .defaultValue = defaultValue.value
                 };
                 append(structInfoFields, fieldInfo);
                 break;
@@ -1249,7 +1275,7 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     
 
     if (structDef.constructor) {
-        ResultType(int, charptr) constructorResult = visitConstructorDefStatement(compiler, structDef.constructor, structType, structName);
+        ResultType(int, charptr) constructorResult = visitConstructorDefStatement(compiler, structDef.constructor, structInfo);
         if (constructorResult.error)
             return constructorResult;
     }
