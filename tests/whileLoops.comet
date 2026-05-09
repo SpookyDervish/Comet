@@ -1,0 +1,20 @@
+func main() -> int {
+    mut big a = 0
+    mut big b = 1
+
+    int n = 92
+    mut int i = 0
+
+    mut big temp
+
+    while i != n {
+        temp = a + b
+        a = b
+        b = temp
+
+        i = i + 1
+    }
+
+    print("The %dnd fib number is: %lld\n", n, a)
+    return a == 7540113804746346429
+}
