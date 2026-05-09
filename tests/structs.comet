@@ -11,6 +11,8 @@ struct Vector {
 
     func add(Vector other) -> void {
         self.x = self.x + other.x
+        self.y = self.y + other.y
+        self.z = self.z + other.z
     }
 }
 

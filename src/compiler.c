@@ -60,7 +60,6 @@ ResultType(CometValue, charptr) callStructMethod(CometCompiler* compiler, LLVMVa
     DESTROY_ESTR(structFuncName);
 
     List(LLVMValueRef) argValues = newList(LLVMValueRef);
-    printf("self = %s\n", LLVMPrintValueToString(self));
     append(argValues, self);
     for (size_t i = 0; i < funcCall.args.count; i++) {
         ResultType(CometValue, charptr) arg = resolveValue(compiler, *get(funcCall.args, i));
@@ -407,6 +406,7 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
         }
 
         case AST_IDENTIFIER: {
+            
             char* varName = node->data.AST_IDENTIFIER.ident;
             Record* varRecord = lookup(compiler->env, varName);
             if (!varRecord) {
@@ -706,8 +706,6 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
 
         Estr ptrName = CREATE_ESTR(fieldName);
         APPEND_ESTR(ptrName, "FieldPtr");
-
-        //pprintf("structToChange = %s\n", LLVMPrintValueToString(structToChange.as.success.pointer));
 
         LLVMValueRef ptr = LLVMBuildGEP2(
             compiler->builder,
@@ -1055,8 +1053,6 @@ ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTy
 
     LLVMTypeRef returnType = LLVMGetReturnType(funcType);
 
-    printf("funcType = %s\n", LLVMPrintTypeToString(funcType));
-
     // get arg info
     
     size_t numArgs = LLVMCountParams(function);
@@ -1095,9 +1091,9 @@ ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTy
         char* argName = arg.ident->data.AST_IDENTIFIER.ident;
         
 
-        LLVMTypeRef argType = argTypes[i];
+        LLVMTypeRef argType = argTypes[i+1];
 
-        LLVMValueRef argValue = LLVMGetParam(function, i);
+        LLVMValueRef argValue = LLVMGetParam(function, i+1);
         LLVMValueRef argPtr = LLVMBuildAlloca(compiler->builder, argType, argName);
         LLVMBuildStore(compiler->builder, argValue, argPtr);
 
@@ -1113,8 +1109,6 @@ ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTy
         if (bodyResult.error)
             return Error(int, charptr, bodyResult.as.error);
         doesReturn = bodyResult.as.success;
-
-        printf("does return? %d\n", doesReturn);
 
         // make sure the function returns
         if (!doesReturn) {
@@ -1273,10 +1267,6 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
     LLVMValueRef value;
     bool isPointer = false;
 
-    printf("left type is struct = %d\n", LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind);
-    printf("left = ");
-    printNode(node->data.AST_INFIX_EXPRESSION.left);
-    printf(", type = %s\n", LLVMPrintTypeToString(left.as.success.type));
     if (LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind) {
         switch (op.type) {
             case CT_DOT: {
@@ -1325,9 +1315,6 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                 LLVMValueRef zero   = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), 0, false);
                 LLVMValueRef index  = LLVMConstInt(LLVMInt32TypeInContext(compiler->context), fieldInfo->index, false);
 
-                //printf("left type = %s\n", LLVMPrintTypeToString(left.as.success.type));
-                //printf("left value = %s\n", LLVMPrintValueToString(left.as.success.pointer));
-
                 Estr ptrName = CREATE_ESTR(structInfo->name);
                 APPEND_ESTR(ptrName, "_access");
 
@@ -1366,13 +1353,9 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
             }
         }
     } else {
-        
-        printf("right = ");
-        printNode(node->data.AST_INFIX_EXPRESSION.right);
-        printf("\n");
-        printf("right.error: %d\n", right.error);
+
         if (right.error)
-            printf("right.as.error: %s\n", right.as.error);
+            return right;
 
         if (LLVMGetTypeKind(left.as.success.type) == LLVMIntegerTypeKind && LLVMGetTypeKind(right.as.success.type) == LLVMIntegerTypeKind) {
 
