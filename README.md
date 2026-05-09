@@ -34,8 +34,10 @@ Comet is a fast, compiled programming built on top of C and LLVM. It has an enor
   - [x] Inline functions
 - [ ] Structs
   - [ ] Struct definition
-    - [x] Fields
-      - [x] Private/protected/readonly
+    - [ ] Fields
+      - [ ] Private/protected/readonly
+      - [x] Default values
+      - [x] Accessing / setting fields
     - [x] Methods
     - [x] Constructor
     - [ ] Destructor
