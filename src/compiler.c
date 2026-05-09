@@ -1273,6 +1273,10 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
     LLVMValueRef value;
     bool isPointer = false;
 
+    printf("left type is struct = %d\n", LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind);
+    printf("left = ");
+    printNode(node->data.AST_INFIX_EXPRESSION.left);
+    printf(", type = %s\n", LLVMPrintTypeToString(left.as.success.type));
     if (LLVMGetTypeKind(left.as.success.type) == LLVMStructTypeKind) {
         switch (op.type) {
             case CT_DOT: {
@@ -1362,9 +1366,7 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
             }
         }
     } else {
-        printf("left = ");
-        printNode(node->data.AST_INFIX_EXPRESSION.left);
-        printf("\n");
+        
         printf("right = ");
         printNode(node->data.AST_INFIX_EXPRESSION.right);
         printf("\n");
