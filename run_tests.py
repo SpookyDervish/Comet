@@ -15,26 +15,30 @@ TESTS_FOLDER_NAME = "tests"
 TESTS_OBJ_FOLDER_NAME = "test_objs"
 
 
-class CometTester(unittest.TestCase):
-    def test_comet(self):
-        cases = os.listdir(TESTS_FOLDER_NAME)
+class CometTest(unittest.TestCase):
+    pass
+
+def make_test(case: str):
+    def test(self):
+        obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"
+        program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
         
-        self.assertTrue(os.path.isfile("./cometc"), "The comet compiler was not found in the same path as run_tests.py! Is there a \"cometc\" executable in the same folder?")
+        result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-O0", "-o", obj_name])
+        self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (comet)!")
         
-        for case in cases:
-            with self.subTest():
-                obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"
-                program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
-                
-                result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-O0", "-o", obj_name])
-                self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (comet)!")
-                
-                gcc_result = subprocess.run(["gcc", obj_name, "-o", program_name, "-no-pie"])
-                self.assertEqual(gcc_result.returncode, 0, f"{case} did not link successfully (gcc)!")
-                
-                program_result = subprocess.run([program_name], stdout=subprocess.DEVNULL)
-                self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
+        gcc_result = subprocess.run(["gcc", obj_name, "-o", program_name, "-no-pie"])
+        self.assertEqual(gcc_result.returncode, 0, f"{case} did not link successfully (gcc)!")
         
+        program_result = subprocess.run([program_name], stdout=subprocess.DEVNULL)
+        self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
+    return test
+
+for i, (test_name) in enumerate(os.listdir("tests")):
+    setattr(
+        CometTest,
+        f"test_{test_name}",
+        make_test(test_name)
+    )       
 
 if __name__ == "__main__":
     unittest.main()
