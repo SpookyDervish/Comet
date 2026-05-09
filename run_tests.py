@@ -32,7 +32,7 @@ class CometTester(unittest.TestCase):
                 gcc_result = subprocess.run(["gcc", obj_name, "-o", program_name, "-no-pie"])
                 self.assertEqual(gcc_result.returncode, 0, f"{case} did not link successfully (gcc)!")
                 
-                program_result = subprocess.run([program_name])
+                program_result = subprocess.run([program_name], stdout=subprocess.DEVNULL)
                 self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
         
 
