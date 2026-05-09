@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include "token.h"
 #include <ctype.h>
+#include <stdbool.h>
 #include <string.h>
 
 const char* KEYWORDS[] = {
@@ -159,12 +160,21 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
     unsigned int bufferPos = 0;
     char* buffer = malloc(bufferSize);
 
+    bool isNegative = false;
     bool isFloat = false;
+
 
     while (lexer->pos < lexer->sourceLen) {
         char current = lexer->currentChar;
 
-        if (current == '.') {
+        if (current == '-') {
+            if (isNegative) {
+                free(buffer);
+                return Error(CometToken, charptr, "Malformed number! (has multiple negative signs)");
+            }
+
+            isNegative = true;
+        } else if (current == '.') {
 
             if (isFloat) {
                 free(buffer);
@@ -386,6 +396,13 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 if (!arrow.error && arrow.as.success == '>') {
                     lexerConsume(lexer);
                     append(tokens, TOKEN_LITERAL(CT_ARROW, "->"));
+                 } else if (isdigit(arrow.as.success)) {
+
+                    ResultType(CometToken, charptr) numberTok = lexerParseNumber(lexer);
+                    if (numberTok.error)
+                        return Error(tokenList, charptr, numberTok.as.error);
+
+                    append(tokens, numberTok.as.success);
                  } else {
                     append(tokens, TOKEN_LITERAL(CT_MINUS, "-"));
                  }

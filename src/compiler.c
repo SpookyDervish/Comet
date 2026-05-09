@@ -886,6 +886,11 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
     if (stepValue.error)
         return Error(int, charptr, stepValue.as.error);
 
+    CometEnvironment* forLoopEnv = newEnvironment("forLoop", compiler->env);
+    CometEnvironment* oldEnv = compiler->env;
+
+    compiler->env = forLoopEnv;
+
     LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varType.as.success, identName);
     LLVMBuildStore(compiler->builder, startValue.as.success.value, ptr);
     defineVar(compiler->env, identName, ptr, varType.as.success, false);
@@ -911,6 +916,9 @@ ResultType(int, charptr) visitForStatement(CometCompiler* compiler, CometASTNode
     LLVMBuildCondBr(compiler->builder, isNotEqual, forLoopEntry, forLoopOtherwise);
 
     LLVMPositionBuilderAtEnd(compiler->builder, forLoopOtherwise);
+
+    compiler->env = oldEnv;
+    free(forLoopEnv);
 
     return Success(int, charptr, false);
 }
