@@ -1,6 +1,7 @@
 :root {
     --bg: #12151d;
     --code-bg: #0a0a0f;
+    --dark-bg: #0a0a0f;
     --secondary-bg: #1f222e;
     --nav-bg: rgba(31, 34, 46, 0.5);
     --teritary-bg: #262d4e;
@@ -44,13 +45,8 @@ nav {
         list-style: none;
 
         li {
-            margin-right: 20px;
+            margin-right: 2.5em;
             font-size: 1.2em;
-            
-            a {
-                text-decoration: none;
-                color: var(--link);
-            }
         }
     }
 }
@@ -207,7 +203,9 @@ h2 {
 
 a:not(.btn) {
     
+    text-decoration: none;
     position: relative;
+    color: var(--link);
 
     &::before {
         content: '';
@@ -230,6 +228,26 @@ a:not(.btn) {
         }
     }
     
+}
+
+#bottom {
+    display: flex;
+    justify-content: space-evenly;
+    padding: 40px;
+    background: var(--dark-bg);
+
+    .column {
+        list-style: none;
+
+        h1 {
+            margin-bottom: 0.5em;
+        }
+        
+        li {
+            margin-bottom: 1em;
+        }
+
+    }
 }
 
 @media only screen and (max-width: 900px) {
