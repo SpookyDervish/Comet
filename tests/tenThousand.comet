@@ -1,0 +1,6 @@
+func main() -> int {
+    for int i in 1 .. 100001 {
+        print("%d\n", i)
+    }
+    return 0
+}
