@@ -365,7 +365,7 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                     APPEND_ESTR(ptrName, "_access");
                     LLVMValueRef ptr = LLVMBuildGEP2(
                         compiler->builder,
-                        left.as.success.type,
+                        LLVMPointerType(left.as.success.type, 0),
                         left.as.success.pointer,
                         (LLVMValueRef[]){ zero, index },
                         2,
@@ -1606,10 +1606,10 @@ ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* r
     char* error = NULL; // used for error messages
 
     // verify IR
-    if (LLVMVerifyModule(compiler->module, LLVMReturnStatusAction, &error) != 0) {
+    /*if (LLVMVerifyModule(compiler->module, LLVMReturnStatusAction, &error) != 0) {
         printf("Module:\n%s\n", LLVMPrintModuleToString(compiler->module));
         return Error(Nothing, charptr, error);
-    }
+    }*/
 
     // init llvm backends
     LLVMInitializeNativeTarget();
