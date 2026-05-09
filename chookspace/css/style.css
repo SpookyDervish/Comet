@@ -57,7 +57,7 @@ span.glow {
 }
 
 #main {
-
+    padding-top: 3.5em;
 
     #outer {
         display: flex;

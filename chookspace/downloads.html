@@ -1,12 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comet - Downloads</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/downloads-style.css">
 </head>
+
 <body>
+    <script>
+        async function getReleases() {
+            try {
+                const response = await fetch("https://chookspace.com/api/repos/comet/comet/releases");
+
+                if (!response.ok) {
+                    throw new Error("Could not get releases");
+                }
+
+                const data = await response.json();
+                console.log(data)
+                return data
+            } catch (error) {
+                console.error("Error fetching releases:", error)
+            }
+        }
+
+        const releases = getReleases();
+    </script>
+
     <nav>
         <ul>
             <li><a href="index.html">Home</a></li>
@@ -15,8 +38,49 @@
         </ul>
     </nav>
 
-    <main>
+    <main id="main">
+        <div id="outer">
+            <div id="inner">
+                <h1>Download Comet</h1>
+                <p>Start your journey.</p>
+                <div class="horizontal">
+                    <a href="downloads/latest.tar" class="btn btn-primary">Download Latest (1.0.0)</a>
+                    <a href="#versions" class="btn">Other Versions</a>
+                </div>
+            </div>
+        </div>
 
+        <div id="versions">
+            <h1>Versions</h1>
+
+            <div id="table">
+                <div id="table-header">
+                    <p>Version</p>
+                    <p>Released</p>
+                    <p>Download</p>
+                </div>
+                <div id="table-body">
+                    <div class="row">
+                        <p>0.0.1</p>
+                        <p>May 10th, 2026</p>
+                        <p><a href="downloads/0.0.1.tar">Download</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <div id="bottom">
+        <ul class="column">
+            <h1><span class="glow">Comet</span></h1>
+            <li><a href="docs.html">Docs</a></li>
+            <li><a href="downloads.html">Download</a></li>
+        </ul>
+        <ul class="column">
+            <h1>Community</h1>
+            <li><a href="packages.html">Packages</a></li>
+        </ul>
+    </div>
 </body>
+
 </html>
