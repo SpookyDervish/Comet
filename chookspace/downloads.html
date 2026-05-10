@@ -55,7 +55,7 @@
             console.log(createdAtDate);
 
             const createdAt = document.createElement("p");
-            createdAt.innerText = `${createdAtDate.toLocalString("en-US", {
+            createdAt.innerText = `${createdAtDate.toLocaleString("en-US", {
                 month: "long"
             })} ${ordinal(day)}, ${createdAtDate.getFullYear()}`
             newRelease.append(createdAt);
