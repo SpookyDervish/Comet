@@ -34,7 +34,10 @@ func main() -> int {
 
     print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
 
+    print("test\n")
     Child myChildVector = new Child(1, 2, 3)
+    print("test 2\n")
+    
     myChildVector.add(new Vector(1, 2, 3))
 
     return myVector.y != 4
