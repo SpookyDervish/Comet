@@ -1151,6 +1151,21 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
         }
     }
 
+    // account for inheritance
+    if (structInfo.parent) {
+        // get parent constructor
+        Estr parentConstructorName = CREATE_ESTR(structInfo.parent->name);
+        APPEND_ESTR(parentConstructorName, "_CONSTRUCTOR");
+
+        LLVMValueRef parentConstructor = LLVMGetNamedFunction(compiler->module, parentConstructorName.str);
+        LLVMTypeRef parentConstructorType = LLVMTypeOf(parentConstructor);
+
+        printf("%s\n", LLVMPrintTypeToString(parentConstructorType));
+        defineVar(compiler->env, "super", parentConstructor,parentConstructorType, false);
+
+        DESTROY_ESTR(parentConstructorName);
+    }
+
     ResultType(int, charptr) bodyResult = compileBlock(compiler, funcDef.program);
     if (bodyResult.error)
         return Error(int, charptr, bodyResult.as.error);
