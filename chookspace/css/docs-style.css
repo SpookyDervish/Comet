@@ -6,13 +6,13 @@
     overflow-y: scroll;
     position: fixed;
     background: var(--secondary-bg);
-    width: 250px;
     border-right: 1px solid var(--border);
-    padding: 16px;
-}
+    padding: 16px 30px;
+    top: 3.5em;
 
-nav {
-    margin-left: 250px;
+    ul ul {
+        margin-left: 20px;
+    }
 }
 
 #main {
@@ -20,7 +20,7 @@ nav {
     
 
     #inner {
-        margin-left: 250px;
+        margin-left: 17.5em;
         padding: 50px;
 
         max-width: 1100px;
