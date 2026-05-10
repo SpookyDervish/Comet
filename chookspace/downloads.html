@@ -39,7 +39,7 @@
             newRelease.append(version);
 
             const createdAtDate = new Date(data.published_at);
-            const day = data.getDate();
+            const day = createdAtDate.getDate();
 
             function ordinal(n) {
                 if (n > 3 && n < 21) return `${n}th`;
@@ -53,9 +53,9 @@
             }
 
             const createdAt = document.createElement("p");
-            createdAt.innerText = `${data.toLocalString("en-US", {
+            createdAt.innerText = `${createdAtDate.toLocalString("en-US", {
                 month: "long"
-            })} ${ordinal(day)}, ${data.getFullYear()}`
+            })} ${ordinal(day)}, ${createdAtDate.getFullYear()}`
             newRelease.append(createdAt);
 
             const link = document.createElement("a");
