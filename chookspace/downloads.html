@@ -27,7 +27,7 @@
                 <h1>Download Comet</h1>
                 <p>Start your journey.</p>
                 <div class="horizontal">
-                    <a href="#" class="btn btn-primary">Download Latest</a>
+                    <a href="#" id="latest" class="btn btn-primary">Download Latest</a>
                     <a href="#versions" class="btn">Other Versions</a>
                 </div>
             </div>
@@ -67,6 +67,7 @@
 
     <script>
         const releasesTable = document.getElementById("table-body");
+        const latestBtn = document.getElementById("latest");
 
         async function getReleases() {
             try {
@@ -123,8 +124,13 @@
         async function main() {
             const releases = await getReleases();
             releases.forEach(element => {
-                createRelease(element)
+                createRelease(element);
             });
+
+            if (releases.length > 0) {
+                latestBtn.innerText = `Download Latest (${releases[0].tag_name})`;
+                latestBtn.href = releases[0].html_url;
+            }
         }
 
         main();
