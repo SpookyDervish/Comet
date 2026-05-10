@@ -9,9 +9,26 @@
     --text: #cccce5;
     --border: #3a3a61;
     --text-dark: #1a1a1a;
+    --text-shadow: rgba(19, 26, 31, 0.5);
     --text-dark-hover: #3a3a5a;
     --link: #92AFD7;
     --primary: #92AFD7;
+
+    --warn-bg: rgba(191, 139, 34, 0.5);
+    --warn-border: #d8b05e;
+    --warn-text: rgb(252, 215, 141);
+
+    --info-bg: rgba(96, 145, 214, 0.5);
+    --info-border: #92AFD7;
+    --info-text: #c0ccdd;
+
+    --success-bg: rgba(96, 214, 145, 0.5);
+    --success-border: #92d7a1;
+    --success-text: #c0ddc2;
+
+    --error-bg: rgba(145, 96, 96, 0.5);
+    --error-border: #d79292;
+    --error-text: #ddc0c0;
 }
 
 * {
@@ -58,11 +75,12 @@ span.glow {
 
 #main {
     padding-top: 3.5em;
+    background: var(--teritary-bg);
 
     #outer {
         display: flex;
         justify-content: center;
-        background: var(--teritary-bg);
+        
         padding: 50px 0;
 
         #inner {
@@ -87,10 +105,14 @@ span.glow {
             }
         }
     }
-    
+}
 
+h1 {
+    text-shadow: 3px 3px 0px var(--text-shadow);
+}
 
-
+h2 {
+    text-shadow: 2px 2px 0px var(--text-shadow);
 }
 
 @keyframes ButtonGlint {
@@ -162,17 +184,7 @@ h2 {
             margin-bottom: 0.75em;
         }
 
-        .code {
-            margin-left: 2em;
-            flex: 1;
-            background: var(--code-bg);
-            border-radius: 8px;
-            padding: 1em;
-            border: 1px solid var(--border);
-            max-width: 600px;
-
-            box-shadow: 5px 5px 5px var(--bg);
-        }
+        
 
         &.showcase-right {
             text-align: right;
@@ -185,11 +197,24 @@ h2 {
     }
 }
 
+.code {
+    margin-left: 2em !important;
+    flex: 1 !important;
+    background: var(--code-bg) !important;
+    border-radius: px !important;
+    padding: 1em !important;
+    border: 1px solid var(--border) !important;
+    max-width: 600px !important;
+
+    box-shadow: 5px 5px 5px var(--bg) !important;
+}
+
 #open-source {
     padding: 80px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    background: var(--bg);
 
     h2 {
         margin-bottom: 1.2em;

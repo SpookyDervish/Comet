@@ -197,3 +197,35 @@ struct MyStruct {
 MyStruct new_struct = new MyStruct()
 print(new_struct to string) -- "<MyStruct test=123>"
 ```
+
+## Exceptions
+### Catching Exceptions:
+```lua
+try {
+    float x = 10 / 0
+} except (ZeroDivisionError) {
+    print("Attempt to divide by zero!")
+}
+```
+
+### Throwing Exceptions:
+```lua
+func foo() -> void {
+    throw new OutOfBoundsError("epic fail")
+}
+
+func main() -> int {
+    foo() -- error!
+    return 0
+}
+```
+
+### Creating Exceptions:
+```lua
+struct MyError : BaseError {
+}
+
+func foo() -> void {
+    throw new MyError("some message")
+}
+```

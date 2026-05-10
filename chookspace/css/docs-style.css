@@ -1,0 +1,91 @@
+#sidebar {
+    float: left;
+    height: 100vh;
+    overflow-y: scroll;
+    position: fixed;
+    background: var(--secondary-bg);
+    width: 250px;
+    border-right: 1px solid var(--border);
+    padding: 16px;
+}
+
+nav {
+    margin-left: 250px;
+}
+
+#main {
+    background: var(--teritary-bg);
+    
+
+    #inner {
+        margin-left: 250px;
+        padding: 50px;
+
+        max-width: 1100px;
+    }
+
+    p:not(.note-text) {
+        margin-bottom: 1em;
+    }
+}
+
+.note {
+    padding: 12px;
+    border-radius: 5px;
+    margin: 1.25em 12px;
+    user-select: none;
+    max-width: 75%;
+
+    &.note-warn {
+        border: dashed 2px var(--warn-border);
+        background: var(--warn-bg);
+        box-shadow: 0px 0px 7px var(--warn-bg);
+
+
+        * {
+            color: var(--warn-text);
+        }
+        
+    }
+
+    &.note-info {
+        border: solid 2px var(--info-border);
+        background: var(--info-bg);
+        box-shadow: 0px 0px 7px var(--info-bg);
+
+        * {
+            color: var(--info-text);
+        }
+    }
+
+    &.note-success {
+        border: solid 2px var(--success-border);
+        background: var(--success-bg);
+        box-shadow: 0px 0px 7px var(--success-bg);
+
+
+        * {
+            color: var(--success-text);
+        }
+    }
+
+    &.note-error {
+        border: dashed 2px var(--error-border);
+        background: var(--error-bg);
+        box-shadow: 0px 0px 7px var(--error-bg);
+
+
+        * {
+            color: var(--error-text);
+        }
+    }
+}
+
+.command {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    font-size: 16px;
+    padding: 8px;
+    margin: 1em 0;
+}

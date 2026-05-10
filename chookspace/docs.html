@@ -1,11 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Comet - Docs</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/docs-style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+
+    <link rel="stylesheet" href="assets/prism.css">
+    <script src="assets/prism.js"></script>
 </head>
+
 <body>
     <nav>
         <ul>
@@ -14,5 +21,101 @@
             <li><a href="downloads.html">Download</a></li>
         </ul>
     </nav>
+
+    <div id="sidebar">
+        <ul>
+            <h2>Specification</h1>
+            <li><a href="#intro">Getting Started</a></li>
+            <ul>
+                <li><a href="#intro">Introduction</a></li>
+                <li><a href="#install">Installation</a></li>
+                <ul>
+                    <li><a href="#building-from-source">Building From Source</a></li>
+                </ul>
+            </ul>
+            <li><a href="#variables">Variables</a></li>
+        </ul>
+    </div>
+
+    <main id="main">
+        <div id="inner">
+            <div id="spec">
+                
+                <div id="intro">
+                    <h1>Introduction</h1>
+                    <p>Welcome to the Comet docs! The Comet docs are a tutorial and specification for the syntax of Comet.</p>
+                    
+                    <h2>"What is Comet?"</h2>
+                    <p>Comet is an object orientated, compiled programming language designed to be the solution to many of the issues with other languages. It has a few core goals:</p>
+                    <ul style="list-style: inside;">
+                        <li>Don't be C++, because C++ has terrible names for everything.</li>
+                        <li>Don't be Rust (or Zig), because Rust is ugly.</li>
+                        <li>Don't be Go, because Go is garbage collected.</li>
+                        <li>Don't be Python, because Python is slow.</li>
+                        <li>Don't be C, because C isn't object orientated.</li>
+                        <li>Don't be Java, because Java is <b>FAR</b> too verbose.</li>
+                        <li>Don't be JavaScript, because JavaScript isn't type safe.</li>
+                    </ul>
+                    <div class="note note-warn">
+                        <h3 class="note-title"><i class="fa fa-exclamation" aria-hidden="true"></i> Warning</h1>
+                        <p class="note-text">Comet is still very, <b>VERY</b> early in development! Here be dragons!</p>
+                    </div>
+                </div>
+                
+                <div id="install">
+                    <h1>Installation</h1>
+                    <p>Because of the beta state of Comet, there is no installer of installation script available at the moment. The only way to install is by <a href="#building-from-source">building from source</a>.</p>
+                    <div id="building-from-source">
+                        <h2>Building From Source</h2>
+                        <div class="note note-info">
+                            <h3 class="note-title"><i class="fa fa-info" aria-hidden="true"></i> Note</h1>
+                            <p class="note-text">Comet is not <b>entirely</b> supported on Windows yet. (due to argp)</p>
+                        </div>
+                        <p>To build comet, you first have to get the repo. Make sure you have <a href="https://git-scm.com/install/">Git</a> and <a href="https://releases.llvm.org/">LLVM</a> installed before anything else. Once you have git installed, type these commands in a terminal to clone the repository, build solstice, and install it:</p>
+                        <pre class="command">git clone https://chookspace.com/comet/comet &&
+cd comet &&
+make &&
+sudo make install</pre>
+                        <p>If you didn't see any errors... hooray! <b>Solstice is now installed!</b></p>
+                    </div>
+                </div>
+                
+                <div id="variables">
+                    <h1>Variables</h1>
+                    <p>This is the syntax for defining a variable in Comet:</p>
+                    <pre class="code"><code class="language-go">type name = value</code></pre>
+                    <br/>
+                    <p>In this example:</p>
+                    <ul>
+                        <li>"type" is the type of the variable. It can either be an inbuilt type or a struct. (See <a href="#structs">structs</a>)</li>
+                        <li>"name" is the name of the variable. Variable names are in camelCase, can't start with numbers, and must be alphanumeric.</li>
+                        <li>"value" is what you want to set the variable to. This can be any expression. That means a variable can be set to a number, an instance of a struct, another variable, etc...</li>
+                    </ul>
+                    <br/>
+                    <h2>Built-in Types</h2>
+                    <p>Comet has a few built in types:</p>
+                    <ul>
+                        <li>small  - An 8 bit integer.</li>
+                        <li>int    - A 32 bit integer. This is what you would use for most calculations.</li>
+                        <li>big    - A 64 bit integer.</li>
+                        <li>float  - A single precision floating point number.</li>
+                        <li>double - A double precision floating point number.</li>
+                        <li>bool   - Either "true" or "false".</li>
+                        <li>void   - Nothing. You can't make a variable be of type void. Use this when you want to make a function that doesn't return anything.</li>
+                    </ul>
+                    <br/>
+                    <p>Variables can also be uninitialized, however this is bad practice and should only be used when needed. Uninitialized variables have no default value and thus contain garbage until you change them.</p>
+                    <p>An example of creating an uninitialized variable:</p>
+                    <pre class="code"><code class="language-go">int myNumber</code></pre>
+                    
+                    
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
 </body>
+
 </html>
