@@ -65,8 +65,8 @@
             releasesTable.append(newRelease)
         }
 
-        const releases = getReleases();
-        releases[0].forEach(element => {
+        const releases = await getReleases();
+        releases.forEach(element => {
             createRelease(element)
         });
     </script>
