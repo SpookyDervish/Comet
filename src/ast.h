@@ -43,6 +43,7 @@ typedef enum {
     AST_CONSTRUCTOR_DEF,
     AST_AS_FUNC_DEV,
     AST_NEW_STATEMENT,
+    AST_OVERRIDE_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -106,6 +107,9 @@ struct CometASTNode {
             CometASTNode* destructor;
             CometASTNode* parentName;
         } AST_STRUCT_DEF_STATEMENT;
+        struct AST_OVERRIDE_STATEMENT {
+            CometASTNode* funcDef;
+        } AST_OVERRIDE_STATEMENT;
         struct AST_CONSTRUCTOR_DEF {
             CometASTNode* program;
             List(astNodePtr) args;

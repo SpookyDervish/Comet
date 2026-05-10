@@ -9,6 +9,10 @@ struct Animal {
 }
 
 struct Dog : Animal {
+    override func speak() -> void {
+        print("Woof!\n")
+    }
+
     init() {}
 }
 
@@ -16,7 +20,7 @@ func main() -> int {
     Animal myAnimal = new Animal()
     myAnimal.speak()
 
-    Dog myDog = new Dog()
+    Dog myDog = new Animal()
     myDog.speak()
 
     return 0

@@ -102,7 +102,7 @@ LLVMValueRef getStructMethod(CometCompiler* compiler, StructInfo* structInfo, ch
 
         DESTROY_ESTR(structFuncName);
     } else {
-        StructInfo* currentParent = structInfo->parent;
+        StructInfo* currentParent = structInfo;
 
         // struct inherits from something, climb the parent tree until we find it
         while (true) {
@@ -110,7 +110,11 @@ LLVMValueRef getStructMethod(CometCompiler* compiler, StructInfo* structInfo, ch
             APPEND_ESTR(structFuncName, "_");
             APPEND_ESTR(structFuncName, funcName);
 
+            printf("func name: %s\n", structFuncName.str);
+
             function = LLVMGetNamedFunction(compiler->module, structFuncName.str);
+            printf("exists: %d\n", function != NULL);
+
             if (function != NULL) {
                 break;
             }
@@ -1342,7 +1346,8 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
                 break;
             }
 
-            case AST_FUNC_DEF_STATEMENT: {
+            case AST_FUNC_DEF_STATEMENT:
+            case AST_OVERRIDE_STATEMENT: {
                 break; // do func defs last or else we wont initialize all the other fields first
             }
 
@@ -1380,28 +1385,85 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldNode = (*get(structDef.fieldDefs, i));
 
-        if (fieldNode->nodeType == AST_FUNC_DEF_STATEMENT) {
-            struct AST_FUNC_DEF_STATEMENT funcDef = fieldNode->data.AST_FUNC_DEF_STATEMENT;
+        switch (fieldNode->nodeType) {
+            case AST_FUNC_DEF_STATEMENT: {
+                struct AST_FUNC_DEF_STATEMENT funcDef = fieldNode->data.AST_FUNC_DEF_STATEMENT;
+                char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
-            ResultType(LLVMTypeRef, charptr) funcType = getMethodType(compiler, structType, structInfo, funcDef);
-            if (funcType.error)
-                return Error(int, charptr, funcType.as.error);
+                ResultType(LLVMTypeRef, charptr) funcType = getMethodType(compiler, structType, structInfo, funcDef);
+                if (funcType.error)
+                    return Error(int, charptr, funcType.as.error);
 
-            // add func to struct
-            StructField fieldInfo = {
-                .index = i,
-                .llvmType = funcType.as.success,
-                .name = funcDef.ident->data.AST_IDENTIFIER.ident,
-                .isPointer = true,
-                .isConst = true,
-                .attrib = funcDef.attrib
-            };
-            append(structInfoFields, fieldInfo);
+                StructField* existingFunc = findField(structInfo, funcName);
+                if (existingFunc != NULL) {
+                    Estr errMsg = CREATE_ESTR("Method \"");
+                    APPEND_ESTR(errMsg, funcName);
+                    APPEND_ESTR(errMsg, "\" redefined in struct \"");
+                    APPEND_ESTR(errMsg, structInfo.name);
+                    APPEND_ESTR(errMsg, "\"");
 
-            // visit func def
-            ResultType(int, charptr) methodResult = visitMethodDefStatement(compiler, funcType.as.success, fieldNode, structType, structInfo, funcDef);
-            if (methodResult.error)
-                return methodResult;
+                    if (structInfo.parent) {
+                        APPEND_ESTR(errMsg, " Did you forget the \"override\" keyword?");
+                    }
+
+                    return Error(int, charptr, errMsg.str);
+                }
+
+                // add func to struct
+                StructField fieldInfo = {
+                    .index = i,
+                    .llvmType = funcType.as.success,
+                    .name = funcDef.ident->data.AST_IDENTIFIER.ident,
+                    .isPointer = true,
+                    .isConst = true,
+                    .attrib = funcDef.attrib
+                };
+                append(structInfoFields, fieldInfo);
+                structInfo.fields.count = structInfoFields.count; // ensure we are updating the fields list each time we add a method
+
+                // visit func def
+                ResultType(int, charptr) methodResult = visitMethodDefStatement(compiler, funcType.as.success, fieldNode, structType, structInfo, funcDef);
+                if (methodResult.error)
+                    return methodResult;
+                break;
+            }
+            case AST_OVERRIDE_STATEMENT: {
+                struct AST_FUNC_DEF_STATEMENT funcDef = fieldNode->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT;
+
+                // get func type
+                ResultType(LLVMTypeRef, charptr) funcType = getMethodType(compiler, structType, structInfo, funcDef);
+                if (funcType.error)
+                    return Error(int, charptr, funcType.as.error);
+
+                // parent func doesnt exist so we cant override it
+                StructField* existingFunc = findField(structInfo, funcDef.ident->data.AST_IDENTIFIER.ident);
+                if (!existingFunc) {
+                    Estr errMsg = CREATE_ESTR("Cannot override method \"");
+                    APPEND_ESTR(errMsg, "because it doesn't exist in the parent struct.");
+                    return Error(int, charptr, errMsg.str);
+                }
+
+                // parent func type and child func type don't match types
+                if (existingFunc->llvmType != funcType.as.success || existingFunc->attrib != funcDef.attrib) {
+                    Estr errMsg = CREATE_ESTR("Conflicting types for method \"");
+                    APPEND_ESTR(errMsg, existingFunc->name);
+                    APPEND_ESTR(errMsg, "\" of struct \"");
+                    APPEND_ESTR(errMsg, structInfo.name);
+                    APPEND_ESTR(errMsg, "\"");
+                    return Error(int, charptr, errMsg.str);
+                }
+
+                // TODO: override function
+
+                // visit func def
+                ResultType(int, charptr) methodResult = visitMethodDefStatement(compiler, funcType.as.success, fieldNode, structType, structInfo, funcDef);
+                if (methodResult.error)
+                    return methodResult;
+
+                break;
+            }
+            default: // unreachable
+                break;
         }
 
         

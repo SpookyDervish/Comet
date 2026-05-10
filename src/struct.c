@@ -33,8 +33,8 @@ void printStructFields(structFieldList fields) {
     index: %d\n \
     access: %d\n \
     default value: %s\n \
-    const: %d\n \
-    pointer: %d\n \
+    is const? %d\n \
+    is pointer? %d\n \
     llvm type: %s\n", field.name, field.index, field.attrib, defaultValue, field.isConst, field.isPointer, llvmType);
     
         LLVMDisposeMessage(defaultValue);

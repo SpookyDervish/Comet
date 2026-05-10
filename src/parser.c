@@ -1087,12 +1087,9 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         CometASTNode* statement = blockProgram.statements[i];
 
         switch (statement->nodeType) {
-            case AST_ASSIGN_STATEMENT: {
-                append(fieldDefs, statement);
-                break;
-            }
-
-            case AST_FUNC_DEF_STATEMENT: {
+            case AST_ASSIGN_STATEMENT:
+            case AST_FUNC_DEF_STATEMENT:
+            case AST_OVERRIDE_STATEMENT: {
                 append(fieldDefs, statement);
                 break;
             }
@@ -1141,6 +1138,17 @@ ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser) 
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseOverrideStatement(CometParser* parser, FieldAttribute fieldAttrib) {
+    parserNextToken(parser); // skip "override"
+
+    ResultType(astNodePtr, charptr) funcDef = parseFunctionDefStatement(parser, fieldAttrib);
+    if (funcDef.error)
+        return funcDef;
+
+    CometASTNode* stmt = AST_NODE(AST_OVERRIDE_STATEMENT, funcDef.as.success);
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -1171,7 +1179,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute
                strcmp(keyword, "protected") == 0   ) {
         parserNextToken(parser);
         return parseStatement(parser, strcmp(keyword, "mut") == 0, fieldAttribStringToAttribEnum(keyword));
-    
+    } else if (strcmp(keyword, "override") == 0) {
+         return parseOverrideStatement(parser, fieldAttrib);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
