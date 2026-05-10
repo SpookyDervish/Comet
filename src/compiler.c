@@ -32,6 +32,48 @@ const char* BUILT_IN_TYPES[] = {
 
 
 // -- HELPER FUNCTIONS -- //
+bool structsAreEqual(StructInfo* struct1, StructInfo* struct2) {
+    if (!struct1 || !struct2) {
+        return false;
+    }
+
+    return struct1->fields.pointer == struct2->fields.pointer;
+}
+
+FieldAccessPerms canAccessField(CometCompiler* compiler, StructField fieldInfo, StructInfo* structInfo) {
+    bool canRead = true;
+    bool canWrite = true;
+    char* fieldType = "unkown";
+
+    switch (fieldInfo.attrib) {
+        case FIELD_PRIVATE:
+            canRead = structsAreEqual(compiler->currentStruct, structInfo);
+            canWrite = canRead;
+            fieldType = "private";
+            break;
+        case FIELD_PROTECTED:
+            canRead = structsAreEqual(compiler->currentStruct, structInfo);
+            canWrite = canRead;
+            fieldType = "protected";
+            break;
+        case FIELD_READ_ONLY:
+            canRead = true;
+            canWrite = structsAreEqual(compiler->currentStruct, structInfo);
+            fieldType = "read only";
+            break;
+        default:
+            canRead = true;
+            canWrite = true;
+            break;
+    }
+
+    return (FieldAccessPerms){
+        .canRead = canRead,
+        .canWrite = canWrite,
+        .fieldType = fieldType
+    };
+}
+
 ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName) {
     for (size_t i = 0; i < compiler->typeMap.count; i++) {
         CometLLVMTypePair type = *get(compiler->typeMap, i);
@@ -692,6 +734,18 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
             return Error(int, charptr, errMsg.str);
         }
 
+        FieldAccessPerms fieldAccessPerms = canAccessField(compiler, *fieldInfo, structInfo);
+        if (!fieldAccessPerms.canWrite) {
+            Estr errMsg = CREATE_ESTR("Cannot change field \"");
+            APPEND_ESTR(errMsg, fieldName);
+            APPEND_ESTR(errMsg, "\" of struct \"");
+            APPEND_ESTR(errMsg, structInfo->name);
+            APPEND_ESTR(errMsg, "\" because it is ");
+            APPEND_ESTR(errMsg, fieldAccessPerms.fieldType);
+            APPEND_ESTR(errMsg, ".");
+            return Error(int, charptr, errMsg.str);
+        }
+
         if (fieldInfo->isConst) {
             Estr errMsg = CREATE_ESTR("Attempt to change constant field \"");
             APPEND_ESTR(errMsg, fieldName);
@@ -1204,7 +1258,8 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
                     .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident,
                     .isPointer = LLVMGetTypeKind(llvmFieldType.as.success) == LLVMStructTypeKind,
                     .isConst = false,
-                    .defaultValue = defaultValue.value
+                    .defaultValue = defaultValue.value,
+                    .attrib = fieldNode->data.AST_ASSIGN_STATEMENT.attrib
                 };
                 append(structInfoFields, fieldInfo);
                 break;
@@ -1235,7 +1290,14 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     size_t structIndex = compiler->structs.count;
     append(compiler->structs, structInfo);
 
-
+    // set the compilers current struct context
+    StructInfo* previousStructContext = compiler->currentStruct;
+    StructInfo* currentStruct = malloc(sizeof(StructInfo));
+    if (currentStruct == NULL) {
+        return Error(int, charptr, "visitStructDefStatement: failed to allocate memory for StructInfo object!");
+    }
+    *currentStruct = structInfo;
+    compiler->currentStruct = currentStruct;
 
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldNode = (*get(structDef.fieldDefs, i));
@@ -1254,6 +1316,7 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
                 .name = funcDef.ident->data.AST_IDENTIFIER.ident,
                 .isPointer = true,
                 .isConst = true,
+                .attrib = funcDef.attrib
             };
             append(structInfoFields, fieldInfo);
 
@@ -1281,6 +1344,10 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     }
 
     get(compiler->structs, structIndex)->fields = structInfoFields;
+
+    // return to previous struct context
+    compiler->currentStruct = previousStructContext;
+    free(currentStruct);
 
     return Success(int, charptr, false);
 }
@@ -1316,6 +1383,7 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                     return Error(CometValue, charptr, "Attempt to get field of something that isn't a struct.");
                 }
 
+                
                 char* fieldName;
                 if (rightNode->nodeType == AST_IDENTIFIER) {
                     fieldName = rightNode->data.AST_IDENTIFIER.ident;
@@ -1333,6 +1401,18 @@ ResultType(CometValue, charptr) visitInfixExpression(CometCompiler* compiler, Co
                     APPEND_ESTR(errMsg, fieldName);
                     APPEND_ESTR(errMsg, "\"");
 
+                    return Error(CometValue, charptr, errMsg.str);
+                }
+
+                FieldAccessPerms fieldAccessPerms = canAccessField(compiler, *fieldInfo, structInfo);
+                if (!fieldAccessPerms.canRead) {
+                    Estr errMsg = CREATE_ESTR("Cannot access field \"");
+                    APPEND_ESTR(errMsg, fieldName);
+                    APPEND_ESTR(errMsg, "\" of struct \"");
+                    APPEND_ESTR(errMsg, structInfo->name);
+                    APPEND_ESTR(errMsg, "\" because it is ");
+                    APPEND_ESTR(errMsg, fieldAccessPerms.fieldType);
+                    APPEND_ESTR(errMsg, ".");
                     return Error(CometValue, charptr, errMsg.str);
                 }
 
@@ -1728,6 +1808,7 @@ ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser) {
     newCompiler->module = LLVMModuleCreateWithNameInContext("main", newCompiler->context);
     newCompiler->builder = LLVMCreateBuilderInContext(newCompiler->context);
     newCompiler->currentFunction = NULL;
+    newCompiler->currentStruct = NULL;
 
     // create type map
     newCompiler->typeMap = newList(CometLLVMTypePair);

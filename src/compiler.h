@@ -30,6 +30,14 @@ typedef struct {
     LLVMValueRef b;
 } LLVMValuePair;
 
+typedef struct {
+    bool canRead;
+    bool canWrite;
+    char* fieldType;
+} FieldAccessPerms;
+
+Result(FieldAccessPerms, charptr);
+
 UseList(LLVMTypeRef);
 UseList(LLVMValueRef);
 UseList(CometLLVMTypePair);
@@ -45,6 +53,7 @@ typedef struct {
     List(StructInfo) structs;
 
     LLVMValueRef currentFunction;
+    StructInfo* currentStruct;
 } CometCompiler;
 typedef CometCompiler* cometCompilerPtr;
 

@@ -10,7 +10,7 @@
 #include <string.h>
 
 
-ResultType(astNodePtr, charptr) parseStatement(CometParser* parser);
+ResultType(astNodePtr, charptr) parseStatement(CometParser* parser, bool isMutable, FieldAttribute attrib);
 
 const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_PLUS, PRECEDENCE_SUM},
@@ -184,6 +184,20 @@ bool peekKeywordIs(CometParser* parser, const char* keyword) {
     return strcmp(parser->peekToken->value.literal, keyword) == 0;
 }
 
+FieldAttribute fieldAttribStringToAttribEnum(char* str) {
+    if (strcmp(str, "public") == 0) {
+        return FIELD_PUBLIC;
+    } else if (strcmp(str, "private") == 0) {
+        return FIELD_PRIVATE;
+    } else if (strcmp(str, "protected") == 0) {
+        return FIELD_PROTECTED;
+    } else if (strcmp(str, "readonly") == 0) {
+        return FIELD_READ_ONLY;
+    } else {
+        return FIELD_PUBLIC;
+    }
+}
+
 CometPrecedenceType getPrecedence(CometTokenType tokenType) {
     for (size_t i = 0; i < sizeof(PRECEDENCES)/sizeof(PRECEDENCES[0]); i++) {
         if (PRECEDENCES[i].tokenType == tokenType) {
@@ -268,6 +282,16 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_EXPRESSION_STATEMENT.expression);
             break;
         case AST_ASSIGN_STATEMENT:
+            FieldAttribute attrib = node->data.AST_ASSIGN_STATEMENT.attrib;
+            if (attrib != FIELD_PUBLIC) {
+                switch (attrib) {
+                    case FIELD_PRIVATE: printf("private "); break;
+                    case FIELD_PROTECTED: printf("protected "); break;
+                    case FIELD_READ_ONLY: printf("readonly "); break;
+                    default: break;
+                }
+            }
+
             printNode(node->data.AST_ASSIGN_STATEMENT.type);
             printf(" ");
             printNode(node->data.AST_ASSIGN_STATEMENT.ident);
@@ -642,7 +666,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type, isMutable, fieldAttrib);
-
+    
     bool hasValue = peekTokenIs(parser, CT_EQ);
     
 
@@ -684,7 +708,7 @@ ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
             return Error(astNodePtr, charptr, "Block statement was not closed!");
         }
 
-        ResultType(astNodePtr, charptr) stmt = parseStatement(parser);
+        ResultType(astNodePtr, charptr) stmt = parseStatement(parser, false, FIELD_PUBLIC);
         if (stmt.error)
             return stmt;
 
@@ -706,7 +730,7 @@ ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser)
     if (!peekTokenIs(parser, CT_OPEN_CURLY)) { // if 1+1 == 2 return
 
         parserNextToken(parser);
-        ResultType(astNodePtr, charptr) innerStmt = parseStatement(parser);
+        ResultType(astNodePtr, charptr) innerStmt = parseStatement(parser, false, FIELD_PUBLIC);
 
         if (innerStmt.error)
             return innerStmt;
@@ -906,7 +930,7 @@ ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser) {
     return parseExpressionStatement(parser);
 }
 
-ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
+ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, FieldAttribute fieldAttrib) {
     // basic format
     // func func_name(type arg_name, type2 arg_name2) -> return_type {
     //     return arg_name + arg_name2
@@ -980,7 +1004,8 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser) {
         args.as.success,
         returnType,
         isInline,
-        inlineExpr
+        inlineExpr,
+        fieldAttrib
     );
     return Success(astNodePtr, charptr, stmt);
 }
@@ -1102,7 +1127,7 @@ ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser) 
     return Success(astNodePtr, charptr, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
+ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
     if (strcmp(keyword, "while") == 0) {
@@ -1116,7 +1141,7 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
     } else if (strcmp(keyword, "continue") == 0) {
         return parseContinueStatement(parser);
     } else if (strcmp(keyword, "func") == 0) {
-        return parseFunctionDefStatement(parser);
+        return parseFunctionDefStatement(parser, fieldAttrib);
     } else if (strcmp(keyword, "return") == 0) {
         return parseReturnStatement(parser);
     } else if (strcmp(keyword, "struct") == 0) {
@@ -1130,7 +1155,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
                strcmp(keyword, "private") == 0   ||
                strcmp(keyword, "readonly") == 0  ||
                strcmp(keyword, "protected") == 0   ) {
-        return parseAssignmentStatement(parser, false, FIELD_PUBLIC);
+        parserNextToken(parser);
+        return parseStatement(parser, strcmp(keyword, "mut") == 0, fieldAttribStringToAttribEnum(keyword));
     
     } else {
         char* buffer = malloc(128);
@@ -1140,13 +1166,13 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser) {
 }
 
 // -- PARSER HELPERS -- //
-ResultType(astNodePtr, charptr) parseStatement(CometParser* parser) {
+ResultType(astNodePtr, charptr) parseStatement(CometParser* parser, bool isMutable, FieldAttribute fieldAttrib) {
     switch (parser->currentToken->type) {
         case CT_IDENT:
-            return parseAssignmentStatement(parser, false, FIELD_PUBLIC);
+            return parseAssignmentStatement(parser, isMutable, fieldAttrib);
 
         case CT_KEYWORD:
-            return parseKeyword(parser);
+            return parseKeyword(parser, fieldAttrib);
 
         default:
             return parseExpressionStatement(parser);
@@ -1157,7 +1183,7 @@ ResultType(astNodePtr, charptr) parseStatement(CometParser* parser) {
 ResultType(astNodePtr, charptr) buildAST(CometParser* parser) {
     
     while (parser->currentToken->type != CT_EOF) {
-        ResultType(astNodePtr, charptr) stmt = parseStatement(parser);
+        ResultType(astNodePtr, charptr) stmt = parseStatement(parser, false, FIELD_PUBLIC);
         if (stmt.error)
             return stmt;
 

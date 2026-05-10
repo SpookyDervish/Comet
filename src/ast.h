@@ -96,6 +96,7 @@ struct CometASTNode {
             CometASTNode* returnType;
             bool isInline;
             CometASTNode* inlineExpr;
+            FieldAttribute attrib;
         } AST_FUNC_DEF_STATEMENT;
         struct AST_RETURN_STATEMENT { CometASTNode* expression; } AST_RETURN_STATEMENT;
         struct AST_STRUCT_DEF_STATEMENT {
