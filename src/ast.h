@@ -104,6 +104,7 @@ struct CometASTNode {
             List(astNodePtr) fieldDefs;
             CometASTNode* constructor;
             CometASTNode* destructor;
+            CometASTNode* parentName;
         } AST_STRUCT_DEF_STATEMENT;
         struct AST_CONSTRUCTOR_DEF {
             CometASTNode* program;

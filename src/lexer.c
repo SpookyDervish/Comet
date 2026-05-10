@@ -14,6 +14,7 @@ const char* KEYWORDS[] = {
     "protected",
     "const",
     "readonly",
+    "override",
     "init",
     "in",
     "return",

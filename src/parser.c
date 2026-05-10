@@ -1059,6 +1059,19 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
     }
 
     CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* parentName = NULL;
+
+    // the class inherits from something
+    bool inherits = peekTokenIs(parser, CT_COLON);
+    if (inherits) {
+        parserNextToken(parser);
+
+        ResultType(int, charptr) expectParentName = expectPeek(parser, CT_IDENT);
+        if (expectParentName.error)
+            return Error(astNodePtr, charptr, expectParentName.as.error);
+
+        parentName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    }
 
     List(astNodePtr) fieldDefs = newList(astNodePtr);
 
@@ -1104,7 +1117,8 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         structName,
         fieldDefs,
         constructor,
-        NULL
+        NULL,
+        parentName
     );
     return Success(astNodePtr, charptr, stmt);
 }

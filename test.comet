@@ -9,10 +9,6 @@ struct Animal {
 }
 
 struct Dog : Animal {
-    override func speak() -> void {
-        print("Woof!\n")
-    }
-
     init() {}
 }
 
