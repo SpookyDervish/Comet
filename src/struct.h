@@ -26,11 +26,15 @@ typedef struct {
 
 UseList(StructField);
 
-typedef struct {
+typedef List(StructField)* structFieldList;
+
+typedef struct StructInfo StructInfo;
+struct StructInfo {
     LLVMTypeRef llvmType;
     List(StructField) fields;
     char* name;
-} StructInfo;
+    StructInfo* parent;
+};
 
 UseList(StructInfo);
 
@@ -43,5 +47,8 @@ typedef struct {
 
 extern const FieldNameAttributePair FIELD_STRING_MAP[];
 FieldAttribute attribStringToFieldAttrib(char* keyword);
+
+void printStruct(StructInfo structInfo);
+void printStructFields(structFieldList fields);
 
 #endif

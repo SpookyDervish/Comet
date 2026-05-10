@@ -10,6 +10,7 @@
 #include <llvm-c/Types.h>
 #include <stddef.h>
 #include <llvm-c/Core.h>
+#include "struct.h"
 
 extern const char* BUILT_IN_TYPES[];
 
@@ -43,6 +44,7 @@ UseList(LLVMValueRef);
 UseList(CometLLVMTypePair);
 
 typedef List(LLVMTypeRef) argTypeList;
+typedef List(LLVMTypeRef) fieldTypeList;
 
 typedef struct {
     CometEnvironment* env;
@@ -62,6 +64,9 @@ Result(LLVMTypeRef, charptr);
 Result(LLVMValueRef, charptr);
 Result(cometCompilerPtr, charptr);
 Result(argTypeList, charptr);
+
+typedef StructInfo* structInfoPtr;
+Result(structInfoPtr, charptr);
 
 ResultType(cometCompilerPtr, charptr) createCompiler(CometParser* parser);
 ResultType(Nothing, charptr) compileAST(CometCompiler* compiler, CometASTNode* root, CometArgs args);

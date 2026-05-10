@@ -97,6 +97,7 @@ ResultType(CometValue, charptr) callStructMethod(CometCompiler* compiler, LLVMVa
     APPEND_ESTR(structFuncName, "_");
     APPEND_ESTR(structFuncName, funcName);
 
+    printf("%s\n", structFuncName.str);
     LLVMTypeRef funcType = fieldInfo->llvmType;
     LLVMValueRef function = LLVMGetNamedFunction(compiler->module, structFuncName.str);
     DESTROY_ESTR(structFuncName);
@@ -1222,6 +1223,40 @@ ResultType(int, charptr) visitMethodDefStatement(CometCompiler* compiler, LLVMTy
     return Success(int, charptr, doesReturn);
 }
 
+ResultType(structInfoPtr, charptr) handleInheritance(CometCompiler* compiler, struct AST_STRUCT_DEF_STATEMENT structDef, structFieldList fields, fieldTypeList fieldTypes) {
+    char* parentName = structDef.parentName->data.AST_IDENTIFIER.ident;
+    char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
+
+    // get parent class type
+    ResultType(LLVMTypeRef, charptr) parentStructType = getType(compiler, parentName);
+    if (parentStructType.error) { // parent class doesnt exist
+        Estr errMsg = CREATE_ESTR("The struct \"");
+        APPEND_ESTR(errMsg, structName);
+        APPEND_ESTR(errMsg, "\" cannot inherit from parent struct \"")
+        APPEND_ESTR(errMsg, parentName);
+        APPEND_ESTR(errMsg, "\" because it hasn't been defined.");
+
+        return Error(structInfoPtr, charptr, errMsg.str);
+    }
+
+    // get parent struct info
+    StructInfo* parentStructInfo = getStruct(compiler, parentStructType.as.success);
+    if (parentStructInfo == NULL) {
+        Estr errMsg = CREATE_ESTR("Failed to get info for struct \"");
+        APPEND_ESTR(errMsg, parentName);
+        APPEND_ESTR(errMsg, "\".")
+        return Error(structInfoPtr, charptr, errMsg.str);
+    }
+
+    // append fields from parent to child
+    for (size_t i = 0; i < parentStructInfo->fields.count; i++) {
+        append((*fields), *get((parentStructInfo->fields), i));
+        append(fieldTypes, (*get(parentStructInfo->fields, i)).llvmType);
+    }
+
+    return Success(structInfoPtr, charptr, parentStructInfo);
+}
+
 ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometASTNode* node) {
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
     char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
@@ -1230,6 +1265,15 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     List(LLVMTypeRef) fieldTypes = newList(LLVMTypeRef);
 
     
+
+    // if we inherit from another class, find the parent class' type
+    bool inherits = structDef.parentName != NULL;
+    StructInfo* parentStructInfo = NULL;
+    if (inherits) {
+        ResultType(structInfoPtr, charptr) inheritanceResult = handleInheritance(compiler, structDef, &structInfoFields, fieldTypes);
+        if (inheritanceResult.error)
+            return Error(int, charptr, inheritanceResult.as.error);
+    }
 
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldNode = (*get(structDef.fieldDefs, i));
@@ -1253,7 +1297,7 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
                 }
 
                 StructField fieldInfo = {
-                    .index = i,
+                    .index = structInfoFields.count,
                     .llvmType = llvmFieldType.as.success,
                     .name = fieldNode->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident,
                     .isPointer = LLVMGetTypeKind(llvmFieldType.as.success) == LLVMStructTypeKind,
@@ -1285,7 +1329,8 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     StructInfo structInfo = {
         .llvmType = structType,
         .name = structName,
-        .fields = structInfoFields
+        .fields = structInfoFields,
+        .parent = parentStructInfo
     };
     size_t structIndex = compiler->structs.count;
     append(compiler->structs, structInfo);

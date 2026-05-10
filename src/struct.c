@@ -1,4 +1,5 @@
 #include "struct.h"
+#include <llvm-c/Core.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -20,6 +21,36 @@ const FieldNameAttributePair FIELD_STRING_MAP[] = {
     {"readonly", FIELD_READ_ONLY},
 };
 
+void printStructFields(structFieldList fields) {
+
+    for (size_t i = 0; i < fields->count; i++) {
+        StructField field = *get((*fields), i);
+
+        char* defaultValue = LLVMPrintValueToString(field.defaultValue);
+        char* llvmType = LLVMPrintTypeToString(field.llvmType);
+
+        printf("  field: %s\n \
+    index: %d\n \
+    access: %d\n \
+    default value: %s\n \
+    const: %d\n \
+    pointer: %d\n \
+    llvm type: %s\n", field.name, field.index, field.attrib, defaultValue, field.isConst, field.isPointer, llvmType);
+    
+        LLVMDisposeMessage(defaultValue);
+        LLVMDisposeMessage(llvmType);
+    }
+}
+
+void printStruct(StructInfo structInfo) {
+    printf("struct %s {\n", structInfo.name);
+    
+    printStructFields(&structInfo.fields);
+
+    char* llvmType = LLVMPrintTypeToString(structInfo.llvmType);
+    printf("\n  llvm type: %s\n}\n", llvmType);
+    LLVMDisposeMessage(llvmType);
+}
 
 FieldAttribute attribStringToFieldAttrib(char* keyword) {
     for (size_t i = 0; i < sizeof(FIELD_STRING_MAP)/sizeof(FIELD_STRING_MAP[0]); i++) {
