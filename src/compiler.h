@@ -44,7 +44,7 @@ UseList(LLVMValueRef);
 UseList(CometLLVMTypePair);
 
 typedef List(LLVMTypeRef) argTypeList;
-typedef List(LLVMTypeRef) fieldTypeList;
+typedef List(LLVMTypeRef)* fieldTypeList;
 
 typedef struct {
     CometEnvironment* env;
@@ -64,6 +64,7 @@ Result(LLVMTypeRef, charptr);
 Result(LLVMValueRef, charptr);
 Result(cometCompilerPtr, charptr);
 Result(argTypeList, charptr);
+Result(LLVMValueRef, Nothing);
 
 typedef StructInfo* structInfoPtr;
 Result(structInfoPtr, charptr);

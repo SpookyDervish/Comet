@@ -89,18 +89,59 @@ ResultType(LLVMTypeRef, charptr) getType(CometCompiler* compiler, char* typeName
     return Error(LLVMTypeRef, charptr, errMsg.str);
 }
 
+LLVMValueRef getStructMethod(CometCompiler* compiler, StructInfo* structInfo, char* funcName) {
+    LLVMValueRef function = NULL;
+
+    // struct doesn't inherit from anything
+    if (!structInfo->parent) {
+        Estr structFuncName = CREATE_ESTR(structInfo->name);
+        APPEND_ESTR(structFuncName, "_");
+        APPEND_ESTR(structFuncName, funcName);
+
+        function = LLVMGetNamedFunction(compiler->module, structFuncName.str);
+
+        DESTROY_ESTR(structFuncName);
+    } else {
+        StructInfo* currentParent = structInfo->parent;
+
+        // struct inherits from something, climb the parent tree until we find it
+        while (true) {
+            Estr structFuncName = CREATE_ESTR(currentParent->name);
+            APPEND_ESTR(structFuncName, "_");
+            APPEND_ESTR(structFuncName, funcName);
+
+            function = LLVMGetNamedFunction(compiler->module, structFuncName.str);
+            if (function != NULL) {
+                break;
+            }
+
+            DESTROY_ESTR(structFuncName);
+
+            if (currentParent->parent)
+                currentParent = currentParent->parent;
+            else
+                return NULL;
+        }
+    }
+
+    return function;
+}
+
 ResultType(CometValue, charptr) resolveValue(CometCompiler* compiler, CometASTNode* node);
 ResultType(CometValue, charptr) callStructMethod(CometCompiler* compiler, LLVMValueRef self, StructInfo* structInfo, StructField* fieldInfo, struct AST_FUNC_CALL funcCall) {
     char* funcName = funcCall.ident->data.AST_IDENTIFIER.ident;
 
-    Estr structFuncName = CREATE_ESTR(structInfo->name);
-    APPEND_ESTR(structFuncName, "_");
-    APPEND_ESTR(structFuncName, funcName);
-
-    printf("%s\n", structFuncName.str);
+    
     LLVMTypeRef funcType = fieldInfo->llvmType;
-    LLVMValueRef function = LLVMGetNamedFunction(compiler->module, structFuncName.str);
-    DESTROY_ESTR(structFuncName);
+    LLVMValueRef function = getStructMethod(compiler, structInfo, funcName);
+    if (!function) {
+        Estr errMsg = CREATE_ESTR("Failed to find method \"");
+        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, "\" of struct \"");
+        APPEND_ESTR(errMsg, structInfo->name);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometValue, charptr, errMsg.str);
+    }
 
     List(LLVMValueRef) argValues = newList(LLVMValueRef);
     append(argValues, self);
@@ -415,24 +456,7 @@ ResultType(CometValue, charptr) resolvePointerValue(CometCompiler* compiler, Com
                         ptrName.str
                     );
 
-                    /*Estr valueName = CREATE_ESTR(fieldName);
-                    APPEND_ESTR(valueName, "_field");
-
-                    LLVMValueRef value = LLVMBuildLoad2(
-                        compiler->builder,
-                        fieldInfo->llvmType,
-                        ptr,
-                        valueName.str
-                    );*/
-                    
-                    //printf("%s is struct = %d\n", fieldName, LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind);
                     bool isPointer = LLVMGetTypeKind(fieldInfo->llvmType) == LLVMStructTypeKind;
-
-                    //Estr tempName = CREATE_ESTR(fieldName);
-                    //APPEND_ESTR(tempName, "_tmp");
-
-                    //LLVMValueRef temp = LLVMBuildAlloca(compiler->builder, fieldInfo->llvmType, tempName.str);
-                    //LLVMBuildStore(compiler->builder, value, temp);
 
                     CometValue result = (CometValue){
                         .pointer = ptr,
@@ -673,6 +697,7 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
         return Error(int, charptr, varAssignType.as.error);
 
 
+    printf("%s\n", LLVMPrintTypeToString(varAssignType.as.success));
     LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varAssignType.as.success, name);
 
     if (value) { // if we set an actual value or didnt assign one
@@ -1250,8 +1275,15 @@ ResultType(structInfoPtr, charptr) handleInheritance(CometCompiler* compiler, st
 
     // append fields from parent to child
     for (size_t i = 0; i < parentStructInfo->fields.count; i++) {
-        append((*fields), *get((parentStructInfo->fields), i));
-        append(fieldTypes, (*get(parentStructInfo->fields, i)).llvmType);
+        StructField parentField = *get((parentStructInfo->fields), i);
+        
+
+        append((*fields), parentField);
+
+        if (LLVMGetTypeKind(parentField.llvmType) == LLVMFunctionTypeKind)
+            continue;
+
+        append((*fieldTypes), parentField.llvmType);
     }
 
     return Success(structInfoPtr, charptr, parentStructInfo);
@@ -1270,9 +1302,10 @@ ResultType(int, charptr) visitStructDefStatement(CometCompiler* compiler, CometA
     bool inherits = structDef.parentName != NULL;
     StructInfo* parentStructInfo = NULL;
     if (inherits) {
-        ResultType(structInfoPtr, charptr) inheritanceResult = handleInheritance(compiler, structDef, &structInfoFields, fieldTypes);
+        ResultType(structInfoPtr, charptr) inheritanceResult = handleInheritance(compiler, structDef, &structInfoFields, &fieldTypes);
         if (inheritanceResult.error)
             return Error(int, charptr, inheritanceResult.as.error);
+        parentStructInfo = inheritanceResult.as.success;
     }
 
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
