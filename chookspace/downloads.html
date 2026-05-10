@@ -13,7 +13,7 @@
     <script>
         async function getReleases() {
             try {
-                const response = await fetch("https://chookspace.com/api/repos/comet/comet/releases");
+                const response = await fetch("https://chsp.au/api/v1/repos/comet/comet/releases");
 
                 if (!response.ok) {
                     throw new Error("Could not get releases");
