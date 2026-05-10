@@ -43,7 +43,7 @@ Comet is a fast, compiled programming built on top of C and LLVM. It has an enor
     - [ ] Destructor
   - [x] "new" keyword
   - [x] Calling methods
-  - [ ] Inheritance
+  - [x] Inheritance
   - [ ] Templates
     - [ ] Template attributes
 - [x] Command line args
