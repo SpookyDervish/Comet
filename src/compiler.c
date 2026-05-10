@@ -248,9 +248,36 @@ LLVMValueRef castInt(
     return LLVMBuildTrunc(builder, value, targetType, "trunc");
 }
 
-ResultType(LLVMValueRef, charptr) castToType(LLVMBuilderRef builder, LLVMValueRef value, LLVMTypeRef targetType) {
+bool structIsParent(StructInfo* child, StructInfo* parent) {
+    bool isParent = false;
+
+    StructInfo* currentStruct = child;
+    while (true) {
+        
+        printf("current type: %s\n", LLVMPrintTypeToString(currentStruct->llvmType));
+        printf("current: 0x%x\n", currentStruct->fields.pointer);
+        printf("parent type: %s\n", LLVMPrintTypeToString(parent->llvmType));
+        printf("parent: 0x%x\n", parent->fields.pointer);
+        if (currentStruct->fields.pointer == parent->fields.pointer) {
+            isParent = true;
+            break;
+        }
+
+        currentStruct = currentStruct->parent;
+        if (!currentStruct) {
+            break;
+        }
+        
+    }
+
+    return isParent;
+}
+
+ResultType(LLVMValueRef, charptr) castToType(CometCompiler* compiler, LLVMValueRef value, LLVMTypeRef targetType) {
     LLVMTypeRef srcType = LLVMTypeOf(value);
     LLVMTypeKind srcTypeKind = LLVMGetTypeKind(srcType);
+
+    LLVMBuilderRef builder = compiler->builder;
 
     LLVMTypeKind targetTypeKind = LLVMGetTypeKind(targetType);
 
@@ -280,6 +307,28 @@ ResultType(LLVMValueRef, charptr) castToType(LLVMBuilderRef builder, LLVMValueRe
                 targetType,
                 ""
             ));
+    } else if (srcTypeKind == LLVMStructTypeKind && targetTypeKind == LLVMStructTypeKind) {
+        StructInfo* srcStruct = getStruct(compiler, srcType);
+        if (!srcStruct) {
+            return Error(LLVMValueRef, charptr, "idk what to write for this error message, how did you even do this");
+        }
+
+        StructInfo* targetStruct = getStruct(compiler, targetType);
+        if (!targetStruct) {
+            return Error(LLVMValueRef, charptr, "idk what to write for this error message, how did you even do this");
+        }
+
+        if (structIsParent(targetStruct, srcStruct)) {
+            LLVMValueRef temp = LLVMBuildAlloca(compiler->builder, srcType, "tmp");
+            LLVMBuildStore(compiler->builder, value, temp);
+            LLVMValueRef cast = LLVMBuildBitCast(
+                compiler->builder,
+                temp,
+                LLVMPointerType(targetType, 0),
+                "");
+            LLVMValueRef result = LLVMBuildLoad2(compiler->builder, targetType, cast, "");
+            return Success(LLVMValueRef, charptr, result);
+        }
     }
 
     char* srcTypeStr = LLVMPrintTypeToString(srcType);
@@ -660,7 +709,7 @@ ResultType(int, charptr) visitReturnStatement(CometCompiler* compiler, CometASTN
         
         return Error(int, charptr, errMsg.str);
     } else if (returnValue.as.success.type != returnType) {
-        ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, returnValue.as.success.value, returnType);
+        ResultType(LLVMValueRef, charptr) cast = castToType(compiler, returnValue.as.success.value, returnType);
         if (cast.error)
             return Error(int, charptr, cast.as.error);
 
@@ -711,7 +760,7 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
             return Error(int, charptr, typeValuePair.as.error);
 
         if (varAssignType.as.success != typeValuePair.as.success.type) {
-            ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varAssignType.as.success);
+            ResultType(LLVMValueRef, charptr) cast = castToType(compiler, typeValuePair.as.success.value, varAssignType.as.success);
             if (cast.error)
                 return Error(int, charptr, cast.as.error);
 
@@ -824,7 +873,7 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
         }
 
         if (typeValuePair.as.success.type != varRecord->type) {
-            ResultType(LLVMValueRef, charptr) cast = castToType(compiler->builder, typeValuePair.as.success.value, varRecord->type);
+            ResultType(LLVMValueRef, charptr) cast = castToType(compiler, typeValuePair.as.success.value, varRecord->type);
             if (cast.error) {
                 Estr errMsg = CREATE_ESTR("Attempt to change type of variable \"");
                 APPEND_ESTR(errMsg, name);
@@ -907,7 +956,7 @@ ResultType(int, charptr) visitWhileStatement(CometCompiler* compiler, CometASTNo
         return Error(int, charptr, boolType.as.error);
 
     if (beforeCheck.as.success.type != boolType.as.success) {
-        ResultType(LLVMValueRef, charptr) casted = castToType(compiler->builder, beforeCheck.as.success.isPointer ? beforeCheck.as.success.pointer : beforeCheck.as.success.value, boolType.as.success);
+        ResultType(LLVMValueRef, charptr) casted = castToType(compiler, beforeCheck.as.success.isPointer ? beforeCheck.as.success.pointer : beforeCheck.as.success.value, boolType.as.success);
         if (casted.error)
             return Error(int, charptr, casted.as.error);
 

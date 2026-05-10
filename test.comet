@@ -22,6 +22,8 @@ func main() -> int {
 
     Dog myDog = new Animal()
     myDog.speak()
+    myDog.age = myDog.age + 1
+    print("%d\n", myDog.age)
 
     return 0
 }
