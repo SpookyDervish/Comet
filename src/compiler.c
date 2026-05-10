@@ -110,10 +110,7 @@ LLVMValueRef getStructMethod(CometCompiler* compiler, StructInfo* structInfo, ch
             APPEND_ESTR(structFuncName, "_");
             APPEND_ESTR(structFuncName, funcName);
 
-            printf("func name: %s\n", structFuncName.str);
-
             function = LLVMGetNamedFunction(compiler->module, structFuncName.str);
-            printf("exists: %d\n", function != NULL);
 
             if (function != NULL) {
                 break;
@@ -253,11 +250,7 @@ bool structIsParent(StructInfo* child, StructInfo* parent) {
 
     StructInfo* currentStruct = child;
     while (true) {
-        
-        printf("current type: %s\n", LLVMPrintTypeToString(currentStruct->llvmType));
-        printf("current: 0x%x\n", currentStruct->fields.pointer);
-        printf("parent type: %s\n", LLVMPrintTypeToString(parent->llvmType));
-        printf("parent: 0x%x\n", parent->fields.pointer);
+
         if (currentStruct->fields.pointer == parent->fields.pointer) {
             isParent = true;
             break;
@@ -750,7 +743,6 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
         return Error(int, charptr, varAssignType.as.error);
 
 
-    printf("%s\n", LLVMPrintTypeToString(varAssignType.as.success));
     LLVMValueRef ptr = LLVMBuildAlloca(compiler->builder, varAssignType.as.success, name);
 
     if (value) { // if we set an actual value or didnt assign one

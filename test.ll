@@ -19,7 +19,7 @@ Animal_speak_entry:
 define void @Animal_CONSTRUCTOR(ptr %0) {
 Animal_CONSTRUCTOR_entry:
   %age_default = getelementptr %Animal, ptr %0, i32 0, i32 0
-  store i32 2, ptr %age_default, align 4
+  store i32 0, ptr %age_default, align 4
   ret void
 }
 
@@ -32,7 +32,7 @@ Dog_speak_entry:
 define void @Dog_CONSTRUCTOR(ptr %0) {
 Dog_CONSTRUCTOR_entry:
   %age_default = getelementptr %Dog, ptr %0, i32 0, i32 0
-  store i32 2, ptr %age_default, align 4
+  store i32 0, ptr %age_default, align 4
   ret void
 }
 
