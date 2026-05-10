@@ -113,10 +113,13 @@
             })} ${ordinal(day)}, ${createdAtDate.getFullYear()}`
             newRelease.append(createdAt);
 
+            const downloadText = document.createElement("p");
+            newRelease.append(downloadText);
+
             const link = document.createElement("a");
             link.href = data.html_url;
             link.innerText = "Download";
-            newRelease.append(link)
+            downloadText.append(link)
 
             releasesTable.append(newRelease)
         }
