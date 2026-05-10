@@ -76,7 +76,6 @@
                 }
 
                 const data = await response.json();
-                console.log(data)
                 return data
             } catch (error) {
                 console.error("Error fetching releases:", error)
@@ -105,8 +104,6 @@
                     case 4: return `${n}th`;
                 }
             }
-
-            console.log(createdAtDate);
 
             const createdAt = document.createElement("p");
             createdAt.innerText = `${createdAtDate.toLocaleString("en-US", {
