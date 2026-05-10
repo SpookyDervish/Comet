@@ -16,6 +16,18 @@ struct Vector {
     }
 }
 
+struct Child : Vector {
+    init(int x, int y, int z) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+
+    override func add(Vector other) -> void {
+        print("overwritten!\n")
+    }
+}
+
 func main() -> int {
     Vector myVector = new Vector(1, 2, 3)
     print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
@@ -23,6 +35,9 @@ func main() -> int {
     myVector.add(new Vector(1, 2, 3))
 
     print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+
+    Child myChildVector = new Child(1, 2, 3)
+    myChildVector.add(new Vector(1, 2, 3))
 
     return myVector.y != 4
 }
