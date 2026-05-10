@@ -1160,7 +1160,6 @@ ResultType(int, charptr) visitConstructorDefStatement(CometCompiler* compiler, C
         LLVMValueRef parentConstructor = LLVMGetNamedFunction(compiler->module, parentConstructorName.str);
         LLVMTypeRef parentConstructorType = LLVMGlobalGetValueType(parentConstructor);
 
-        printf("%s\n", LLVMPrintTypeToString(parentConstructorType));
         defineVar(compiler->env, "super", parentConstructor,parentConstructorType, false);
 
         DESTROY_ESTR(parentConstructorName);
@@ -1774,8 +1773,6 @@ ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTN
         return Error(CometValue, charptr, errMsg.str);
     }
 
-    printf("%s\n", LLVMPrintTypeToString(funcRecord->type));
-
     // trying to call something that isn't function
     if (LLVMGetTypeKind(funcRecord->type) != LLVMFunctionTypeKind) {
         Estr errMsg = CREATE_ESTR("Cannot call \"");
@@ -1790,51 +1787,56 @@ ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTN
     LLVMGetParamTypes(funcRecord->type, paramTypes);
 
     List(LLVMValueRef) argValues = newList(LLVMValueRef);
+
+     // ensure number of args passed to function is correct
+    if (!LLVMIsFunctionVarArg(funcRecord->type)) {
+        if (funcCall.args.count < paramCount) {
+            Estr errMsg = CREATE_ESTR("Not enough params passed to function \"");
+            APPEND_ESTR(errMsg, funcName);
+            APPEND_ESTR(errMsg, "\" (expects ");
+
+            char* buffer = malloc(128);
+            sprintf(buffer, "%d, passed %zu)", paramCount, funcCall.args.count);
+            APPEND_ESTR(errMsg, buffer);
+
+            return Error(CometValue, charptr, errMsg.str);
+        } else if (funcCall.args.count > paramCount) {
+            Estr errMsg = CREATE_ESTR("Too many params passed to function \"");
+            APPEND_ESTR(errMsg, funcName);
+            APPEND_ESTR(errMsg, "\" (expects ");
+
+            char* buffer = malloc(128);
+            sprintf(buffer, "%d, passed %zu)", paramCount, funcCall.args.count);
+
+            APPEND_ESTR(errMsg, buffer);
+            return Error(CometValue, charptr, errMsg.str);
+        }
+    }
+    
+    printf("%s\n", funcName);
     for (size_t i = 0; i < funcCall.args.count; i++) {
         ResultType(CometValue, charptr) arg = resolveValue(compiler, *get(funcCall.args, i));
         if (arg.error)
             return arg;
 
         // wrong type passed to function
-        printf("%s\n", LLVMPrintTypeToString(arg.as.success.type));
-        printf("%s\n", LLVMPrintTypeToString(paramTypes[i]));
+        printf("%d %d\n", paramCount, i);
         if (arg.as.success.type != paramTypes[i]) {
             ResultType(LLVMValueRef, charptr) castedArg = castToType(compiler, arg.as.success.value, paramTypes[i]);
 
             if (castedArg.error) {
+                
                 return Error(CometValue, charptr, castedArg.as.error);
             }
         }
 
         append(argValues, arg.as.success.value);
     }
-
     
 
-    // ensure number of args passed to function is correct
-    if (!LLVMIsFunctionVarArg(funcRecord->type)) {
-        if (argValues.count < paramCount) {
-            Estr errMsg = CREATE_ESTR("Not enough params passed to function \"");
-            APPEND_ESTR(errMsg, funcName);
-            APPEND_ESTR(errMsg, "\" (expects ");
+   
 
-            char* buffer = malloc(128);
-            sprintf(buffer, "%d, passed %zu)", paramCount, argValues.count);
-            APPEND_ESTR(errMsg, buffer);
-
-            return Error(CometValue, charptr, errMsg.str);
-        } else if (argValues.count > paramCount) {
-            Estr errMsg = CREATE_ESTR("Too many params passed to function \"");
-            APPEND_ESTR(errMsg, funcName);
-            APPEND_ESTR(errMsg, "\" (expects ");
-
-            char* buffer = malloc(128);
-            sprintf(buffer, "%d, passed %zu)", paramCount, argValues.count);
-
-            APPEND_ESTR(errMsg, buffer);
-            return Error(CometValue, charptr, errMsg.str);
-        }
-    }
+    
 
     LLVMTypeRef returnType = LLVMGetReturnType(funcRecord->type);
 
@@ -1888,10 +1890,8 @@ ResultType(CometValue, charptr) visitNewStatement(CometCompiler* compiler, Comet
             return arg;
 
         // wrong type passed to function
-        printf("%s\n", LLVMPrintTypeToString(arg.as.success.type));
-        printf("%s\n", LLVMPrintTypeToString(paramTypes[i]));
-        if (arg.as.success.type != paramTypes[i]) {
-            ResultType(LLVMValueRef, charptr) castedArg = castToType(compiler, arg.as.success.value, paramTypes[i]);
+        if (arg.as.success.type != paramTypes[i+1]) {
+            ResultType(LLVMValueRef, charptr) castedArg = castToType(compiler, arg.as.success.value, paramTypes[i+1]);
 
             if (castedArg.error) {
                 return Error(CometValue, charptr, castedArg.as.error);
