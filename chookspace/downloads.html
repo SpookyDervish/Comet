@@ -11,6 +11,8 @@
 
 <body>
     <script>
+        const releasesTable = document.getElementById("table-body");
+
         async function getReleases() {
             try {
                 const response = await fetch("https://chsp.au/api/v1/repos/comet/comet/releases");
@@ -27,7 +29,46 @@
             }
         }
 
+        function createRelease(data) {
+            const newRelease = document.createElement("div");
+            newRelease.className = "row";
+
+            const version = document.createElement("p");
+            version.innerText = data.tag_name;
+            newRelease.append(version);
+
+            const createdAtDate = new Date(data.published_at);
+            const day = data.getDate();
+
+            function ordinal(n) {
+                if (n > 3 && n < 21) return `${n}th`;
+
+                switch (n % 10) {
+                    case 1: return `${n}st`;
+                    case 2: return `${n}nd`;
+                    case 3: return `${n}rd`;
+                    case 4: return `${n}th`;
+                }
+            }
+
+            const createdAt = document.createElement("p");
+            createdAt.innerText = `${data.toLocalString("en-US", {
+                month: "long"
+            })} ${ordinal(day)}, ${data.getFullYear()}`
+            newRelease.append(createdAt);
+
+            const link = document.createElement("a");
+            link.href = data.html_url;
+            link.innerText = "Download";
+            newRelease.append(link)
+
+            releasesTable.append(newRelease)
+        }
+
         const releases = getReleases();
+        releases.forEach(element => {
+            createRelease(element)
+        });
     </script>
 
     <nav>
