@@ -35,7 +35,6 @@ nav {
     padding: 12px;
     border-radius: 5px;
     margin: 1.25em 12px;
-    user-select: none;
     max-width: 75%;
 
     &.note-warn {
