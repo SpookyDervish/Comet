@@ -1,0 +1,27 @@
+struct Animal {
+    int age = 0
+
+    func speak() -> void {
+        print("...\n")
+    }
+
+    init() {}
+}
+
+struct Dog : Animal {
+    override func speak() -> void {
+        print("Woof!\n")
+    }
+
+    init() {}
+}
+
+func main() -> int {
+    Animal myAnimal = new Animal()
+    myAnimal.speak()
+
+    Dog myDog = new Dog()
+    myDog.speak()
+
+    return 0
+}
