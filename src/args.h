@@ -12,6 +12,7 @@ typedef struct {
     bool outputLLVMIr;
     bool outputASM;
     int optimisation;
+    bool showVersion;
 } CometArgs;
 
 Result(CometArgs, charptr);
