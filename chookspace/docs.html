@@ -137,6 +137,13 @@ sudo make install</pre>
     print("Hello, World!")
 }</code></pre>
                         <br />
+                        <p>Save this to a file called "helloWorld.comet". We can compile this program to an object file with the following command:</p>
+                        <pre class="command">cometc helloWorld.comet -o helloWorld.obj</pre>
+                        <p>And then we can compile this to a program with <b>gcc</b>:</p>
+                        <pre class="command">gcc helloWorld.obj -o helloWorld</pre>
+                        <p>We can then run our fully compiled program:</p>
+                        <pre class="command">$ ./helloWorld
+Hello, World!</pre>
                     </div>
                 </div>
 
