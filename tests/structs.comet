@@ -18,7 +18,7 @@ struct Vector {
 
 struct Child : Vector {
     init(int x, int y, int z) {
-        
+        super(self, x, y, z)
     }
 
     override func add(Vector other) -> void {
