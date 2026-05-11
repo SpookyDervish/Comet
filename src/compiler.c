@@ -790,7 +790,8 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
         if (typeValuePair.error)
             return Error(int, charptr, typeValuePair.as.error);
 
-        if (LLVMGetTypeKind(typeValuePair.as.success.type) == LLVMPointerTypeKind) {
+
+        if (LLVMGetTypeKind(typeValuePair.as.success.type) == LLVMStructTypeKind) {
             typeValuePair.as.success.value = LLVMBuildLoad2(compiler->builder, varAssignType.as.success, typeValuePair.as.success.value, "loadStruct");
             typeValuePair.as.success.type = varAssignType.as.success;
         }
@@ -812,6 +813,7 @@ ResultType(int, charptr) visitAssignStatement(CometCompiler* compiler, CometASTN
         
     }
 
+    printf("%s type: %s\n", name, LLVMPrintTypeToString(varAssignType.as.success));
     defineVar(compiler->env, name, ptr, varAssignType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
 
     return Success(int, charptr, false);
@@ -826,6 +828,8 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
     ResultType(CometValue, charptr) typeValuePair = resolveValue(compiler, value);
         if (typeValuePair.error)
             return Error(int, charptr, typeValuePair.as.error);
+
+    printf("%s reassign type: %s\n", left->data.AST_IDENTIFIER.ident, LLVMPrintTypeToString(typeValuePair.as.success.type));
 
     if (left->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
         ResultType(CometValue, charptr) structToChange = resolvePointerValue(compiler, left->data.AST_INFIX_EXPRESSION.left);
@@ -908,12 +912,17 @@ ResultType(int, charptr) visitReassignStatement(CometCompiler* compiler, CometAS
             return Error(int, charptr, errMsg.str);
         }
 
+        printf("typeValuePair type: %s\n", LLVMPrintTypeToString(typeValuePair.as.success.type));
+        printf("typeValuePair value %s\n", LLVMPrintValueToString(typeValuePair.as.success.value));
+        printf("varRecord->type: %s\n", LLVMPrintTypeToString(varRecord->type));
         if (typeValuePair.as.success.type != varRecord->type) {
             ResultType(LLVMValueRef, charptr) cast = castToType(compiler, typeValuePair.as.success.value, varRecord->type);
             if (cast.error) {
                 Estr errMsg = CREATE_ESTR("Attempt to change type of variable \"");
                 APPEND_ESTR(errMsg, name);
-                APPEND_ESTR(errMsg, "\" at runtime.");
+                APPEND_ESTR(errMsg, "\" at runtime. (");
+                APPEND_ESTR(errMsg, cast.as.error);
+                APPEND_ESTR(errMsg, ")");
                 return Error(int, charptr, errMsg.str);
             }
 
