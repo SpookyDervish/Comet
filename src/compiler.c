@@ -1820,8 +1820,7 @@ ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTN
             return arg;
 
         // wrong type passed to function
-        printf("%d %d\n", paramCount, i);
-        if (arg.as.success.type != paramTypes[i]) {
+        if (i < paramCount && arg.as.success.type != paramTypes[i]) {
             ResultType(LLVMValueRef, charptr) castedArg = castToType(compiler, arg.as.success.value, paramTypes[i]);
 
             if (castedArg.error) {
