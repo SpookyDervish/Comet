@@ -1812,8 +1812,7 @@ ResultType(CometValue, charptr) visitFuncCall(CometCompiler* compiler, CometASTN
             return Error(CometValue, charptr, errMsg.str);
         }
     }
-    
-    printf("%s\n", funcName);
+
     for (size_t i = 0; i < funcCall.args.count; i++) {
         ResultType(CometValue, charptr) arg = resolveValue(compiler, *get(funcCall.args, i));
         if (arg.error)
