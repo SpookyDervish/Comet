@@ -1,6 +1,5 @@
 #include "lexer.h"
 #include "parser.h"
-#include "compiler.h"
 #include "args.h"
 #include "util.h"
 #include <stddef.h>
@@ -46,18 +45,6 @@ int main(int argc, char** argv) {
     ResultType(astNodePtr, charptr) ast = buildAST(parser.as.success);
     if (ast.error) {
         fprintf(stderr, "error while building ast: %s\n", ast.as.error);
-        return 1;
-    }
-
-    ResultType(cometCompilerPtr, charptr) compiler = createCompiler(parser.as.success);
-    if (compiler.error) {
-        fprintf(stderr, "error while creating compiler: %s\n", compiler.as.error);
-        return 1;
-    }
-
-    ResultType(Nothing, charptr) result = compileAST(compiler.as.success, ast.as.success, args.as.success);
-    if (result.error) {
-        printf("Compiler error: %s\n", result.as.error);
         return 1;
     }
 
