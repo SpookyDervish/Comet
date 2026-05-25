@@ -100,6 +100,8 @@ ResultType(voidPtr, charptr) compile(CometCompiler* c, CometASTNode* node) {
 
         case AST_EXPRESSION_STATEMENT:
             return visitExpressionStatement(c, node);
+        case AST_ASSIGN_STATEMENT:
+            return visitAssignStatement(c, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometOperand, charptr) value = visitInfixExpression(c, node);

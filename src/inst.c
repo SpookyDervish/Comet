@@ -1,4 +1,6 @@
 #include "inst.h"
+#include "environment.h"
+#include "operand.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,8 +87,8 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
             sprintf(
                 extra,
                 "; consts[%d] = %s",
-                inst.dest.imm.intVal,
-                cometOperandToCStr(c->consts[inst.dest.imm.intVal])
+                inst.a.imm.intVal,
+                cometOperandToCStr(c->consts[inst.a.imm.intVal])
             );
             break;
         default: extra = "";
@@ -96,9 +98,9 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
         buffer,
         "%s%s, %s, %s    %s",
         cometInstOpcodeToCStr(inst.opcode),
-        cometOperandToCStr(inst.dest),
         cometOperandToCStr(inst.a),
         cometOperandToCStr(inst.b),
+        cometOperandToCStr(inst.c),
         extra
     );
 
@@ -106,19 +108,19 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
 }
 
 void buildInst(
-    CometCompiler* c,
+    CometCompiler* compiler,
     CometInstType opcode,
-    CometOperand dest,
     CometOperand a,
-    CometOperand b
+    CometOperand b,
+    CometOperand c
 ) {
-    c->outputProgram[c->programIdx] = (CometInst){
+    compiler->outputProgram[compiler->programIdx] = (CometInst){
         .opcode = opcode,
-        .dest = dest,
         .a = a,
         .b = b,
+        .c = c
     };
-    c->programIdx++;
+    compiler->programIdx++;
 }
 
 ResultType(cometCompilerPtr, charptr) newCompiler() {
@@ -126,6 +128,7 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
 
     newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
+    newCompiler->env = newEnvironment("root", NULL);
 
     return Success(cometCompilerPtr, charptr, newCompiler);
 }
@@ -215,6 +218,18 @@ void buildPushConst(CometCompiler* c, CometOperand idx) {
     pushVal(c);
 
     buildInst(c, INST_PUSH_CONST, idx, NO_OPERAND, NO_OPERAND);
+}
+void buildStore(CometCompiler* c, uint32_t idx) {
+    popVal(c);
+
+    
+    CometOperand value = createOperand(CO_IMMEDIATE);
+    value.imm = (CometImmediate){
+        .typeKind = COMET_INT,
+        .intVal = idx
+    };
+
+    buildInst(c, INST_STORE, value, NO_OPERAND, NO_OPERAND);
 }
 CometOperand buildAdd(CometCompiler* c) {
     popVal(c);
