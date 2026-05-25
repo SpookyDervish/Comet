@@ -1,14 +1,19 @@
 #include "compiler_vm.h"
 #include "ast.h"
+#include "inst.h"
 #include "lexer.h"
+#include "token.h"
+#include <stddef.h>
 #include <stdlib.h>
 
 
 // -- HELPER METHODS -- //
-CometOperand createOperand(CometOperandKind type) {
-    return (CometOperand){
-        .type = type
-    };
+ResultType(voidPtr, charptr) visitProgram(CometCompiler* c, CometASTNode* p) {
+    for (size_t i = 0; i < p->data.AST_PROGRAM.numStatements; i++) {
+        compile(c, p->data.AST_PROGRAM.statements[i]);
+    }
+
+    return Success(voidPtr, charptr, NULL);
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node);
@@ -17,9 +22,20 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(c, node);
 
-        case AST_INT:
-            CometOperand new = createOperand(CO_CONST);
-            
+        case AST_INT: {
+            CometOperand new = createOperand(CO_IMMEDIATE);
+            new.imm.typeKind = COMET_INT;
+            new.imm.intVal = node->data.AST_INT.number;
+            return Success(CometOperand, charptr, new);
+        }
+
+        default: {
+            Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
+            APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));
+            APPEND_ESTR(errMsg, "\"");
+
+            return Error(CometOperand, charptr, errMsg.str);
+        }
     }
 }
 
@@ -29,7 +45,31 @@ ResultType(voidPtr, charptr) visitExpressionStatement(CometCompiler* c, CometAST
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) left = resolveValue(c, node);
+    struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
+
+    ResultType(CometOperand, charptr) left = resolveValue(c, expr.left);
+    if (left.error)
+        return left;
+    ResultType(CometOperand, charptr) right = resolveValue(c, expr.right);
+    if (right.error)
+        return right;
+    
+    CometOperand out;
+    switch (expr.op.type) {
+        case CT_PLUS: {
+            out = buildAdd(c, left.as.success, right.as.success);
+        }
+
+        default: {
+            Estr errMsg = CREATE_ESTR("Invalid operator \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
+            APPEND_ESTR(errMsg, "\"");
+
+            return Error(CometOperand, charptr, errMsg.str);
+        }
+    }
+
+    return Success(CometOperand, charptr, out);
 }
 
 // -- MAIN -- //
@@ -40,14 +80,18 @@ CometCompiler* createCompilerVM() {
 
 ResultType(voidPtr, charptr) compile(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
+        case AST_PROGRAM:
+            return visitProgram(c, node);
+
         case AST_EXPRESSION_STATEMENT:
             return visitExpressionStatement(c, node);
 
-        case AST_INFIX_EXPRESSION:
+        case AST_INFIX_EXPRESSION: {
             ResultType(CometOperand, charptr) value = visitInfixExpression(c, node);
             if (value.error) {
                 return Error(voidPtr, charptr, value.as.error);
             }
+        }
 
         default: {
             Estr errMsg = CREATE_ESTR("No compiler visit method for \"");

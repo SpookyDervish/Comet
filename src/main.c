@@ -1,3 +1,5 @@
+#include "compiler_vm.h"
+#include "inst.h"
 #include "lexer.h"
 #include "parser.h"
 #include "args.h"
@@ -47,6 +49,20 @@ int main(int argc, char** argv) {
         fprintf(stderr, "error while building ast: %s\n", ast.as.error);
         return 1;
     }
+
+    ResultType(cometCompilerPtr, charptr) compiler = newCompiler();
+    if (compiler.error) {
+        fprintf(stderr, "error while creating compiler: %s\n", ast.as.error);
+        return 1;
+    }
+
+    ResultType(voidPtr, charptr) result = compile(compiler.as.success, ast.as.success);
+    if (result.error) {
+        fprintf(stderr, "error while compiling: %s\n", result.as.error);
+        return 1;
+    }
+
+    printf("%s\n", cometInstructionToCStr(compiler.as.success->outputProgram[0]));
 
     return 0;
 }
