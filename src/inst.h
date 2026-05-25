@@ -17,7 +17,7 @@ typedef enum {
 } CometValueTypeKind;
 
 typedef enum {
-    CO_REG,
+    CO_STACK,
     CO_IMMEDIATE
 } CometOperandKind;
 
@@ -56,14 +56,8 @@ typedef struct {
 #define NO_OPERAND ((CometOperand){0})
 
 typedef struct {
-    CometValueTypeKind inferredType;
-    bool alive;
-} CometTemp;
-
-typedef struct {
     size_t programIdx;
-    size_t regIdx;
-    CometTemp temps[256];
+    size_t stackIdx;
     CometInst outputProgram[256];
 } CometCompiler;
 

@@ -56,7 +56,7 @@ char* cometOperandToCStr(CometOperand operand) {
         case CO_IMMEDIATE:
             return cometImmediateToCStr(operand.imm);
 
-        case CO_REG: {
+        case CO_STACK: {
             char* buffer = malloc(64);
             sprintf(buffer, "%%%d", operand.reg);
             return buffer;
@@ -108,8 +108,8 @@ CometOperand buildAdd(
     CometOperand a,
     CometOperand b
 ) {
-    CometOperand reg = createOperand(CO_REG);
-    reg.reg = c->regIdx++;
+    CometOperand reg = createOperand(CO_STACK);
+    reg.reg = c->stackIdx++;
 
     buildInst(c, INST_ADD, reg, a, b);
 
@@ -120,7 +120,7 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     CometCompiler* newCompiler = calloc(sizeof(CometCompiler), 1);
 
     newCompiler->programIdx = 0;
-    newCompiler->regIdx = 0;
+    newCompiler->stackIdx = 0;
 
     return Success(cometCompilerPtr, charptr, newCompiler);
 }
