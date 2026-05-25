@@ -4,6 +4,7 @@
 #include "inst.h"
 #include "lexer.h"
 #include "operand.h"
+#include "parser.h"
 #include "token.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -53,12 +54,14 @@ ResultType(CometOperand, charptr) visitExpressionStatement(CometCompiler* c, Com
     return compile(c, node->data.AST_EXPRESSION_STATEMENT.expression);
 }
 
-ResultType(voidPtr, charptr) visitAssignStatement(CometCompiler* c, CometASTNode* node) {
+ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometASTNode* node) {
     ResultType(CometOperand, charptr) exprResult = compile(c, node->data.AST_ASSIGN_STATEMENT.expression);
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
     uint32_t idx = defineVar(c->env, ident, exprResult.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);
+
+    return Success(CometOperand, charptr, NO_OPERAND);
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
@@ -105,17 +108,16 @@ CometCompiler* createCompilerVM() {
 }
 
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) {
+    
+    printf("%s\n", ASTNodeTypeToCStr(node->nodeType));
     switch (node->nodeType) {
         case AST_PROGRAM:
-            visitProgram(c, node);
-            break;
+            return visitProgram(c, node);
 
         case AST_EXPRESSION_STATEMENT:
-            visitExpressionStatement(c, node);
-            break;
+            return visitExpressionStatement(c, node);
         case AST_ASSIGN_STATEMENT:
-            visitAssignStatement(c, node);
-            break;
+            return visitAssignStatement(c, node);
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometOperand, charptr) value = visitInfixExpression(c, node);

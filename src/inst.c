@@ -70,6 +70,8 @@ char* cometOperandToCStr(CometOperand operand) {
 char* cometInstOpcodeToCStr(CometInstType instType) {
     switch (instType) {
         case INST_PUSH_CONST: return "PUSH_CONST  ";
+        case INST_STORE     : return "STORE       ";
+        case INST_LOAD      : return "LOAD        ";
         case INST_ADD       : return "ADD         ";
         case INST_SUB       : return "SUB         ";
         case INST_MUL       : return "MUL         ";
