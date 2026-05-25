@@ -56,7 +56,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ResultType(voidPtr, charptr) result = compile(compiler.as.success, ast.as.success);
+    ResultType(CometOperand, charptr) result = compile(compiler.as.success, ast.as.success);
     if (result.error) {
         fprintf(stderr, "error while compiling: %s\n", result.as.error);
         return 1;

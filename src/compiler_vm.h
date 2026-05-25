@@ -14,7 +14,7 @@ typedef void* voidPtr;
 
 Result(voidPtr, charptr);
 
-ResultType(voidPtr, charptr) compile(CometCompiler* c, CometASTNode* node);
+ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node);
 CometOperand createOperand(CometOperandKind type);
 
 

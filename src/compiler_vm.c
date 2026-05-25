@@ -1,21 +1,24 @@
 #include "compiler_vm.h"
 #include "ast.h"
+#include "environment.h"
 #include "inst.h"
 #include "lexer.h"
+#include "operand.h"
 #include "token.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 
 // -- HELPER METHODS -- //
-ResultType(voidPtr, charptr) visitProgram(CometCompiler* c, CometASTNode* p) {
+ResultType(CometOperand, charptr) visitProgram(CometCompiler* c, CometASTNode* p) {
     for (size_t i = 0; i < p->data.AST_PROGRAM.numStatements; i++) {
-        ResultType(voidPtr, charptr) result = compile(c, p->data.AST_PROGRAM.statements[i]);
+        ResultType(CometOperand, charptr) result = compile(c, p->data.AST_PROGRAM.statements[i]);
         if (result.error)
             return result;
     }
 
-    return Success(voidPtr, charptr, NULL);
+    return Success(CometOperand, charptr, NO_OPERAND);
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node);
@@ -46,8 +49,16 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
 }
 
 // -- VISIT METHODS -- //
-ResultType(voidPtr, charptr) visitExpressionStatement(CometCompiler* c, CometASTNode* node) {
+ResultType(CometOperand, charptr) visitExpressionStatement(CometCompiler* c, CometASTNode* node) {
     return compile(c, node->data.AST_EXPRESSION_STATEMENT.expression);
+}
+
+ResultType(voidPtr, charptr) visitAssignStatement(CometCompiler* c, CometASTNode* node) {
+    ResultType(CometOperand, charptr) exprResult = compile(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+    uint32_t idx = defineVar(c->env, ident, exprResult.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
+    buildStore(c, idx);
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
@@ -93,22 +104,22 @@ CometCompiler* createCompilerVM() {
     return newCompiler;
 }
 
-ResultType(voidPtr, charptr) compile(CometCompiler* c, CometASTNode* node) {
+ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_PROGRAM:
-            return visitProgram(c, node);
+            visitProgram(c, node);
+            break;
 
         case AST_EXPRESSION_STATEMENT:
-            return visitExpressionStatement(c, node);
+            visitExpressionStatement(c, node);
+            break;
         case AST_ASSIGN_STATEMENT:
-            return visitAssignStatement(c, node);
+            visitAssignStatement(c, node);
+            break;
 
         case AST_INFIX_EXPRESSION: {
             ResultType(CometOperand, charptr) value = visitInfixExpression(c, node);
-            if (value.error) {
-                return Error(voidPtr, charptr, value.as.error);
-            }
-            return Success(voidPtr, charptr, NULL);
+            return value;
         }
 
         default: {
@@ -116,7 +127,7 @@ ResultType(voidPtr, charptr) compile(CometCompiler* c, CometASTNode* node) {
             APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));
             APPEND_ESTR(errMsg, "\"!");
 
-            return Error(voidPtr, charptr, errMsg.str);
+            return Error(CometOperand, charptr, errMsg.str);
         }
     }
 }

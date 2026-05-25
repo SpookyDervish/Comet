@@ -1,5 +1,4 @@
 #include "struct.h"
-#include <llvm-c/Core.h>
 #include <stddef.h>
 #include <string.h>
 
