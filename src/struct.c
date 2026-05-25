@@ -26,19 +26,12 @@ void printStructFields(structFieldList fields) {
     for (size_t i = 0; i < fields->count; i++) {
         StructField field = *get((*fields), i);
 
-        char* defaultValue = LLVMPrintValueToString(field.defaultValue);
-        char* llvmType = LLVMPrintTypeToString(field.llvmType);
-
         printf("  field: %s\n \
     index: %d\n \
     access: %d\n \
-    default value: %s\n \
     is const? %d\n \
-    is pointer? %d\n \
-    llvm type: %s\n", field.name, field.index, field.attrib, defaultValue, field.isConst, field.isPointer, llvmType);
-    
-        LLVMDisposeMessage(defaultValue);
-        LLVMDisposeMessage(llvmType);
+    is pointer? %d\n"
+    , field.name, field.index, field.attrib, field.isConst, field.isPointer);
     }
 }
 
@@ -46,10 +39,6 @@ void printStruct(StructInfo structInfo) {
     printf("struct %s {\n", structInfo.name);
     
     printStructFields(&structInfo.fields);
-
-    char* llvmType = LLVMPrintTypeToString(structInfo.llvmType);
-    printf("\n  llvm type: %s\n}\n", llvmType);
-    LLVMDisposeMessage(llvmType);
 }
 
 FieldAttribute attribStringToFieldAttrib(char* keyword) {

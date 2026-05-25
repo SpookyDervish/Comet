@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <string.h>
 #include <stdbool.h>
-#include <llvm-c/Types.h>
 
 typedef enum {
     FIELD_PRIVATE,
@@ -15,13 +14,11 @@ typedef enum {
 } FieldAttribute;
 
 typedef struct {
-    LLVMTypeRef llvmType;
     unsigned index;
     char* name;
     bool isPointer;
     FieldAttribute attrib;
     bool isConst;
-    LLVMValueRef defaultValue;
 } StructField;
 
 UseList(StructField);
@@ -30,7 +27,6 @@ typedef List(StructField)* structFieldList;
 
 typedef struct StructInfo StructInfo;
 struct StructInfo {
-    LLVMTypeRef llvmType;
     List(StructField) fields;
     char* name;
     StructInfo* parent;

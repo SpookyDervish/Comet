@@ -10,7 +10,9 @@
 // -- HELPER METHODS -- //
 ResultType(voidPtr, charptr) visitProgram(CometCompiler* c, CometASTNode* p) {
     for (size_t i = 0; i < p->data.AST_PROGRAM.numStatements; i++) {
-        compile(c, p->data.AST_PROGRAM.statements[i]);
+        ResultType(voidPtr, charptr) result = compile(c, p->data.AST_PROGRAM.statements[i]);
+        if (result.error)
+            return result;
     }
 
     return Success(voidPtr, charptr, NULL);
