@@ -63,7 +63,7 @@ int main(int argc, char** argv) {
     }
 
     for (size_t i = 0; i < compiler.as.success->programIdx; i++) {
-        printf("%s\n", cometInstructionToCStr(compiler.as.success->outputProgram[i]));
+        printf("%s\n", cometInstructionToCStr(compiler.as.success, compiler.as.success->outputProgram[i]));
     }
 
     return 0;

@@ -2,6 +2,7 @@
 #define INST_H
 
 #include "../include/error.h"
+#include "environment.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,8 +18,8 @@ typedef enum {
 } CometValueTypeKind;
 
 typedef enum {
-    CO_STACK,
-    CO_IMMEDIATE
+    CO_IMMEDIATE,
+    CO_STACK
 } CometOperandKind;
 
 typedef struct {
@@ -36,14 +37,16 @@ typedef struct {
 typedef struct {
     CometOperandKind type;
     union {
-        uint32_t reg;
+        uint32_t stackIdx;
         CometImmediate imm;
     };
 } CometOperand;
 
 typedef enum {
-    INST_MOV,
-    INST_ADD
+    INST_PUSH_CONST,
+    INST_ADD,
+    INST_SUB,
+    INST_MUL
 } CometInstType;
 
 typedef struct {
@@ -56,8 +59,10 @@ typedef struct {
 #define NO_OPERAND ((CometOperand){0})
 
 typedef struct {
-    size_t programIdx;
-    size_t stackIdx;
+    uint32_t programIdx;
+    uint32_t stackIdx;
+    uint32_t constIdx;
+    CometOperand consts[256];
     CometInst outputProgram[256];
 } CometCompiler;
 
@@ -70,8 +75,11 @@ ResultType(cometCompilerPtr, charptr) newCompiler();
 
 char* cometImmediateToCStr(CometImmediate immediate);
 char* cometOperandToCStr(CometOperand operand);
-char* cometInstructionToCStr(CometInst inst);
+char* cometInstructionToCStr(CometCompiler* c, CometInst inst);
 char* cometInstOpcodeToCStr(CometInstType instType);
+
+CometOperand pushVal(CometCompiler* c);
+void popVal(CometCompiler* c);
 
 void buildInst(
     CometCompiler* c,
@@ -80,6 +88,10 @@ void buildInst(
     CometOperand a,
     CometOperand b
 );
-CometOperand buildAdd(CometCompiler* c, CometOperand a, CometOperand b);
+void buildPushConst(CometCompiler* c, CometOperand idx);
+CometOperand storeConst(CometCompiler* c, CometOperand value);
+CometOperand buildAdd(CometCompiler* c);
+CometOperand buildSub(CometCompiler* c);
+CometOperand buildMul(CometCompiler* c);
 
 #endif

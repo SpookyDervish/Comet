@@ -28,6 +28,10 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
             CometOperand new = createOperand(CO_IMMEDIATE);
             new.imm.typeKind = COMET_INT;
             new.imm.intVal = node->data.AST_INT.number;
+
+            CometOperand idx = storeConst(c, new);
+            buildPushConst(c, idx);
+
             return Success(CometOperand, charptr, new);
         }
 
@@ -59,7 +63,16 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
     CometOperand out;
     switch (expr.op.type) {
         case CT_PLUS: {
-            out = buildAdd(c, left.as.success, right.as.success);
+            out = buildAdd(c);
+            break;
+        }
+        case CT_MINUS: {
+            out = buildSub(c);
+            break;
+        }
+        case CT_TIMES: {
+            out = buildMul(c);
+            break;
         }
 
         default: {
@@ -93,6 +106,7 @@ ResultType(voidPtr, charptr) compile(CometCompiler* c, CometASTNode* node) {
             if (value.error) {
                 return Error(voidPtr, charptr, value.as.error);
             }
+            return Success(voidPtr, charptr, NULL);
         }
 
         default: {

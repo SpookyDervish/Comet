@@ -2,7 +2,6 @@
 #include "ast.h"
 #include "lexer.h"
 #include "token.h"
-#include <llvm-c/Types.h>
 #include <uthash.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,8 +10,6 @@
 typedef struct {
     char* name;
     UT_hash_handle hh;
-    LLVMTypeRef type;
-    LLVMValueRef ptr;
     bool isMutable;
 } Record;
 
@@ -25,5 +22,5 @@ struct CometEnvironment {
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent);
-void defineVar(CometEnvironment* env, char* name, LLVMValueRef ptr, LLVMTypeRef type, bool isMutable);
+void defineVar(CometEnvironment* env, char* name, bool isMutable);
 Record* lookup(CometEnvironment* env, char* name);

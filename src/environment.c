@@ -12,7 +12,7 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     return env;
 }
 
-void defineVar(CometEnvironment* env, char* name, LLVMValueRef ptr, LLVMTypeRef type, bool isMutable) {
+void defineVar(CometEnvironment* env, char* name, bool isMutable) {
     Record* record;
     HASH_FIND_STR(env->records, name, record);
 
@@ -25,8 +25,6 @@ void defineVar(CometEnvironment* env, char* name, LLVMValueRef ptr, LLVMTypeRef 
     // create a new record and save it to the hash map (or dictionary or whatever you wanna call it)
     record = malloc(sizeof(Record));
     record->name = strdup(name);
-    record->type = type;
-    record->ptr = ptr;
     record->isMutable = isMutable;
 
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
