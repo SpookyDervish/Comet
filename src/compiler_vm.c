@@ -39,10 +39,23 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
             return Success(CometOperand, charptr, new);
         }
 
+        case AST_DOUBLE: {
+            CometOperand new = createOperand(CO_IMMEDIATE);
+            new.imm.typeKind = COMET_DOUBLE;
+            new.imm.doubleVal = node->data.AST_DOUBLE.number;
+
+            CometOperand idx = storeConst(c, new);
+            buildPushConst(c, idx);
+
+            return Success(CometOperand, charptr, new);
+        }
+
         case AST_IDENTIFIER: {
             uint32_t idx = lookup(c->env, node->data.AST_IDENTIFIER.ident)->recordIdx;
 
-            buildLoad(c, idx);
+            CometOperand new = buildLoad(c, idx);
+            return Success(CometOperand, charptr, new);
+            
         }
 
         default: {
@@ -61,7 +74,10 @@ ResultType(CometOperand, charptr) visitExpressionStatement(CometCompiler* c, Com
 }
 
 ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) exprResult = compile(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    ResultType(CometOperand, charptr) exprResult = resolveValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (exprResult.error)
+        return exprResult;
+    
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
     uint32_t idx = defineVar(c->env, ident, exprResult.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
@@ -125,11 +141,9 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
         case AST_ASSIGN_STATEMENT:
             return visitAssignStatement(c, node);
 
-        case AST_INFIX_EXPRESSION: {
-            ResultType(CometOperand, charptr) value = visitInfixExpression(c, node);
-            return value;
-        }
-
+        case AST_INFIX_EXPRESSION: 
+            return visitInfixExpression(c, node);
+        
         default: {
             Estr errMsg = CREATE_ESTR("No compiler visit method for \"");
             APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));

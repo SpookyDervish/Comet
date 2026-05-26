@@ -241,6 +241,8 @@ CometOperand buildLoad(CometCompiler* c, uint32_t idx) {
     };
 
     buildInst(c, INST_LOAD, value, NO_OPERAND, NO_OPERAND);
+
+    return value;
 }
 CometOperand buildAdd(CometCompiler* c) {
     popVal(c);
