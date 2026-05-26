@@ -1,6 +1,6 @@
 #include "vm.h"
 #include "args.h"
-#include "../include/ansi.h"
+#include "../lib/ansi.h"
 
 #define VERSION_NUMBER "0.1.0"
 

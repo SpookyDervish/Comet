@@ -2,6 +2,7 @@
 #define OPERAND_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct {
     char name[32];
