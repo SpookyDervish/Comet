@@ -71,8 +71,9 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->stackCapacity = max(max(64, loadedFile->numConsts), loadedFile->numConsts*2);
     newVM->stack = calloc(newVM->stackCapacity, sizeof(int64_t));
     newVM->instructions = NULL;
+    newVM->constants = calloc(loadedFile->numConsts, sizeof(CometOperand));
 
-    memcpy(newVM->constants, loadedFile + sizeof(CometFile), sizeof(CometOperand) * loadedFile->numConsts);
+    memcpy(newVM->constants, ((char*)loadedFile) + sizeof(CometFile), sizeof(CometOperand) * loadedFile->numConsts);
 
     printf("%d\n", newVM->constants[0].imm.intVal);
 
