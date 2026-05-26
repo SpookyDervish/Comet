@@ -303,9 +303,7 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
     };
 
     fwrite(&cometFile, sizeof(CometFile), 1, file);
-    printf("header = %zu\n", sizeof(cometFile));
     fwrite(c->consts, sizeof(CometOperand), c->constIdx, file);
-    printf("consts = %zu\n", sizeof(CometOperand) * c->constIdx);
 
 
     for (size_t i = 0; i < c->functionCount; i++) {
@@ -317,7 +315,6 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
         fwrite(&serializedFunc, sizeof(CometSerializedFunc), 1, file);
         
     }
-    printf("functions = %zu\n", sizeof(CometSerializedFunc) * c->functionCount);
 
     for (size_t instIdx = 0; instIdx < c->programIdx; instIdx++) {
         CometInst inst = c->outputProgram[instIdx];
@@ -326,10 +323,6 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
         fwrite(serializedInst, sizeof(CometSerializedInst), 1, file);
         
     }
-        printf("instructions = %zu\n", sizeof(CometSerializedFunc));
-
-
-
     fclose(file);
 
     return Success(voidPtr, charptr, NULL);
