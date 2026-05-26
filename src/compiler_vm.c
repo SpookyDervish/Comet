@@ -4,7 +4,6 @@
 #include "inst.h"
 #include "lexer.h"
 #include "operand.h"
-#include "parser.h"
 #include "token.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -194,6 +193,24 @@ ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometAS
     
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node) {
+    struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
+    char* funcName = funcCall.ident->data.AST_IDENTIFIER.ident;
+
+    List(CometOperand) funcCallArgs = newList(CometOperand);
+    for (size_t argIdx = 0; argIdx < funcCall.args.count; argIdx++) {
+        CometASTNode* argNode = *get(funcCall.args, argIdx);
+
+        ResultType(CometOperand, charptr) argValue = resolveValue(c, argNode);
+        if (argValue.error)
+            return argValue;
+
+        append(funcCallArgs, argValue.as.success);
+    }
+
+    CometOperand returnValue = buildCall(c, funcName, funcCallArgs);
+    return Success(CometOperand, charptr, returnValue);
+}
 
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
@@ -215,7 +232,9 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitFuncDefStatement(c, node);
         case AST_RETURN_STATEMENT:
             return visitReturnStatement(c, node);
-
+        
+        case AST_FUNC_CALL:
+            return visitFuncCall(c, node);
         case AST_INFIX_EXPRESSION: 
             return visitInfixExpression(c, node);
         

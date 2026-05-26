@@ -42,7 +42,7 @@ typedef struct {
     union {
         uint32_t stackIdx;
         CometImmediate imm;
-        CometFunction* function;
+        char* symbolName;
     };
 } CometOperand;
 

@@ -17,7 +17,9 @@ typedef enum {
     INST_ADD,
     INST_SUB,
     INST_MUL,
-    INST_LOAD_ARG
+    INST_LOAD_ARG,
+    INST_RET,
+    INST_CALL
 } CometInstType;
 
 typedef struct {
@@ -55,6 +57,8 @@ char* cometInstOpcodeToCStr(CometInstType instType);
 CometOperand pushVal(CometCompiler* c);
 void popVal(CometCompiler* c);
 
+UseList(CometOperand);
+
 void buildInst(
     CometCompiler* c,
     CometInstType opcode,
@@ -70,7 +74,8 @@ CometOperand buildAdd(CometCompiler* c);
 CometOperand buildSub(CometCompiler* c);
 CometOperand buildMul(CometCompiler* c);
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount);
-CometOperand buildReturn(CometCompiler* c, CometOperand value);
+void buildReturn(CometCompiler* c, CometOperand value);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
+CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
 
 #endif

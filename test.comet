@@ -3,5 +3,6 @@ func add(int a, int b) -> int {
 }
 
 func main() -> void {
-    
+    int x = 2
+    add(x, 4)
 }

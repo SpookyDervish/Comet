@@ -68,7 +68,7 @@ char* cometOperandToCStr(CometOperand operand) {
 
         case CO_SYMBOL: {
             char* buffer = malloc(64);
-            sprintf(buffer, "func %s, %d args", operand.function->name, operand.function->argCount); 
+            sprintf(buffer, "func %s", operand.symbolName); 
             return buffer;
         }
     }
@@ -83,6 +83,8 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_SUB       : return "SUB         ";
         case INST_MUL       : return "MUL         ";
         case INST_LOAD_ARG  : return "LOAD_ARG    ";
+        case INST_RET       : return "RET         ";
+        case INST_CALL      : return "CALL        ";
         default             : return "FIXME       ";
     }
 }
@@ -198,7 +200,7 @@ CometOperand findConst(CometCompiler* c, CometOperand value) {
             }
 
             case CO_SYMBOL: {
-                if (constValue.function == value.function) {
+                if (strcmp(constValue.symbolName, value.symbolName) == 0) {
                     return constIdx;
                 }
                 break;
@@ -300,12 +302,12 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount) {
     c->functionCount++;
 
     CometOperand funcValue = createOperand(CO_SYMBOL);
-    funcValue.function = newFunction;
+    funcValue.symbolName = name;
 
     return funcValue;
 }
-CometOperand buildReturn(CometCompiler* c, CometOperand value) {
-    return pushVal(c);
+void buildReturn(CometCompiler* c, CometOperand value) {
+    buildInst(c, INST_RET, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
     CometOperand argValue = pushVal(c);
@@ -317,4 +319,20 @@ CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
     buildInst(c, INST_LOAD_ARG, indexOperand, NO_OPERAND, NO_OPERAND);
 
     return argValue;
+}
+CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
+    CometOperand funcValue = createOperand(CO_SYMBOL);
+    funcValue.symbolName = name;
+
+    CometOperand returnValue = pushVal(c);
+
+    for (size_t argIdx = 0; argIdx < args.count; argIdx++) {
+        CometOperand argValue = *get(args, argIdx);
+
+        pushVal(c);
+        //buildInst(c, INST_PUSH_ARG, argValue, NO_OPERAND, NO_OPERAND);
+    }
+
+    buildInst(c, INST_CALL, funcValue, NO_OPERAND, NO_OPERAND);
+    return returnValue;
 }
