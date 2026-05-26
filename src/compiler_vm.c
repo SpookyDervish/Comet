@@ -51,9 +51,29 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
         }
 
         case AST_IDENTIFIER: {
-            uint32_t idx = lookup(c->env, node->data.AST_IDENTIFIER.ident)->recordIdx;
+            char* varName = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(c->env, varName);
 
-            CometOperand new = buildLoad(c, idx);
+            if (varRecord == NULL) {
+                Estr errMsg = CREATE_ESTR("Undefined variable \"");
+                APPEND_ESTR(errMsg, varName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometOperand, charptr, errMsg.str);
+            }
+
+            uint32_t idx = varRecord->recordIdx;
+
+            CometOperand new;
+            switch (varRecord->recordType) {
+                case RECORD_LOCAL: 
+                   new = buildLoad(c, idx);
+                   break;
+                case RECORD_ARG:
+                    new = buildLoadArg(c, idx);
+                    break;
+                
+            }
+             
             return Success(CometOperand, charptr, new);
             
         }
@@ -80,7 +100,7 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
     
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
-    uint32_t idx = defineVar(c->env, ident, exprResult.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
+    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);
 
     return Success(CometOperand, charptr, NO_OPERAND);
@@ -122,6 +142,58 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
 
     return Success(CometOperand, charptr, out);
 }
+ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
+    char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+
+    
+    // build the function start and define the function in the current scope
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count);
+    defineVar(c->env, funcName, RECORD_LOCAL, funcValue, false);
+
+    // create the new scope for the function
+    CometEnvironment* funcEnv = newEnvironment(funcName, c->env);
+    c->env = funcEnv;
+
+    // define each argument in the functions scope
+    for (size_t argIdx = 0; argIdx < funcDef.args.count; argIdx++) {
+        CometASTNode* argNode = *get(funcDef.args, argIdx);
+        struct AST_ARG_DEF argument = argNode->data.AST_ARG_DEF;
+
+        CometOperand argValue = createOperand(CO_IMMEDIATE);
+        argValue.imm.typeKind = COMET_INT;
+        argValue.imm.intVal = argIdx;
+
+        defineVar(
+            c->env,
+            argument.ident->data.AST_IDENTIFIER.ident, 
+            RECORD_ARG,
+            argValue, 
+            false
+        );
+    }
+
+    // build the functions body
+    ResultType(CometOperand, charptr) bodyResult = compile(c, funcDef.program);
+    if (bodyResult.error)
+        return bodyResult;
+
+    // return back to the parent scope
+    c->env = c->env->parent;
+    free(funcEnv);
+
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
+ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometASTNode* node) {
+    ResultType(CometOperand, charptr) returnValue = resolveValue(c, node->data.AST_RETURN_STATEMENT.expression);
+    if (returnValue.error)
+        return returnValue;
+    
+    buildReturn(c, returnValue.as.success);
+    
+    
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
@@ -131,7 +203,6 @@ CometCompiler* createCompilerVM() {
 
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) {
     
-    printf("%s\n", ASTNodeTypeToCStr(node->nodeType));
     switch (node->nodeType) {
         case AST_PROGRAM:
             return visitProgram(c, node);
@@ -140,6 +211,10 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitExpressionStatement(c, node);
         case AST_ASSIGN_STATEMENT:
             return visitAssignStatement(c, node);
+        case AST_FUNC_DEF_STATEMENT:
+            return visitFuncDefStatement(c, node);
+        case AST_RETURN_STATEMENT:
+            return visitReturnStatement(c, node);
 
         case AST_INFIX_EXPRESSION: 
             return visitInfixExpression(c, node);

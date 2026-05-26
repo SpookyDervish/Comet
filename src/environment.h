@@ -7,6 +7,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+typedef enum {
+    RECORD_LOCAL,
+    RECORD_ARG
+} RecordType;
+
 // basically the same as a token but with a name instead of a type
 typedef struct {
     char* name;
@@ -14,6 +19,7 @@ typedef struct {
     bool isMutable;
     CometOperand value;
     uint32_t recordIdx;
+    RecordType recordType;
 } Record;
 
 typedef struct CometEnvironment CometEnvironment;
@@ -26,5 +32,5 @@ struct CometEnvironment {
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent);
-uint32_t defineVar(CometEnvironment* env, char* name, CometOperand value, bool isMutable);
+uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, bool isMutable);
 Record* lookup(CometEnvironment* env, char* name);

@@ -280,7 +280,7 @@ void printNode(CometASTNode* node) {
         case AST_EXPRESSION_STATEMENT:
             printNode(node->data.AST_EXPRESSION_STATEMENT.expression);
             break;
-        case AST_ASSIGN_STATEMENT:
+        case AST_ASSIGN_STATEMENT: {
             FieldAttribute attrib = node->data.AST_ASSIGN_STATEMENT.attrib;
             if (attrib != FIELD_PUBLIC) {
                 switch (attrib) {
@@ -302,6 +302,7 @@ void printNode(CometASTNode* node) {
                 printNode(value);
             }
             break;
+        }
         case AST_REASSIGN_STATEMENT:
             printNode(node->data.AST_REASSIGN_STATEMENT.ident);
             printf(" = ");

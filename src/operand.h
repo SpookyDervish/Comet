@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 
+typedef struct {
+    char name[32];
+    uint32_t startIdx;
+    uint32_t argCount;
+} CometFunction;
+
 typedef enum {
     COMET_VOID,
     COMET_SMALL,
@@ -15,7 +21,8 @@ typedef enum {
 
 typedef enum {
     CO_IMMEDIATE,
-    CO_STACK
+    CO_STACK,
+    CO_SYMBOL
 } CometOperandKind;
 
 typedef struct {
@@ -35,6 +42,7 @@ typedef struct {
     union {
         uint32_t stackIdx;
         CometImmediate imm;
+        CometFunction* function;
     };
 } CometOperand;
 

@@ -1,2 +1,7 @@
-int x = 5 + 2 * 3 - 6
-int y = x + 2
+func add(int a, int b) -> int {
+    return a + b
+}
+
+func main() -> void {
+    
+}

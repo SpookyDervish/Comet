@@ -12,7 +12,7 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     return env;
 }
 
-uint32_t defineVar(CometEnvironment* env, char* name, CometOperand value, bool isMutable) {
+uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, bool isMutable) {
     Record* record;
     HASH_FIND_STR(env->records, name, record);
 
@@ -27,6 +27,7 @@ uint32_t defineVar(CometEnvironment* env, char* name, CometOperand value, bool i
     record->name = strdup(name);
     record->value = value;
     record->isMutable = isMutable;
+    record->recordType = recordType;
 
     record->recordIdx = env->recordIdx;
     env->recordIdx++;

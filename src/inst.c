@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 CometOperand createOperand(CometOperandKind type) {
     return (CometOperand){
@@ -25,7 +26,7 @@ char* cometImmediateToCStr(CometImmediate immediate) {
         }
         case COMET_BIG: {
             char* buffer = malloc(64);
-            sprintf(buffer, "%ld", immediate.bigVal);
+            sprintf(buffer, "%lld", immediate.bigVal);
             return buffer;
         }
 
@@ -60,8 +61,14 @@ char* cometOperandToCStr(CometOperand operand) {
             return cometImmediateToCStr(operand.imm);
 
         case CO_STACK: {
-            char* buffer = malloc(64);
+            char* buffer = malloc(32);
             sprintf(buffer, "%%%d", operand.stackIdx);
+            return buffer;
+        }
+
+        case CO_SYMBOL: {
+            char* buffer = malloc(64);
+            sprintf(buffer, "func %s, %d args", operand.function->name, operand.function->argCount); 
             return buffer;
         }
     }
@@ -75,6 +82,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_ADD       : return "ADD         ";
         case INST_SUB       : return "SUB         ";
         case INST_MUL       : return "MUL         ";
+        case INST_LOAD_ARG  : return "LOAD_ARG    ";
         default             : return "FIXME       ";
     }
 }
@@ -188,6 +196,13 @@ CometOperand findConst(CometCompiler* c, CometOperand value) {
                 }
                 break;
             }
+
+            case CO_SYMBOL: {
+                if (constValue.function == value.function) {
+                    return constIdx;
+                }
+                break;
+            }
         }
     }
 
@@ -273,4 +288,33 @@ CometOperand buildMul(CometCompiler* c) {
     buildInst(c, INST_MUL, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 
     return dest;
+}
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount) {
+    CometFunction* newFunction = malloc(sizeof(CometFunction));
+    newFunction->argCount = argCount;
+
+    strncpy(newFunction->name, name, 32);
+    newFunction->startIdx = c->programIdx;
+
+    c->functions[c->functionCount] = newFunction;
+    c->functionCount++;
+
+    CometOperand funcValue = createOperand(CO_SYMBOL);
+    funcValue.function = newFunction;
+
+    return funcValue;
+}
+CometOperand buildReturn(CometCompiler* c, CometOperand value) {
+    return pushVal(c);
+}
+CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
+    CometOperand argValue = pushVal(c);
+
+    CometOperand indexOperand = createOperand(CO_IMMEDIATE);
+    indexOperand.imm.typeKind = COMET_INT;
+    indexOperand.imm.intVal = idx;
+
+    buildInst(c, INST_LOAD_ARG, indexOperand, NO_OPERAND, NO_OPERAND);
+
+    return argValue;
 }
