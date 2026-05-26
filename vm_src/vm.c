@@ -2,6 +2,7 @@
 #include "args.h"
 #include "operand.h"
 #include "serialized.h"
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -65,17 +66,21 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
     CometVM* newVM = malloc(sizeof(CometVM));
     if (newVM == NULL) {
+        free(loadedFile);
         return Error(vmPtr, charptr, "failed to allocate memory for CometVM!");
     }
 
     newVM->stackCapacity = max(max(64, loadedFile->numConsts), loadedFile->numConsts*2);
     newVM->stack = calloc(newVM->stackCapacity, sizeof(int64_t));
-    newVM->instructions = NULL;
+    newVM->instructions = calloc(loadedFile->numInstructions, sizeof(CometSerializedInst));
     newVM->constants = calloc(loadedFile->numConsts, sizeof(CometOperand));
+    newVM->functions = calloc(loadedFile->numFunctions, sizeof(CometSerializedFunc));
 
-    memcpy(newVM->constants, ((char*)loadedFile) + sizeof(CometFile), sizeof(CometOperand) * loadedFile->numConsts);
-
-    printf("%d\n", newVM->constants[0].imm.intVal);
+    size_t constantsTableSize = sizeof(CometOperand) * loadedFile->numConsts;
+    size_t functionsTableSize = sizeof(CometSerializedFunc) * loadedFile->numFunctions;
+    memcpy(newVM->constants, ((char*)loadedFile) + sizeof(CometFile), constantsTableSize);
+    memcpy(newVM->functions, ((char*)loadedFile) + sizeof(CometFile) + constantsTableSize, sizeof(CometSerializedFunc) * loadedFile->numFunctions);
+    memcpy(newVM->instructions, ((char*)loadedFile) + sizeof(CometFile) + constantsTableSize + functionsTableSize, sizeof(CometSerializedInst) * loadedFile->numInstructions);
 
     return Success(vmPtr, charptr, newVM);
 }

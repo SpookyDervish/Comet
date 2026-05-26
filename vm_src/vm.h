@@ -13,6 +13,7 @@ typedef struct {
     uint64_t stackCapacity;
     int64_t* stack;
     CometSerializedInst* instructions;
+    CometSerializedFunc* functions;
 } CometVM;
 
 typedef CometVM* vmPtr;
