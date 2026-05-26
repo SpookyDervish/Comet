@@ -19,10 +19,17 @@ typedef enum {
     COMET_BOOL
 } CometValueTypeKind;
 
+typedef struct {
+    uint32_t pos;
+    bool resolved;
+} CometLabel;
+
 typedef enum {
+    CO_NONE,
     CO_IMMEDIATE,
     CO_STACK,
-    CO_SYMBOL
+    CO_SYMBOL,
+    CO_LABEL
 } CometOperandKind;
 
 typedef struct {
@@ -43,6 +50,7 @@ typedef struct {
         uint32_t stackIdx;
         CometImmediate imm;
         char* symbolName;
+        CometLabel* label;
     };
 } CometOperand;
 

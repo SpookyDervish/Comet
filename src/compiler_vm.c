@@ -7,6 +7,7 @@
 #include "token.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 
@@ -31,6 +32,17 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
             CometOperand new = createOperand(CO_IMMEDIATE);
             new.imm.typeKind = COMET_INT;
             new.imm.intVal = node->data.AST_INT.number;
+
+            CometOperand idx = storeConst(c, new);
+            buildPushConst(c, idx);
+
+            return Success(CometOperand, charptr, new);
+        }
+
+        case AST_BOOL: {
+            CometOperand new = createOperand(CO_IMMEDIATE);
+            new.imm.typeKind = COMET_BOOL;
+            new.imm.boolVal = node->data.AST_BOOL.value;
 
             CometOperand idx = storeConst(c, new);
             buildPushConst(c, idx);
@@ -117,6 +129,7 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
     
     CometOperand out;
     switch (expr.op.type) {
+        // arithmetic
         case CT_PLUS: {
             out = buildAdd(c);
             break;
@@ -127,6 +140,12 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
         }
         case CT_TIMES: {
             out = buildMul(c);
+            break;
+        }
+
+        // conditionals
+        case CT_EQ_EQ: {
+            out = buildEq(c);
             break;
         }
 
@@ -211,6 +230,51 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     CometOperand returnValue = buildCall(c, funcName, funcCallArgs);
     return Success(CometOperand, charptr, returnValue);
 }
+ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_IF_STATEMENT ifStmt = node->data.AST_IF_STATEMENT;
+    CometASTNode* elseBody = ifStmt.elseProgram;
+
+    CometLabel* endLabel = buildLabel(c);
+    CometLabel* elseLabel = buildLabel(c);
+
+    ResultType(CometOperand, charptr) condition = resolveValue(c, ifStmt.expression);
+    if (condition.error)
+        return condition;
+
+    if (elseBody != NULL)
+        buildJumpIfFalse(c, elseLabel);
+    else
+        buildJumpIfFalse(c, endLabel);
+
+    ResultType(CometOperand, charptr) ifBodyResult = compile(c, ifStmt.program);
+    if (ifBodyResult.error)
+        return ifBodyResult;
+
+    
+
+    
+
+    if (ifStmt.elseProgram != NULL) {
+        buildJump(c, endLabel);
+        resolveLabel(c, elseLabel);
+        condition = resolveValue(c, ifStmt.expression);
+        if (condition.error)
+            return condition;
+
+        buildNot(c);
+        buildJumpIfFalse(c, endLabel);
+
+        ResultType(CometOperand, charptr) elseBodyResult = compile(c, ifStmt.elseProgram);
+        if (elseBodyResult.error)
+            return elseBodyResult;
+
+    }
+
+    resolveLabel(c, endLabel);
+    
+
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
@@ -232,6 +296,8 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitFuncDefStatement(c, node);
         case AST_RETURN_STATEMENT:
             return visitReturnStatement(c, node);
+        case AST_IF_STATEMENT:
+            return visitIfStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

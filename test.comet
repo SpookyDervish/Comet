@@ -1,8 +1,9 @@
-func add(int a, int b) -> int {
-    return a + b
-}
+func main() -> int {
+    if 1 + 1 == 2 {
+        return 0
+    } else {
+        return 1
+    }
 
-func main() -> void {
-    int x = 2
-    add(x, 4)
+    return 2
 }

@@ -71,21 +71,37 @@ char* cometOperandToCStr(CometOperand operand) {
             sprintf(buffer, "func %s", operand.symbolName); 
             return buffer;
         }
+
+        case CO_LABEL: {
+            char* buffer = malloc(32);
+            if (operand.label->resolved)
+                sprintf(buffer, "0x%x", operand.label->pos);
+            else
+                sprintf(buffer, "(unresolved)");
+
+            return buffer;
+        }
     }
+
+    return "FIXME";
 }
 
 char* cometInstOpcodeToCStr(CometInstType instType) {
     switch (instType) {
-        case INST_PUSH_CONST: return "PUSH_CONST  ";
-        case INST_STORE     : return "STORE       ";
-        case INST_LOAD      : return "LOAD        ";
-        case INST_ADD       : return "ADD         ";
-        case INST_SUB       : return "SUB         ";
-        case INST_MUL       : return "MUL         ";
-        case INST_LOAD_ARG  : return "LOAD_ARG    ";
-        case INST_RET       : return "RET         ";
-        case INST_CALL      : return "CALL        ";
-        default             : return "FIXME       ";
+        case INST_PUSH_CONST   : return "    PUSH_CONST      ";
+        case INST_STORE        : return "    STORE           ";
+        case INST_LOAD         : return "    LOAD            ";
+        case INST_ADD          : return "    ADD             ";
+        case INST_SUB          : return "    SUB             ";
+        case INST_MUL          : return "    MUL             ";
+        case INST_LOAD_ARG     : return "    LOAD_ARG        ";
+        case INST_RET          : return "    RET             ";
+        case INST_CALL         : return "    CALL            ";
+        case INST_EQ           : return "    EQ              ";
+        case INST_JMP          : return "    JMP             ";
+        case INST_JMP_IF_FALSE : return "    JMP_IF_FALSE    ";
+        case INST_NOT          : return "    NOT             ";
+        default                : return "    FIXME           ";
     }
 }
 
@@ -93,9 +109,13 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
     char* buffer = malloc(256);
     char* extra = malloc(128);
 
+    buffer[0] = 0;
+    extra[0] = 0;
+
     // print extra info if we can
     switch (inst.opcode) {
         case INST_PUSH_CONST:
+            
             sprintf(
                 extra,
                 "; consts[%d] = %s",
@@ -103,16 +123,41 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
                 cometOperandToCStr(c->consts[inst.a.imm.intVal])
             );
             break;
-        default: extra = "";
+
+        case INST_JMP:
+        case INST_JMP_IF_FALSE:
+            if (inst.a.label->pos >= c->programIdx) {
+                sprintf(extra, "; (???)");
+                break;
+            }
+
+            sprintf(
+                extra,
+                "; (%s)",
+                cometInstructionToCStr(c, c->outputProgram[inst.a.label->pos])
+            );
+            break;
+
+        default: break;
     }
+
+    char* argsBuffer = malloc(128);
+    argsBuffer[0] = 0;
+    if (inst.a.type != CO_NONE)
+        sprintf(argsBuffer, "%s", cometOperandToCStr(inst.a));    
+    if (inst.b.type != CO_NONE)
+        sprintf(argsBuffer + strlen(argsBuffer), ", %s", cometOperandToCStr(inst.b));    
+    if (inst.c.type != CO_NONE)
+        sprintf(argsBuffer + strlen(argsBuffer), ", %s", cometOperandToCStr(inst.c));    
+
 
     sprintf(
         buffer,
-        "%s%s, %s, %s    %s",
+        "0x%04x%s%s    %s",
+        inst.pos,
         cometInstOpcodeToCStr(inst.opcode),
-        cometOperandToCStr(inst.a),
-        cometOperandToCStr(inst.b),
-        cometOperandToCStr(inst.c),
+        argsBuffer,
+
         extra
     );
 
@@ -130,7 +175,8 @@ void buildInst(
         .opcode = opcode,
         .a = a,
         .b = b,
-        .c = c
+        .c = c,
+        .pos = compiler->programIdx
     };
     compiler->programIdx++;
 }
@@ -213,8 +259,6 @@ CometOperand findConst(CometCompiler* c, CometOperand value) {
 
 // -- INSTRUCTIONS -- //
 CometOperand storeConst(CometCompiler* c, CometOperand value) {
-      
-
     // see if a constant with the same value already exists
     CometOperand existingConst = findConst(c, value);
     if (existingConst.imm.typeKind != COMET_VOID) {
@@ -291,6 +335,16 @@ CometOperand buildMul(CometCompiler* c) {
 
     return dest;
 }
+CometOperand buildEq(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_EQ, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount) {
     CometFunction* newFunction = malloc(sizeof(CometFunction));
     newFunction->argCount = argCount;
@@ -328,11 +382,48 @@ CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
 
     for (size_t argIdx = 0; argIdx < args.count; argIdx++) {
         CometOperand argValue = *get(args, argIdx);
-
         pushVal(c);
-        //buildInst(c, INST_PUSH_ARG, argValue, NO_OPERAND, NO_OPERAND);
     }
 
     buildInst(c, INST_CALL, funcValue, NO_OPERAND, NO_OPERAND);
     return returnValue;
+}
+void buildJump(CometCompiler* c, CometLabel* label) {
+    CometOperand labelOperand = createOperand(CO_LABEL);
+    labelOperand.label = label;
+
+    buildInst(c, INST_JMP, labelOperand, NO_OPERAND, NO_OPERAND);
+}
+void buildJumpIfFalse(CometCompiler* c, CometLabel* label) {
+    CometOperand labelOperand = createOperand(CO_LABEL);
+    labelOperand.label = label;
+
+    popVal(c);
+
+    buildInst(c, INST_JMP_IF_FALSE, labelOperand, NO_OPERAND, NO_OPERAND);
+}
+CometOperand buildNot(CometCompiler* c) {
+    popVal(c);
+    CometOperand dest = pushVal(c);
+
+    
+
+    buildInst(c, INST_NOT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+
+// -- LABELS -- //
+CometLabel* buildLabel(CometCompiler* c) {
+    CometLabel* newLabel = malloc(sizeof(CometLabel));
+    newLabel->resolved = false;
+
+    c->labels[c->labelCount] = newLabel;
+    c->labelCount++;
+
+    return newLabel;
+}
+void resolveLabel(CometCompiler* c, CometLabel* label) {
+    label->pos = c->programIdx;
+    label->resolved = true;
 }

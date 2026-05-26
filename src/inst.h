@@ -19,7 +19,11 @@ typedef enum {
     INST_MUL,
     INST_LOAD_ARG,
     INST_RET,
-    INST_CALL
+    INST_CALL,
+    INST_EQ,
+    INST_JMP,
+    INST_JMP_IF_FALSE,
+    INST_NOT
 } CometInstType;
 
 typedef struct {
@@ -27,6 +31,7 @@ typedef struct {
     CometOperand a;
     CometOperand b;
     CometOperand c;
+    uint32_t pos;
 } CometInst;
 
 #define NO_OPERAND ((CometOperand){0})
@@ -36,7 +41,9 @@ typedef struct {
     uint32_t stackIdx;
     uint32_t constIdx;
     uint32_t functionCount;
+    uint32_t labelCount;
     CometOperand consts[512];
+    CometLabel* labels[512];
     CometInst outputProgram[2048];
     CometFunction* functions[128];
     CometEnvironment* env;
@@ -73,9 +80,16 @@ CometOperand buildLoad(CometCompiler* c, uint32_t idx);
 CometOperand buildAdd(CometCompiler* c);
 CometOperand buildSub(CometCompiler* c);
 CometOperand buildMul(CometCompiler* c);
+CometOperand buildEq(CometCompiler* c);
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount);
 void buildReturn(CometCompiler* c, CometOperand value);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
+void buildJump(CometCompiler* c, CometLabel* label);
+void buildJumpIfFalse(CometCompiler* c, CometLabel* label);
+CometOperand buildNot(CometCompiler* c);
+
+CometLabel* buildLabel(CometCompiler* c);
+void resolveLabel(CometCompiler* c, CometLabel* label);
 
 #endif
