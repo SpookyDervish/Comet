@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include "../include/error.h"
+#include "../lib/error.h"
 #include "../include/operand.h"
 
 typedef void* voidPtr;

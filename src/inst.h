@@ -1,7 +1,7 @@
 #ifndef INST_H
 #define INST_H
 
-#include "../include/error.h"
+#include "../lib/error.h"
 #include "environment.h"
 #include "../include/operand.h"
 #include <stdint.h>
