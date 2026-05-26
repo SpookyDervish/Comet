@@ -55,7 +55,15 @@ char* cometImmediateToCStr(CometImmediate immediate) {
     }
 }
 
-char* cometOperandToCStr(CometOperand operand) {
+CometFunction* getSymbol(CometCompiler* c, CometOperand symbolValue) {
+    for (size_t i = 0; i < c->functionCount; i++) {
+        if (i == symbolValue.symbolIdx) {
+            return c->functions[i];
+        }
+    }
+}
+
+char* cometOperandToCStr(CometCompiler* c, CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE:
             return cometImmediateToCStr(operand.imm);
@@ -67,8 +75,10 @@ char* cometOperandToCStr(CometOperand operand) {
         }
 
         case CO_SYMBOL: {
+            CometFunction* func = getSymbol(c, operand);
+
             char* buffer = malloc(64);
-            sprintf(buffer, "func %s", operand.symbolName); 
+            sprintf(buffer, "func %s, %d args", func->name, func->argCount); 
             return buffer;
         }
 
@@ -120,7 +130,7 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
                 extra,
                 "; consts[%d] = %s",
                 inst.a.imm.intVal,
-                cometOperandToCStr(c->consts[inst.a.imm.intVal])
+                cometOperandToCStr(c, c->consts[inst.a.imm.intVal])
             );
             break;
 
@@ -144,11 +154,11 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
     char* argsBuffer = malloc(128);
     argsBuffer[0] = 0;
     if (inst.a.type != CO_NONE)
-        sprintf(argsBuffer, "%s", cometOperandToCStr(inst.a));    
+        sprintf(argsBuffer, "%s", cometOperandToCStr(c, inst.a));    
     if (inst.b.type != CO_NONE)
-        sprintf(argsBuffer + strlen(argsBuffer), ", %s", cometOperandToCStr(inst.b));    
+        sprintf(argsBuffer + strlen(argsBuffer), ", %s", cometOperandToCStr(c, inst.b));    
     if (inst.c.type != CO_NONE)
-        sprintf(argsBuffer + strlen(argsBuffer), ", %s", cometOperandToCStr(inst.c));    
+        sprintf(argsBuffer + strlen(argsBuffer), ", %s", cometOperandToCStr(c, inst.c));    
 
 
     sprintf(
@@ -216,6 +226,16 @@ bool immediatesAreEqual(CometImmediate a, CometImmediate b) {
     }
 }
 
+uint32_t getSymbolIndex(CometCompiler* c, const char* symbolName) {
+    for (size_t i = 0; i < c->functionCount; i++) {
+        CometFunction* func = c->functions[i];
+
+        if (strcmp(func->name, symbolName)) {
+            return i;
+        }
+    }
+}
+
 CometOperand findConst(CometCompiler* c, CometOperand value) {
     for (uint32_t i = 0; i < c->constIdx; i++) {
         CometOperand constValue = c->consts[i];
@@ -246,7 +266,9 @@ CometOperand findConst(CometCompiler* c, CometOperand value) {
             }
 
             case CO_SYMBOL: {
-                if (strcmp(constValue.symbolName, value.symbolName) == 0) {
+
+
+                if (constValue.symbolIdx == value.symbolIdx) {
                     return constIdx;
                 }
                 break;
@@ -353,10 +375,11 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount) {
     newFunction->startIdx = c->programIdx;
 
     c->functions[c->functionCount] = newFunction;
-    c->functionCount++;
 
     CometOperand funcValue = createOperand(CO_SYMBOL);
-    funcValue.symbolName = name;
+    funcValue.symbolIdx = c->functionCount;
+
+    c->functionCount++;
 
     return funcValue;
 }
@@ -376,7 +399,7 @@ CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
 }
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
     CometOperand funcValue = createOperand(CO_SYMBOL);
-    funcValue.symbolName = name;
+    funcValue.symbolIdx = getSymbolIndex(c, name);
 
     CometOperand returnValue = pushVal(c);
 

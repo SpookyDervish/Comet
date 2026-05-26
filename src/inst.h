@@ -57,7 +57,7 @@ Result(cometCompilerPtr, charptr);
 ResultType(cometCompilerPtr, charptr) newCompiler();
 
 char* cometImmediateToCStr(CometImmediate immediate);
-char* cometOperandToCStr(CometOperand operand);
+char* cometOperandToCStr(CometCompiler* c ,CometOperand operand);
 char* cometInstructionToCStr(CometCompiler* c, CometInst inst);
 char* cometInstOpcodeToCStr(CometInstType instType);
 
@@ -65,6 +65,11 @@ CometOperand pushVal(CometCompiler* c);
 void popVal(CometCompiler* c);
 
 UseList(CometOperand);
+
+CometFunction* getSymbol(CometCompiler* c, CometOperand symbolValue);
+
+uint32_t getSymbolIndex(CometCompiler* c, const char* symbolName);
+CometOperand findConst(CometCompiler* c, CometOperand value);
 
 void buildInst(
     CometCompiler* c,

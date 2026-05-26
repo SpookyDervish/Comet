@@ -1,6 +1,8 @@
 SRC=src
+VM_SRC=vm_src
 
 SRC_FILES=$(wildcard $(SRC)/*.c)
+VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 
 CC=gcc
 CXX=g++
@@ -9,14 +11,19 @@ LDFLAGS=$(shell llvm-config --ldflags)
 LDLIBS=$(shell llvm-config --libs all) $(shell llvm-config --system-libs)
 DEBUG_CFLAGS=-Wall -Wextra -ggdb $(shell llvm-config --cflags) -fsanitize=address -g
 
-TARGET=cometc
+COMPILER_TARGET=cometc
+VM_TARGET=comet
 
+both: $(COMPILER_TARGET) $(VM_TARGET)
 
-$(TARGET): $(SRC_FILES)
-	$(CC) $(SRC_FILES) -o $(TARGET) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+$(COMPILER_TARGET): $(SRC_FILES)
+	$(CC) $(SRC_FILES) -o $(COMPILER_TARGET) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+
+$(VM_TARGET): $(VM_SRC_FILES)
+	$(CC) $(VM_SRC_FILES) -o $(VM_TARGET) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 debug:
-	$(CC) $(SRC_FILES) -o $(TARGET) $(DEBUG_CFLAGS) $(LDFLAGS) $(LDLIBS)
+	$(CC) $(SRC_FILES) -o $(COMPILER_TARGET) $(DEBUG_CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 clean:
-	rm $(TARGET)
+	rm $(COMPILER_TARGET)

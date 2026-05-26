@@ -1,15 +1,17 @@
 #include "compiler_vm.h"
 #include "inst.h"
 #include "lexer.h"
+#include "operand.h"
 #include "parser.h"
 #include "args.h"
+#include "serialize.h"
 #include "util.h"
 #include <stddef.h>
 #include <stdio.h>
 #include "../include/ansi.h"
 
 
-const char* VERSION_NUMBER = "0.1.0";
+#define VERSION_NUMBER "0.1.0"
 
 
 int main(int argc, char** argv) {
@@ -22,7 +24,7 @@ int main(int argc, char** argv) {
 
     // print version if we want
     if (args.as.success.showVersion) {
-        printf("Comet - Version %s\n", VERSION_NUMBER);
+        printf("CometC - Version %s\n", VERSION_NUMBER);
         printf(ESC_DIM "The programming language to fix em' all.\n");
         return 0;
     }
@@ -59,14 +61,20 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ResultType(CometOperand, charptr) result = compile(compiler.as.success, ast.as.success);
-    if (result.error) {
-        fprintf(stderr, "error while compiling: %s\n", result.as.error);
+    ResultType(CometOperand, charptr) compileResult = compile(compiler.as.success, ast.as.success);
+    if (compileResult.error) {
+        fprintf(stderr, "error while compiling: %s\n", compileResult.as.error);
         return 1;
     }
 
     for (size_t i = 0; i < compiler.as.success->programIdx; i++) {
         printf("%s\n", cometInstructionToCStr(compiler.as.success, compiler.as.success->outputProgram[i]));
+    }
+
+    ResultType(voidPtr, charptr) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath);
+    if (writeSuccess.error) {
+        fprintf(stderr, "error while writing output: %s\n", writeSuccess.as.error);
+        return 1;
     }
 
     return 0;

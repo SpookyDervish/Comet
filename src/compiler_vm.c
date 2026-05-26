@@ -4,11 +4,14 @@
 #include "inst.h"
 #include "lexer.h"
 #include "operand.h"
+#include "serialize.h"
 #include "token.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
 
 // -- HELPER METHODS -- //
@@ -23,10 +26,14 @@ ResultType(CometOperand, charptr) visitProgram(CometCompiler* c, CometASTNode* p
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node);
+ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(c, node);
+
+        case AST_FUNC_CALL:
+            return visitFuncCall(c, node);
 
         case AST_INT: {
             CometOperand new = createOperand(CO_IMMEDIATE);
@@ -280,6 +287,53 @@ ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNod
 CometCompiler* createCompilerVM() {
     CometCompiler* newCompiler = calloc(sizeof(CometCompiler), 1);
     return newCompiler;
+}
+
+ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath) {
+    FILE* file = fopen(filePath, "wb");
+    if (file == NULL) {
+        return Error(voidPtr, charptr, strerror(errno));
+    }
+
+    CometFile cometFile = {
+        .magic = "COMET",
+        .version = 1,
+        .numConsts = c->constIdx,
+        .numInstructions = c->programIdx,
+        .numFunctions = c->functionCount
+    };
+
+    fwrite(&cometFile, sizeof(CometFile), 1, file);
+    printf("header = %zu\n", sizeof(cometFile));
+    fwrite(c->consts, sizeof(CometOperand), c->constIdx, file);
+    printf("consts = %zu\n", sizeof(CometOperand) * c->constIdx);
+
+
+    for (size_t i = 0; i < c->functionCount; i++) {
+        CometSerializedFunc serializedFunc = {
+            .startIdx = c->functions[i]->startIdx
+        };
+        strcpy(serializedFunc.name, c->functions[i]->name);
+
+        fwrite(&serializedFunc, sizeof(CometSerializedFunc), 1, file);
+        
+    }
+    printf("functions = %zu\n", sizeof(CometSerializedFunc) * c->functionCount);
+
+    for (size_t instIdx = 0; instIdx < c->programIdx; instIdx++) {
+        CometInst inst = c->outputProgram[instIdx];
+        CometSerializedInst* serializedInst = serializeInst(c, inst);
+
+        fwrite(serializedInst, sizeof(CometSerializedInst), 1, file);
+        
+    }
+        printf("instructions = %zu\n", sizeof(CometSerializedFunc));
+
+
+
+    fclose(file);
+
+    return Success(voidPtr, charptr, NULL);
 }
 
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) {

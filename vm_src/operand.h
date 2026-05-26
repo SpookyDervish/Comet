@@ -3,12 +3,6 @@
 
 #include <stdint.h>
 
-typedef struct {
-    char name[32];
-    uint32_t startIdx;
-    uint32_t argCount;
-} CometFunction;
-
 typedef enum {
     COMET_VOID,
     COMET_SMALL,
