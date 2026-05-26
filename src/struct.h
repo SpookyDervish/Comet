@@ -1,7 +1,7 @@
 #ifndef STRUCT_H
 #define STRUCT_H
 
-#include "../include/list.h"
+#include "../lib/list.h"
 #include <stddef.h>
 #include <string.h>
 #include <stdbool.h>

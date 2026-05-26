@@ -3,7 +3,7 @@
 #include "environment.h"
 #include "inst.h"
 #include "lexer.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include "serialize.h"
 #include "token.h"
 #include <stddef.h>
@@ -214,9 +214,8 @@ ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometAS
     if (returnValue.error)
         return returnValue;
     
-    buildReturn(c, returnValue.as.success);
-    
-    
+    buildReturn(c);
+
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node) {
@@ -285,7 +284,7 @@ ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNod
 
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
-    CometCompiler* newCompiler = calloc(sizeof(CometCompiler), 1);
+    CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
     return newCompiler;
 }
 
@@ -296,7 +295,7 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
     }
 
     CometFile cometFile = {
-        .magic = "COMET",
+        .magic = {'C', 'O', 'M', 'E',  'T'},
         .version = 1,
         .numConsts = c->constIdx,
         .numInstructions = c->programIdx,

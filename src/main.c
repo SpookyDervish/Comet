@@ -1,14 +1,12 @@
 #include "compiler_vm.h"
 #include "inst.h"
 #include "lexer.h"
-#include "operand.h"
 #include "parser.h"
 #include "args.h"
-#include "serialize.h"
 #include "util.h"
 #include <stddef.h>
 #include <stdio.h>
-#include "../include/ansi.h"
+#include "../lib/ansi.h"
 
 
 #define VERSION_NUMBER "0.1.0"

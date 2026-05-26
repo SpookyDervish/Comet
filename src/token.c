@@ -80,7 +80,7 @@ char* tokenToCStr(CometToken tok) {
             sprintf(buffer, "<Token literal=\"%s\", type=%s>", tok.value.literal, tokenTypeToCStr(tok.type));
             return buffer;
         case CL_INT:
-            sprintf(buffer, "<Token literal=%lld, type=%s>", tok.value.intVal, tokenTypeToCStr(tok.type));
+            sprintf(buffer, "<Token literal=%zu, type=%s>", tok.value.intVal, tokenTypeToCStr(tok.type));
             return buffer;
         case CL_DOUBLE:
             sprintf(buffer, "<Token literal=%f, type=%s>", tok.value.doubleVal, tokenTypeToCStr(tok.type));

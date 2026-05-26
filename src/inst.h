@@ -3,7 +3,7 @@
 
 #include "../include/error.h"
 #include "environment.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +87,7 @@ CometOperand buildSub(CometCompiler* c);
 CometOperand buildMul(CometCompiler* c);
 CometOperand buildEq(CometCompiler* c);
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount);
-void buildReturn(CometCompiler* c, CometOperand value);
+void buildReturn(CometCompiler* c);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
 void buildJump(CometCompiler* c, CometLabel* label);

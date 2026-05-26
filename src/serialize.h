@@ -2,7 +2,7 @@
 #define SERIALIZE_H
 
 #include "inst.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include <stdint.h>
 
 typedef struct {

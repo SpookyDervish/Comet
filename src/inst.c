@@ -1,6 +1,6 @@
 #include "inst.h"
 #include "environment.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +16,7 @@ char* cometImmediateToCStr(CometImmediate immediate) {
     switch (immediate.typeKind) {
         case COMET_SMALL: {
             char* buffer = malloc(4);
-            sprintf(buffer, "%d", immediate.smallVal);
+            sprintf(buffer, "%hbd", immediate.smallVal);
             return buffer;
         }
         case COMET_INT: {
@@ -26,7 +26,7 @@ char* cometImmediateToCStr(CometImmediate immediate) {
         }
         case COMET_BIG: {
             char* buffer = malloc(64);
-            sprintf(buffer, "%lld", immediate.bigVal);
+            sprintf(buffer, "%zu", immediate.bigVal);
             return buffer;
         }
 
@@ -52,6 +52,8 @@ char* cometImmediateToCStr(CometImmediate immediate) {
         case COMET_VOID: {
             return "void";
         }
+
+        default: return "FIXME";
     }
 }
 
@@ -61,6 +63,8 @@ CometFunction* getSymbol(CometCompiler* c, CometOperand symbolValue) {
             return c->functions[i];
         }
     }
+
+    return NULL;
 }
 
 char* cometOperandToCStr(CometCompiler* c, CometOperand operand) {
@@ -91,6 +95,8 @@ char* cometOperandToCStr(CometCompiler* c, CometOperand operand) {
 
             return buffer;
         }
+
+        default: break;
     }
 
     return "FIXME";
@@ -192,7 +198,7 @@ void buildInst(
 }
 
 ResultType(cometCompilerPtr, charptr) newCompiler() {
-    CometCompiler* newCompiler = calloc(sizeof(CometCompiler), 1);
+    CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
 
     newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
@@ -223,6 +229,8 @@ bool immediatesAreEqual(CometImmediate a, CometImmediate b) {
         case COMET_FLOAT: return a.floatVal == b.floatVal;
         case COMET_DOUBLE: return a.doubleVal == b.doubleVal;
         case COMET_VOID: return true;
+        default: return false;
+        
     }
 }
 
@@ -234,6 +242,8 @@ uint32_t getSymbolIndex(CometCompiler* c, const char* symbolName) {
             return i;
         }
     }
+
+    return -1;
 }
 
 CometOperand findConst(CometCompiler* c, CometOperand value) {
@@ -273,6 +283,8 @@ CometOperand findConst(CometCompiler* c, CometOperand value) {
                 }
                 break;
             }
+
+            default: break;
         }
     }
 
@@ -383,7 +395,7 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount) {
 
     return funcValue;
 }
-void buildReturn(CometCompiler* c, CometOperand value) {
+void buildReturn(CometCompiler* c) {
     buildInst(c, INST_RET, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
@@ -404,7 +416,6 @@ CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
     CometOperand returnValue = pushVal(c);
 
     for (size_t argIdx = 0; argIdx < args.count; argIdx++) {
-        CometOperand argValue = *get(args, argIdx);
         pushVal(c);
     }
 

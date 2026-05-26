@@ -1,7 +1,7 @@
 #ifndef VM_H
 #define VM_H
 
-#include "operand.h"
+#include "../include/operand.h"
 #include <stdint.h>
 
 typedef struct {

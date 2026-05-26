@@ -1,7 +1,7 @@
 #pragma once
 #include "ast.h"
 #include "lexer.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include "token.h"
 #include <uthash.h>
 #include <stdlib.h>

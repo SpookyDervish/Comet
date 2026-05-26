@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "../include/error.h"
-#include "../include/estr.h"
-#include "../include/list.h"
+#include "../lib/error.h"
+#include "../lib/estr.h"
+#include "../lib/list.h"
 #include "token.h"
 
 typedef CometToken* cometTokPtr;

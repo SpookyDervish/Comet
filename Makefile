@@ -6,10 +6,10 @@ VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -Wextra $(shell llvm-config --cflags) -I/Users/nathaniel.chandler/.brew/opt/uthash/include
-LDFLAGS=$(shell llvm-config --ldflags)
-LDLIBS=$(shell llvm-config --libs all) $(shell llvm-config --system-libs)
-DEBUG_CFLAGS=-Wall -Wextra -ggdb $(shell llvm-config --cflags) -fsanitize=address -g
+CFLAGS=-Wall -Wextra  -Wno-trigraphs -I/Users/nathaniel.chandler/.brew/opt/uthash/include
+LDFLAGS=
+LDLIBS=
+DEBUG_CFLAGS=-Wall -Wextra -ggdb -fsanitize=address -g
 
 COMPILER_TARGET=cometc
 VM_TARGET=comet
@@ -26,4 +26,6 @@ debug:
 	$(CC) $(SRC_FILES) -o $(COMPILER_TARGET) $(DEBUG_CFLAGS) $(LDFLAGS) $(LDLIBS)
 
 clean:
+	rm $(VM_TARGET)
 	rm $(COMPILER_TARGET)
+	

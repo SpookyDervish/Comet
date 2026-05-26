@@ -1,6 +1,6 @@
 #include "serialize.h"
 #include "inst.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -27,7 +27,7 @@ uint32_t serializeOperand(CometCompiler* c, CometOperand operand) {
 }
 
 CometSerializedInst* serializeInst(CometCompiler* c, CometInst inst) {
-    CometSerializedInst* serialized = calloc(sizeof(CometSerializedInst), 1);
+    CometSerializedInst* serialized = calloc(1, sizeof(CometSerializedInst));
     serialized->opcode = inst.opcode;
     serialized->a = serializeOperand(c, inst.a);
     serialized->b = serializeOperand(c, inst.b);
