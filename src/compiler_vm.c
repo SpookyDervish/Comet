@@ -39,6 +39,12 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
             return Success(CometOperand, charptr, new);
         }
 
+        case AST_IDENTIFIER: {
+            uint32_t idx = lookup(c->env, node->data.AST_IDENTIFIER.ident)->recordIdx;
+
+            buildLoad(c, idx);
+        }
+
         default: {
             Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
             APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));

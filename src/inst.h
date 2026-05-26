@@ -62,7 +62,7 @@ void buildInst(
 CometOperand storeConst(CometCompiler* c, CometOperand value);
 void buildPushConst(CometCompiler* c, CometOperand idx);
 void buildStore(CometCompiler* c, uint32_t idx);
-CometOperand buildLoad(CometCompiler* c);
+CometOperand buildLoad(CometCompiler* c, uint32_t idx);
 CometOperand buildAdd(CometCompiler* c);
 CometOperand buildSub(CometCompiler* c);
 CometOperand buildMul(CometCompiler* c);

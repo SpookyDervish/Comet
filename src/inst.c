@@ -233,6 +233,15 @@ void buildStore(CometCompiler* c, uint32_t idx) {
 
     buildInst(c, INST_STORE, value, NO_OPERAND, NO_OPERAND);
 }
+CometOperand buildLoad(CometCompiler* c, uint32_t idx) {
+    CometOperand value = createOperand(CO_IMMEDIATE);
+    value.imm = (CometImmediate){
+        .typeKind = COMET_INT,
+        .intVal = idx
+    };
+
+    buildInst(c, INST_LOAD, value, NO_OPERAND, NO_OPERAND);
+}
 CometOperand buildAdd(CometCompiler* c) {
     popVal(c);
     popVal(c);
