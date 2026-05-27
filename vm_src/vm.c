@@ -179,10 +179,8 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             memcpy(&aDouble, &a, sizeof(double));
             double bDouble;
             memcpy(&bDouble, &b, sizeof(double));
-            printf("a: %f, b: %f\n", aDouble, bDouble);
 
             double result = aDouble + bDouble;
-            printf("%f\n", result);
             int64_t outputtedResult;
             memcpy(&outputtedResult, &result, sizeof(int64_t));
 

@@ -144,6 +144,11 @@ ResultType(CometValueTypeKind, charptr) resolveType(CometCompiler* c, CometASTNo
             ResultType(CometValueTypeKind, charptr) left = resolveType(c, node->data.AST_INFIX_EXPRESSION.left);
             ResultType(CometValueTypeKind, charptr) right = resolveType(c, node->data.AST_INFIX_EXPRESSION.right);
 
+            // division always results in a double
+            if (node->data.AST_INFIX_EXPRESSION.op.type == CT_DIVIDE) {
+                return Success(CometValueTypeKind, charptr, COMET_DOUBLE);
+            }
+
             return Success(CometValueTypeKind, charptr, unifyType(left.as.success, right.as.success));
         }
 
