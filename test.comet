@@ -1,3 +1,4 @@
 func main() -> int {
-    return 123
+    int x = 123
+    return x
 }

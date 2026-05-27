@@ -25,4 +25,12 @@ int main(int argc, char** argv) {
         fprintf(stderr, "error while loading file: %s\n", newVm.as.error);
         return 1;
     }
+
+    ResultType(int, charptr) result = startVM(newVm.as.success);
+    if (result.error) {
+        fprintf(stderr, "error while executing: %s\n", result.as.error);
+        return 1;
+    }
+
+    return result.as.success;
 }
