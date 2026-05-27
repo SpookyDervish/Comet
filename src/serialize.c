@@ -9,7 +9,7 @@ uint32_t serializeOperand(CometCompiler* c, CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE: {
             
-            return operand.imm.intVal;
+            return operand.imm.smallVal;
         }
 
         case CO_LABEL:

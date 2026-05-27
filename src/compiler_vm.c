@@ -227,8 +227,8 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
         struct AST_ARG_DEF argument = argNode->data.AST_ARG_DEF;
 
         CometOperand argValue = createOperand(CO_IMMEDIATE);
-        argValue.imm.typeKind = COMET_INT;
-        argValue.imm.intVal = argIdx;
+        argValue.imm.typeKind = COMET_SMALL;
+        argValue.imm.smallVal = argIdx;
 
         defineVar(
             c->env,

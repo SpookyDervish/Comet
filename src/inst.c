@@ -449,8 +449,8 @@ CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
     CometOperand argValue = pushVal(c);
 
     CometOperand indexOperand = createOperand(CO_IMMEDIATE);
-    indexOperand.imm.typeKind = COMET_INT;
-    indexOperand.imm.intVal = idx;
+    indexOperand.imm.typeKind = COMET_SMALL;
+    indexOperand.imm.smallVal = idx;
 
     buildInst(c, INST_LOAD_ARG, indexOperand, NO_OPERAND, NO_OPERAND);
 
