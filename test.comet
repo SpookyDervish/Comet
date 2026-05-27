@@ -1,7 +1,27 @@
-func main() -> int {
-    if 6 * 6 == 36 {
+func fib(int n) -> int {
+    if n <= 0 {
         return 0
     }
+    if n == 1 {
+        return 1
+    }
 
-    return 1
+    mut int a = 0
+    mut int b = 1
+    mut int i = 2
+    mut int temp = 0
+
+    while i <= n {
+        temp = a + b
+        a = b
+        b = temp
+        i = i + 1
+    }
+
+    return b
+}
+
+func main() -> int {
+    int result = fib(92)
+    return result
 }

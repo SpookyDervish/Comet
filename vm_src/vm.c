@@ -140,7 +140,7 @@ void returnFromFunc(CometVM* vm) {
     free(funcFrame);
 }
 
-ResultType(voidPtr, charptr) clock(CometVM* vm) {
+ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
     CometSerializedInst inst = vm->instructions[vm->currentFrame->ip];
     vm->currentFrame->ip++;
 
@@ -183,12 +183,41 @@ ResultType(voidPtr, charptr) clock(CometVM* vm) {
             push(vm, a == b);
             break;
         }
+        case INST_LT: {
+            int64_t b = pop(vm);
+            int64_t a = pop(vm);
+
+            printf("a: %d, b: %d\n", a, b);
+
+            push(vm, a < b);
+            break;
+        }
+        case INST_GT: {
+            int64_t b = pop(vm);
+            int64_t a = pop(vm);
+
+            push(vm, a > b);
+            break;
+        }
+        case INST_LTE: {
+            int64_t b = pop(vm);
+            int64_t a = pop(vm);
+
+            push(vm, a <= b);
+            break;
+        }
+        case INST_GTE: {
+            int64_t b = pop(vm);
+            int64_t a = pop(vm);
+
+            push(vm, a >= b);
+            break;
+        }
 
         case INST_JMP_IF_FALSE: {
             int64_t a = pop(vm);
 
             if (!a) {
-                printf("%d\n", inst.a);
                 vm->currentFrame->ip = inst.a;
             }
             break;
@@ -224,8 +253,17 @@ ResultType(voidPtr, charptr) clock(CometVM* vm) {
             break;
         }
 
-        default:
-            return Error(voidPtr, charptr, "Reached invalid instruction!");
+        case INST_NOT: {
+            int64_t value = pop(vm);
+            push(vm, !value);
+            break;
+        }
+
+        default: {
+            char* buffer = malloc(128);
+            sprintf(buffer, "Reached invalid instruction! (%d)", inst.opcode);
+            return Error(voidPtr, charptr, buffer);
+        }
     }
 }
 
@@ -240,7 +278,7 @@ ResultType(int, charptr) startVM(CometVM* vm) {
     callFunction(vm, mainFunc);
 
     while (vm->running) {
-        ResultType(voidPtr, charptr) instResult = clock(vm);
+        ResultType(voidPtr, charptr) instResult = vmClock(vm);
         if (instResult.error)
             return Error(int, charptr, instResult.as.error);
     }

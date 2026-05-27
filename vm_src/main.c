@@ -2,10 +2,13 @@
 #include "args.h"
 #include "../lib/ansi.h"
 #include <stdio.h>
+#include <time.h>
 
 #define VERSION_NUMBER "0.1.0"
 
 int main(int argc, char** argv) {
+    
+
     // parse command line args
     ResultType(CometArgs, charptr) args = parseArgs(argc, argv);
     if (args.error) {
@@ -26,11 +29,20 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    
+
+    clock_t start = clock();
     ResultType(int, charptr) result = startVM(newVm.as.success);
+    clock_t end = clock();
+    
+
     if (result.error) {
         fprintf(stderr, "error while executing: %s\n", result.as.error);
         return 1;
     }
+
+    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Execution took %f seconds\n", time_spent);
 
     return result.as.success;
 }

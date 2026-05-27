@@ -123,6 +123,31 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
+    ResultType(CometOperand, charptr) exprResult = resolveValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (exprResult.error)
+        return exprResult;
+    
+    char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+    Record* varRecord = lookup(c->env, ident);
+    if (!varRecord) {
+        Estr errMsg = CREATE_ESTR("Cannot reassign undefined variable \"");
+        APPEND_ESTR(errMsg, ident);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    if (!varRecord->isMutable) {
+        Estr errMsg = CREATE_ESTR("Cannot change value of immutable variable \"");
+        APPEND_ESTR(errMsg, ident);
+        APPEND_ESTR(errMsg, "\", did you forget \"mut\"?");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    buildStore(c, varRecord->recordIdx);
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
@@ -153,6 +178,22 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
         // conditionals
         case CT_EQ_EQ: {
             out = buildEq(c);
+            break;
+        }
+        case CT_LT: {
+            out = buildLt(c);
+            break;
+        }
+        case CT_GT: {
+            out = buildGt(c);
+            break;
+        }
+        case CT_LTE: {
+            out = buildLte(c);
+            break;
+        }
+        case CT_GTE: {
+            out = buildGte(c);
             break;
         }
 
@@ -281,6 +322,36 @@ ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNod
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_WHILE_STATEMENT whileStmt = node->data.AST_WHILE_STATEMENT;
+    
+    CometLabel* startLabel = buildLabel(c);
+    CometLabel* endLabel = buildLabel(c);
+
+    
+
+    ResultType(CometOperand, charptr) condition = resolveValue(c, whileStmt.expression);
+    if (condition.error)
+        return condition;
+
+    buildJumpIfFalse(c, endLabel);
+    resolveLabel(c, startLabel);
+
+    ResultType(CometOperand, charptr) whileBodyResult = compile(c, whileStmt.program);
+    if (whileBodyResult.error)
+        return whileBodyResult;
+
+    condition = resolveValue(c, whileStmt.expression);
+    if (condition.error)
+        return condition;
+
+    buildNot(c);
+    buildJumpIfFalse(c, startLabel);
+
+    resolveLabel(c, endLabel);
+
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
@@ -340,12 +411,16 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitExpressionStatement(c, node);
         case AST_ASSIGN_STATEMENT:
             return visitAssignStatement(c, node);
+        case AST_REASSIGN_STATEMENT:
+            return visitReassignStatement(c, node);
         case AST_FUNC_DEF_STATEMENT:
             return visitFuncDefStatement(c, node);
         case AST_RETURN_STATEMENT:
             return visitReturnStatement(c, node);
         case AST_IF_STATEMENT:
             return visitIfStatement(c, node);
+        case AST_WHILE_STATEMENT:
+            return visitWhileStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

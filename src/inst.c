@@ -114,6 +114,10 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_RET          : return "    RET             ";
         case INST_CALL         : return "    CALL            ";
         case INST_EQ           : return "    EQ              ";
+        case INST_LT           : return "    LT              ";
+        case INST_GT           : return "    GT              ";
+        case INST_LTE          : return "    LTE             ";
+        case INST_GTE          : return "    GTE             ";
         case INST_JMP          : return "    JMP             ";
         case INST_JMP_IF_FALSE : return "    JMP_IF_FALSE    ";
         case INST_NOT          : return "    NOT             ";
@@ -379,6 +383,46 @@ CometOperand buildEq(CometCompiler* c) {
     CometOperand dest = pushVal(c);
 
     buildInst(c, INST_EQ, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometOperand buildLt(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_LT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometOperand buildGt(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_GT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometOperand buildLte(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_LTE, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometOperand buildGte(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_GTE, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 
     return dest;
 }

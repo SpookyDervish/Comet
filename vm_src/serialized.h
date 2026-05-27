@@ -14,6 +14,10 @@ typedef enum {
     INST_RET,
     INST_CALL,
     INST_EQ,
+    INST_GT,
+    INST_LT,
+    INST_GTE,
+    INST_LTE,
     INST_JMP,
     INST_JMP_IF_FALSE,
     INST_NOT

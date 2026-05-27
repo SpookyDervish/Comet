@@ -21,6 +21,10 @@ typedef enum {
     INST_RET,
     INST_CALL,
     INST_EQ,
+    INST_GT,
+    INST_LT,
+    INST_GTE,
+    INST_LTE,
     INST_JMP,
     INST_JMP_IF_FALSE,
     INST_NOT
@@ -86,6 +90,10 @@ CometOperand buildAdd(CometCompiler* c);
 CometOperand buildSub(CometCompiler* c);
 CometOperand buildMul(CometCompiler* c);
 CometOperand buildEq(CometCompiler* c);
+CometOperand buildLt(CometCompiler* c);
+CometOperand buildGt(CometCompiler* c);
+CometOperand buildLte(CometCompiler* c);
+CometOperand buildGte(CometCompiler* c);
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount);
 void buildReturn(CometCompiler* c);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
