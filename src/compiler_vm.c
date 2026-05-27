@@ -25,6 +25,22 @@ ResultType(CometOperand, charptr) visitProgram(CometCompiler* c, CometASTNode* p
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 
+int rankType(CometValueTypeKind type) {
+    switch (type) {
+        case COMET_BOOL: return 1;
+        case COMET_SMALL: return 2;
+        case COMET_INT: return 3;
+        case COMET_BIG: return 4;
+        case COMET_FLOAT: return 5;
+        case COMET_DOUBLE: return 6;
+        default: return 0;
+    }
+}
+
+CometValueTypeKind unifyType(CometValueTypeKind a, CometValueTypeKind b) {
+    return (rankType(a) > rankType(b)) ? a : b;
+}
+
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* node) {
@@ -124,6 +140,12 @@ ResultType(CometValueTypeKind, charptr) resolveType(CometCompiler* c, CometASTNo
                 return Error(CometValueTypeKind, charptr, errMsg.str);
             }
         }
+        case AST_INFIX_EXPRESSION: {
+            ResultType(CometValueTypeKind, charptr) left = resolveType(c, node->data.AST_INFIX_EXPRESSION.left);
+            ResultType(CometValueTypeKind, charptr) right = resolveType(c, node->data.AST_INFIX_EXPRESSION.right);
+
+            return Success(CometValueTypeKind, charptr, unifyType(left.as.success, right.as.success));
+        }
 
         default: {
             Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
@@ -178,22 +200,6 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
 
     buildStore(c, varRecord->recordIdx);
     return Success(CometOperand, charptr, NO_OPERAND);
-}
-
-int rankType(CometValueTypeKind type) {
-    switch (type) {
-        case COMET_BOOL: return 1;
-        case COMET_SMALL: return 2;
-        case COMET_INT: return 3;
-        case COMET_BIG: return 4;
-        case COMET_FLOAT: return 5;
-        case COMET_DOUBLE: return 6;
-        default: return 0;
-    }
-}
-
-CometValueTypeKind unifyType(CometValueTypeKind a, CometValueTypeKind b) {
-    return (rankType(a) > rankType(b)) ? a : b;
 }
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
