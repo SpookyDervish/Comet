@@ -1,4 +1,11 @@
+func add(int a, int b) -> int {
+    return a + b 
+}
+
+func square(int a) -> int {
+    return a * a
+}
+
 func main() -> int {
-    int x = 123
-    return x
+    return square(square(add(3, 6)))
 }

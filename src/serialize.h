@@ -8,13 +8,14 @@
 typedef struct {
     char name[32];
     uint32_t startIdx;
+    uint32_t numArgs;
 } CometSerializedFunc;
 
 typedef struct {
     uint8_t opcode;
-    uint32_t a;
-    uint32_t b;
-    uint32_t c;
+    int32_t a;
+    int32_t b;
+    int32_t c;
 } CometSerializedInst;
 
 CometSerializedInst* serializeInst(CometCompiler* c, CometInst inst);

@@ -285,6 +285,7 @@ ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNod
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
     CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
+    newCompiler->outputProgram = calloc(2048, sizeof(CometInst));
     return newCompiler;
 }
 
@@ -308,7 +309,8 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
 
     for (size_t i = 0; i < c->functionCount; i++) {
         CometSerializedFunc serializedFunc = {
-            .startIdx = c->functions[i]->startIdx
+            .startIdx = c->functions[i]->startIdx,
+            .numArgs = c->functions[i]->argCount
         };
         strcpy(serializedFunc.name, c->functions[i]->name);
 

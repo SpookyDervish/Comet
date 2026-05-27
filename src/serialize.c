@@ -2,14 +2,14 @@
 #include "inst.h"
 #include "../include/operand.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 uint32_t serializeOperand(CometCompiler* c, CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE: {
-            CometOperand constantIdx = findConst(c, operand);
-
-            return constantIdx.imm.intVal;
+            
+            return operand.imm.intVal;
         }
 
         case CO_LABEL:

@@ -44,7 +44,7 @@ typedef struct {
     uint32_t labelCount;
     CometOperand consts[512];
     CometLabel* labels[512];
-    CometInst outputProgram[2048];
+    CometInst* outputProgram;
     CometFunction* functions[128];
     CometEnvironment* env;
 } CometCompiler;

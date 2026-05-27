@@ -6,25 +6,30 @@
 #include "serialized.h"
 #include <stdint.h>
 
-
+typedef struct {
+    int64_t* stack;
+    int64_t* args;
+    int64_t ip;
+    uint32_t sp;
+} Frame;
 
 typedef struct {
     uint32_t numConstants;
     CometOperand* constants;
 
     uint64_t stackCapacity;
-    int64_t* stack;
+    int64_t** currentStack;
 
     uint32_t numFunctions;
     CometSerializedInst* instructions;
 
     CometSerializedFunc* functions;
 
-    CometSerializedFunc* callStack[128];
+    Frame** callStack;
+    Frame* currentFrame;
     uint8_t callIdx;
 
-    uint32_t ip;
-    uint32_t sp;
+    uint32_t* currentSp;
 
     int64_t* variables;
 

@@ -200,6 +200,7 @@ void buildInst(
 ResultType(cometCompilerPtr, charptr) newCompiler() {
     CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
 
+    newCompiler->outputProgram = calloc(2048, sizeof(CometInst));
     newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
     newCompiler->env = newEnvironment("root", NULL);
@@ -229,16 +230,18 @@ bool immediatesAreEqual(CometImmediate a, CometImmediate b) {
         case COMET_FLOAT: return a.floatVal == b.floatVal;
         case COMET_DOUBLE: return a.doubleVal == b.doubleVal;
         case COMET_VOID: return true;
-        default: return false;
+        default: break;;
         
     }
+
+    return false;
 }
 
 uint32_t getSymbolIndex(CometCompiler* c, const char* symbolName) {
     for (size_t i = 0; i < c->functionCount; i++) {
         CometFunction* func = c->functions[i];
 
-        if (strcmp(func->name, symbolName)) {
+        if (strcmp(func->name, symbolName) == 0) {
             return i;
         }
     }
