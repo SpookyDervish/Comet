@@ -27,7 +27,7 @@ ResultType(CometOperand, charptr) visitProgram(CometCompiler* c, CometASTNode* p
 
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node);
-ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* node) {
+ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(c, node);
@@ -97,7 +97,7 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
         }
 
         default: {
-            Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
+            Estr errMsg = CREATE_ESTR("Could not build expression: \"");
             APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));
             APPEND_ESTR(errMsg, "\"");
 
@@ -106,13 +106,44 @@ ResultType(CometOperand, charptr) resolveValue(CometCompiler* c, CometASTNode* n
     }
 }
 
+ResultType(CometValueTypeKind, charptr) resolveType(CometCompiler* c, CometASTNode* node) {
+    CometValueTypeKind outType;
+
+    switch (node->nodeType) {
+        case AST_INT: outType = COMET_INT; break;
+        case AST_BOOL: outType = COMET_BOOL; break;
+        case AST_DOUBLE: outType = COMET_DOUBLE; break;
+        case AST_IDENTIFIER: {
+            char* varName = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(c->env, varName);
+
+            if (!varRecord) {
+                Estr errMsg = CREATE_ESTR("Undefined variable \"");
+                APPEND_ESTR(errMsg, varName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometValueTypeKind, charptr, errMsg.str);
+            }
+        }
+
+        default: {
+            Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
+            APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));
+            APPEND_ESTR(errMsg, "\"");
+
+            return Error(CometValueTypeKind, charptr, errMsg.str);
+        }
+    }
+
+    return Success(CometValueTypeKind, charptr, outType);
+}
+
 // -- VISIT METHODS -- //
 ResultType(CometOperand, charptr) visitExpressionStatement(CometCompiler* c, CometASTNode* node) {
     return compile(c, node->data.AST_EXPRESSION_STATEMENT.expression);
 }
 
 ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) exprResult = resolveValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
     
@@ -124,7 +155,7 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) exprResult = resolveValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
     
@@ -149,73 +180,84 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 
+int rankType(CometValueTypeKind type) {
+    switch (type) {
+        case COMET_BOOL: return 1;
+        case COMET_SMALL: return 2;
+        case COMET_INT: return 3;
+        case COMET_BIG: return 4;
+        case COMET_FLOAT: return 5;
+        case COMET_DOUBLE: return 6;
+        default: return 0;
+    }
+}
+
+CometValueTypeKind unifyType(CometValueTypeKind a, CometValueTypeKind b) {
+    return (rankType(a) > rankType(b)) ? a : b;
+}
+
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
-    ResultType(CometOperand, charptr) left = resolveValue(c, expr.left);
-    if (left.error)
-        return left;
-    ResultType(CometOperand, charptr) right = resolveValue(c, expr.right);
-    if (right.error)
-        return right;
+    ResultType(CometValueTypeKind, charptr) leftType = resolveType(c, expr.left);
+    if (leftType.error)
+        return Error(CometOperand, charptr, leftType.as.error);
+    ResultType(CometValueTypeKind, charptr) rightType = resolveType(c, expr.right);
+    if (rightType.error)
+        return Error(CometOperand, charptr, rightType.as.error);
+
+    CometValueTypeKind resultType = unifyType(leftType.as.success, rightType.as.success);
     
+    visitValue(c, expr.left);
+    if (leftType.as.success != resultType) {
+        leftType.as.success = buildCast(c, leftType.as.success, resultType);
+    }
+    visitValue(c, expr.right);
+    if (rightType.as.success != resultType) {
+        rightType.as.success = buildCast(c, rightType.as.success, resultType);
+    }
+
     CometOperand out;
 
     // int operations
     switch (expr.op.type) {
         // arithmetic
         case CT_PLUS: {
-            out = buildAdd(
-                c,
-                left.as.success.imm.typeKind,
-                right.as.success.imm.typeKind
-            );
+            out = buildAdd(c, resultType);
             break;
         }
         case CT_MINUS: {
-            out = buildSub(
-                c,
-                left.as.success.imm.typeKind,
-                right.as.success.imm.typeKind
-            );
+            out = buildSub(c, resultType);
             break;
         }
         case CT_TIMES: {
-            out = buildMul(
-                c,
-                left.as.success.imm.typeKind,
-                right.as.success.imm.typeKind
-            );
+            out = buildMul(c, resultType);
             break;
         }
         case CT_DIVIDE: {
-            out = buildDiv(
-                c,
-                left.as.success.imm.typeKind,
-                right.as.success.imm.typeKind
-            );
+            out = buildDiv(c, resultType);
             break;
         }
 
         // conditionals
         case CT_EQ_EQ: {
-            out = buildEq(c);
+            out = buildEq(c, resultType);
             break;
         }
         case CT_LT: {
-            out = buildLt(c);
+            out = buildLt(c, resultType);
             break;
         }
         case CT_GT: {
-            out = buildGt(c);
+            out = buildGt(c, resultType);
             break;
         }
         case CT_LTE: {
-            out = buildLte(c);
+            out = buildLte(c, resultType);
             break;
         }
         case CT_GTE: {
-            out = buildGte(c);
+            out = buildGte(c, resultType);
             break;
         }
 
@@ -273,7 +315,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) returnValue = resolveValue(c, node->data.AST_RETURN_STATEMENT.expression);
+    ResultType(CometOperand, charptr) returnValue = visitValue(c, node->data.AST_RETURN_STATEMENT.expression);
     if (returnValue.error)
         return returnValue;
     
@@ -289,7 +331,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     for (size_t argIdx = 0; argIdx < funcCall.args.count; argIdx++) {
         CometASTNode* argNode = *get(funcCall.args, argIdx);
 
-        ResultType(CometOperand, charptr) argValue = resolveValue(c, argNode);
+        ResultType(CometOperand, charptr) argValue = visitValue(c, argNode);
         if (argValue.error)
             return argValue;
 
@@ -306,7 +348,7 @@ ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNod
     CometLabel* endLabel = buildLabel(c);
     CometLabel* elseLabel = buildLabel(c);
 
-    ResultType(CometOperand, charptr) condition = resolveValue(c, ifStmt.expression);
+    ResultType(CometOperand, charptr) condition = visitValue(c, ifStmt.expression);
     if (condition.error)
         return condition;
 
@@ -326,7 +368,7 @@ ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNod
     if (ifStmt.elseProgram != NULL) {
         buildJump(c, endLabel);
         resolveLabel(c, elseLabel);
-        condition = resolveValue(c, ifStmt.expression);
+        condition = visitValue(c, ifStmt.expression);
         if (condition.error)
             return condition;
 
@@ -352,7 +394,7 @@ ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometAST
 
     
 
-    ResultType(CometOperand, charptr) condition = resolveValue(c, whileStmt.expression);
+    ResultType(CometOperand, charptr) condition = visitValue(c, whileStmt.expression);
     if (condition.error)
         return condition;
 
@@ -363,7 +405,7 @@ ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometAST
     if (whileBodyResult.error)
         return whileBodyResult;
 
-    condition = resolveValue(c, whileStmt.expression);
+    condition = visitValue(c, whileStmt.expression);
     if (condition.error)
         return condition;
 

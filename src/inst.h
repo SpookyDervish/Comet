@@ -25,11 +25,16 @@ typedef enum {
     INST_LOAD_ARG,
     INST_RET,
     INST_CALL,
-    INST_EQ,
-    INST_GT,
-    INST_LT,
-    INST_GTE,
-    INST_LTE,
+    INST_EQI,
+    INST_EQF,
+    INST_GTI,
+    INST_GTF,
+    INST_LTI,
+    INST_LTF,
+    INST_GTEI,
+    INST_GTEF,
+    INST_LTEI,
+    INST_LTEF,
     INST_JMP,
     INST_JMP_IF_FALSE,
     INST_NOT,
@@ -81,6 +86,8 @@ CometFunction* getSymbol(CometCompiler* c, CometOperand symbolValue);
 uint32_t getSymbolIndex(CometCompiler* c, const char* symbolName);
 CometOperand findConst(CometCompiler* c, CometOperand value);
 
+bool typeIsInt(CometValueTypeKind kind);
+
 void buildInst(
     CometCompiler* c,
     CometInstType opcode,
@@ -92,15 +99,15 @@ CometOperand storeConst(CometCompiler* c, CometOperand value);
 void buildPushConst(CometCompiler* c, CometOperand idx);
 void buildStore(CometCompiler* c, uint32_t idx);
 CometOperand buildLoad(CometCompiler* c, uint32_t idx);
-CometOperand buildAdd(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
-CometOperand buildSub(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
-CometOperand buildMul(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
-CometOperand buildDiv(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
-CometOperand buildEq(CometCompiler* c);
-CometOperand buildLt(CometCompiler* c);
-CometOperand buildGt(CometCompiler* c);
-CometOperand buildLte(CometCompiler* c);
-CometOperand buildGte(CometCompiler* c);
+CometOperand buildAdd(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildSub(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildMul(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildDiv(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildEq(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildLt(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildGt(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildLte(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildGte(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount);
 void buildReturn(CometCompiler* c);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
@@ -109,6 +116,7 @@ void buildJump(CometCompiler* c, CometLabel* label);
 void buildJumpIfFalse(CometCompiler* c, CometLabel* label);
 CometOperand buildNot(CometCompiler* c);
 CometOperand buildI2F(CometCompiler* c);
+CometValueTypeKind buildCast(CometCompiler* c, CometValueTypeKind before, CometValueTypeKind after);
 
 CometLabel* buildLabel(CometCompiler* c);
 void resolveLabel(CometCompiler* c, CometLabel* label);

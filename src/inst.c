@@ -119,11 +119,16 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_LOAD_ARG     : return "    LOAD_ARG        ";
         case INST_RET          : return "    RET             ";
         case INST_CALL         : return "    CALL            ";
-        case INST_EQ           : return "    EQ              ";
-        case INST_LT           : return "    LT              ";
-        case INST_GT           : return "    GT              ";
-        case INST_LTE          : return "    LTE             ";
-        case INST_GTE          : return "    GTE             ";
+        case INST_EQI          : return "    EQI             ";
+        case INST_EQF          : return "    EQF             ";
+        case INST_LTI          : return "    LTI             ";
+        case INST_LTF          : return "    LTF             ";
+        case INST_GTI          : return "    GTI             ";
+        case INST_GTF          : return "    GTF             ";
+        case INST_LTEI         : return "    LTEI            ";
+        case INST_LTEF         : return "    LTEF            ";
+        case INST_GTEI         : return "    GTEI            ";
+        case INST_GTEF         : return "    GTEF            ";
         case INST_JMP          : return "    JMP             ";
         case INST_JMP_IF_FALSE : return "    JMP_IF_FALSE    ";
         case INST_NOT          : return "    NOT             ";
@@ -365,103 +370,129 @@ CometOperand buildLoad(CometCompiler* c, uint32_t idx) {
 
     return value;
 }
-CometOperand buildAdd(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType) {
+CometOperand buildAdd(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    if (typeIsInt(aType) && typeIsInt(bType)) { // int add
+    if (typeIsInt(resultType)) {
         buildInst(c, INST_ADDI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
     } else {
-        // first value isn't int
-        if (!typeIsInt(aType)) {
-            if (typeIsInt(bType)) {
-                buildI2F(c);
-            }
-
-            buildInst(c, INST_ADDF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
-        }
+        buildInst(c, INST_ADDF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
     }
+
     return dest;
 }
-CometOperand buildSub(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType) {
+CometOperand buildSub(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_SUBI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_SUBI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_SUBF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildMul(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType) {
+CometOperand buildMul(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_MULI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_MULI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_MULF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildDiv(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType) {
+CometOperand buildDiv(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_DIVI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_DIVI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_DIVF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildEq(CometCompiler* c) {
+CometOperand buildEq(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_EQ, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_EQI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_EQF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildLt(CometCompiler* c) {
+CometOperand buildLt(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_LT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_LTI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_LTF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildGt(CometCompiler* c) {
+CometOperand buildGt(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_GT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_GTI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_GTF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildLte(CometCompiler* c) {
+CometOperand buildLte(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_LTE, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_LTEI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_LTEF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
-CometOperand buildGte(CometCompiler* c) {
+CometOperand buildGte(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
 
     CometOperand dest = pushVal(c);
 
-    buildInst(c, INST_GTE, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_GTEI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_GTEF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
 
     return dest;
 }
@@ -539,6 +570,13 @@ CometOperand buildI2F(CometCompiler* c) {
     buildInst(c, INST_I2F, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 
     return dest;
+}
+CometValueTypeKind buildCast(CometCompiler* c, CometValueTypeKind before, CometValueTypeKind after) {
+    if (typeIsInt(before) && !typeIsInt(after)) {
+        buildI2F(c);
+    }
+
+    return after;
 }
 
 // -- LABELS -- //

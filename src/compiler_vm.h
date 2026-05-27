@@ -23,6 +23,8 @@ typedef struct {
     uint32_t numFunctions;
 } CometFile;
 
+Result(CometValueTypeKind, charptr);
+
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node);
 ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath);
 CometOperand createOperand(CometOperandKind type);

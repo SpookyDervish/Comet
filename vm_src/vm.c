@@ -263,39 +263,99 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
 
-        case INST_EQ: {
+        case INST_EQI: {
             int64_t a = pop(vm);
             int64_t b = pop(vm);
 
             push(vm, a == b);
             break;
         }
-        case INST_LT: {
+        case INST_EQF: {
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            push(vm, aDouble == bDouble);
+            break;
+        }
+        case INST_LTI: {
             int64_t b = pop(vm);
             int64_t a = pop(vm);
 
             push(vm, a < b);
             break;
         }
-        case INST_GT: {
+        case INST_LTF: {
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            push(vm, aDouble < bDouble);
+            break;
+        }
+        case INST_GTI: {
             int64_t b = pop(vm);
             int64_t a = pop(vm);
 
             push(vm, a > b);
             break;
         }
-        case INST_LTE: {
+        case INST_GTF: {
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            push(vm, aDouble > bDouble);
+            break;
+        }
+        case INST_LTEI: {
             int64_t b = pop(vm);
             int64_t a = pop(vm);
 
             push(vm, a <= b);
             break;
         }
-        case INST_GTE: {
+        case INST_LTEF: {
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            push(vm, aDouble <= bDouble);
+            break;
+        }
+        case INST_GTEI: {
             int64_t b = pop(vm);
             int64_t a = pop(vm);
 
             push(vm, a >= b);
+            break;
+        }
+        case INST_GTEF: {
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            push(vm, aDouble >= bDouble);
             break;
         }
 

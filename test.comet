@@ -1,4 +1,6 @@
 func main() -> int {
-    double x = 1.123 + 1
-    return x
+    if 0.123 == 0.123 {
+        return 1
+    }
+    return 0
 }
