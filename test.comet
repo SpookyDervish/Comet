@@ -1,4 +1,4 @@
 func main() -> int {
-    int x = 2
-    return x * x
+    int x
+    while (true) {}
 }

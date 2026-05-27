@@ -4,6 +4,7 @@
 #include "inst.h"
 #include "lexer.h"
 #include "../include/operand.h"
+#include "parser.h"
 #include "serialize.h"
 #include "token.h"
 #include <stddef.h>
@@ -173,11 +174,19 @@ ResultType(CometOperand, charptr) visitExpressionStatement(CometCompiler* c, Com
 }
 
 ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    CometASTNode* expr = node->data.AST_ASSIGN_STATEMENT.expression;
+    char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+    if (!expr) {
+        Estr errMsg = CREATE_ESTR("Variable \"");
+        APPEND_ESTR(errMsg, ident);
+        APPEND_ESTR(errMsg, "\" was not assigned a value.");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    ResultType(CometOperand, charptr) exprResult = visitValue(c, expr);
     if (exprResult.error)
         return exprResult;
-    
-    char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
     uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);
