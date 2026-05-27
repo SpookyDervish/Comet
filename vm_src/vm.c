@@ -176,6 +176,24 @@ ResultType(voidPtr, charptr) clock(CometVM* vm) {
             break;
         }
 
+        case INST_EQ: {
+            int64_t a = pop(vm);
+            int64_t b = pop(vm);
+
+            push(vm, a == b);
+            break;
+        }
+
+        case INST_JMP_IF_FALSE: {
+            int64_t a = pop(vm);
+
+            if (!a) {
+                printf("%d\n", inst.a);
+                vm->currentFrame->ip = inst.a;
+            }
+            break;
+        }
+
         case INST_STORE: {
             int64_t value = pop(vm);
             
