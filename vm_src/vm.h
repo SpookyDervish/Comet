@@ -9,8 +9,9 @@
 typedef struct {
     int64_t* stack;
     int64_t* args;
-    int64_t ip;
+    uint64_t ip;
     uint32_t sp;
+    char* funcName;
 } Frame;
 
 typedef struct {

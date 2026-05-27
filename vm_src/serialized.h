@@ -7,9 +7,14 @@ typedef enum {
     INST_PUSH_CONST,
     INST_STORE,
     INST_LOAD,
-    INST_ADD,
-    INST_SUB,
-    INST_MUL,
+    INST_ADDI,
+    INST_ADDF,
+    INST_SUBI,
+    INST_SUBF,
+    INST_MULI,
+    INST_MULF,
+    INST_DIVI,
+    INST_DIVF,
     INST_LOAD_ARG,
     INST_RET,
     INST_CALL,
@@ -20,7 +25,8 @@ typedef enum {
     INST_LTE,
     INST_JMP,
     INST_JMP_IF_FALSE,
-    INST_NOT
+    INST_NOT,
+    INST_I2F
 } CometInstType;
 
 typedef struct {

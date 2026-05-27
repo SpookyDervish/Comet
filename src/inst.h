@@ -14,9 +14,14 @@ typedef enum {
     INST_PUSH_CONST,
     INST_STORE,
     INST_LOAD,
-    INST_ADD,
-    INST_SUB,
-    INST_MUL,
+    INST_ADDI,
+    INST_ADDF,
+    INST_SUBI,
+    INST_SUBF,
+    INST_MULI,
+    INST_MULF,
+    INST_DIVI,
+    INST_DIVF,
     INST_LOAD_ARG,
     INST_RET,
     INST_CALL,
@@ -27,7 +32,8 @@ typedef enum {
     INST_LTE,
     INST_JMP,
     INST_JMP_IF_FALSE,
-    INST_NOT
+    INST_NOT,
+    INST_I2F
 } CometInstType;
 
 typedef struct {
@@ -86,9 +92,10 @@ CometOperand storeConst(CometCompiler* c, CometOperand value);
 void buildPushConst(CometCompiler* c, CometOperand idx);
 void buildStore(CometCompiler* c, uint32_t idx);
 CometOperand buildLoad(CometCompiler* c, uint32_t idx);
-CometOperand buildAdd(CometCompiler* c);
-CometOperand buildSub(CometCompiler* c);
-CometOperand buildMul(CometCompiler* c);
+CometOperand buildAdd(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
+CometOperand buildSub(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
+CometOperand buildMul(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
+CometOperand buildDiv(CometCompiler* c, CometValueTypeKind aType, CometValueTypeKind bType);
 CometOperand buildEq(CometCompiler* c);
 CometOperand buildLt(CometCompiler* c);
 CometOperand buildGt(CometCompiler* c);
@@ -101,6 +108,7 @@ CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
 void buildJump(CometCompiler* c, CometLabel* label);
 void buildJumpIfFalse(CometCompiler* c, CometLabel* label);
 CometOperand buildNot(CometCompiler* c);
+CometOperand buildI2F(CometCompiler* c);
 
 CometLabel* buildLabel(CometCompiler* c);
 void resolveLabel(CometCompiler* c, CometLabel* label);

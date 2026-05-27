@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../lib/estr.h"
 
 CometFile* getFileContents(const char* filename) {
     // https://stackoverflow.com/questions/3747086/reading-the-whole-text-file-into-a-char-array-in-c
@@ -75,8 +76,18 @@ void pushImm(CometVM* vm, CometImmediate imm) {
         case COMET_SMALL: push(vm, (int64_t)imm.smallVal); break;
         case COMET_INT: push(vm, (int64_t)imm.intVal); break;
         case COMET_BIG: push(vm, (int64_t)imm.bigVal); break;
-        case COMET_FLOAT: push(vm, (int64_t)imm.floatVal); break;
-        case COMET_DOUBLE: push(vm, (int64_t)imm.doubleVal); break;
+        case COMET_FLOAT: {
+            int64_t casted;
+            memcpy(&casted, &imm.floatVal, sizeof(float));
+            push(vm, casted);
+            break;
+        }
+        case COMET_DOUBLE: {
+            int64_t casted;
+            memcpy(&casted, &imm.doubleVal, sizeof(double));
+            push(vm, casted);
+            break;
+        }
         case COMET_BOOL: push(vm, (int64_t)imm.boolVal); break;
         case COMET_VOID: break;
     }
@@ -107,6 +118,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     callFrame->stack = calloc(256, sizeof(int64_t));
     callFrame->args = calloc(256, sizeof(int64_t));
     callFrame->sp = 0;
+    callFrame->funcName = function->name;
 
     for (size_t i = 0; i < function->numArgs; i++) {
         callFrame->args[i] = pop(vm);
@@ -152,27 +164,102 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
 
-        case INST_ADD: {
+        case INST_ADDI: {
             int64_t a = pop(vm);
             int64_t b = pop(vm);
 
             push(vm, a + b);
             break;
         }
+        case INST_ADDF: {
+            int64_t a = pop(vm);
+            int64_t b = pop(vm);
 
-        case INST_SUB: {
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+            printf("a: %f, b: %f\n", aDouble, bDouble);
+
+            double result = aDouble + bDouble;
+            printf("%f\n", result);
+            int64_t outputtedResult;
+            memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+            push(vm, outputtedResult);
+            break;
+        }
+        case INST_SUBI: {
             int64_t a = pop(vm);
             int64_t b = pop(vm);
 
             push(vm, a - b);
             break;
         } 
+        case INST_SUBF: {
+            int64_t a = pop(vm);
+            int64_t b = pop(vm);
 
-        case INST_MUL: {
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            double result = aDouble - bDouble;
+            int64_t outputtedResult;
+            memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+            push(vm, outputtedResult);
+            break;
+        } 
+        case INST_MULI: {
             int64_t a = pop(vm);
             int64_t b = pop(vm);
 
             push(vm, a * b);
+            break;
+        }
+        case INST_MULF: {
+            int64_t a = pop(vm);
+            int64_t b = pop(vm);
+
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            double result = aDouble * bDouble;
+            int64_t outputtedResult;
+            memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+            push(vm, outputtedResult);
+            break;
+        }
+        case INST_DIVI: {
+            int64_t a = pop(vm);
+            int64_t b = pop(vm);
+
+            double result = (double)a / (double)b;
+            int64_t casted;
+            memcpy(&casted, &result, sizeof(int64_t));
+
+            push(vm, a * b);
+            break;
+        }
+        case INST_DIVF: {
+            int64_t a = pop(vm);
+            int64_t b = pop(vm);
+
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            double result = aDouble / bDouble;
+            int64_t outputtedResult;
+            memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+            push(vm, outputtedResult);
             break;
         }
 
@@ -186,8 +273,6 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         case INST_LT: {
             int64_t b = pop(vm);
             int64_t a = pop(vm);
-
-            printf("a: %d, b: %d\n", a, b);
 
             push(vm, a < b);
             break;
@@ -259,12 +344,39 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
 
+        case INST_I2F: {
+            double value = pop(vm);
+
+            int64_t casted;
+            memcpy(&casted, &value, sizeof(int64_t));
+
+            push(vm, casted);
+            break;
+        }
+
         default: {
             char* buffer = malloc(128);
             sprintf(buffer, "Reached invalid instruction! (%d)", inst.opcode);
             return Error(voidPtr, charptr, buffer);
-        }
+        };
     }
+
+    return Success(voidPtr, charptr, NULL);
+}
+
+char* stackTrace(CometVM* vm) {
+    Estr stackTrace = CREATE_ESTR("\nStack Trace:\n");
+
+    for (size_t i = 0; i < vm->callIdx; i++) {
+        Frame* call = vm->callStack[i];
+
+        char* funcBuffer = malloc(128);
+        sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)\n", call->ip, call->funcName, call->sp);
+
+        APPEND_ESTR(stackTrace, funcBuffer);
+    }
+
+    return stackTrace.str;
 }
 
 ResultType(int, charptr) startVM(CometVM* vm) {
@@ -279,12 +391,18 @@ ResultType(int, charptr) startVM(CometVM* vm) {
 
     while (vm->running) {
         ResultType(voidPtr, charptr) instResult = vmClock(vm);
-        if (instResult.error)
-            return Error(int, charptr, instResult.as.error);
+        if (instResult.error) {
+            Estr errMsg = CREATE_ESTR(instResult.as.error);
+            APPEND_ESTR(errMsg, stackTrace(vm));
+
+            return Error(int, charptr, errMsg.str);
+        }
     }
 
    return Success(int, charptr, (*vm->currentStack)[0]);
 }
+
+
 
 ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     CometFile* loadedFile = getFileContents(filePath);

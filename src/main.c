@@ -62,6 +62,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    for (size_t i = 0; i < compiler.as.success->programIdx; i++) {
+        printf("%s\n", cometInstructionToCStr(compiler.as.success, compiler.as.success->outputProgram[i]));
+    } 
+
     ResultType(voidPtr, charptr) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath);
     if (writeSuccess.error) {
         fprintf(stderr, "error while writing output: %s\n", writeSuccess.as.error);

@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "args.h"
 #include "../lib/ansi.h"
+#include <stddef.h>
 #include <stdio.h>
 #include <time.h>
 
@@ -28,8 +29,6 @@ int main(int argc, char** argv) {
         fprintf(stderr, "error while loading file: %s\n", newVm.as.error);
         return 1;
     }
-
-    
 
     clock_t start = clock();
     ResultType(int, charptr) result = startVM(newVm.as.success);

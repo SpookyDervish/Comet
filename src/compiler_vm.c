@@ -160,18 +160,40 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
         return right;
     
     CometOperand out;
+
+    // int operations
     switch (expr.op.type) {
         // arithmetic
         case CT_PLUS: {
-            out = buildAdd(c);
+            out = buildAdd(
+                c,
+                left.as.success.imm.typeKind,
+                right.as.success.imm.typeKind
+            );
             break;
         }
         case CT_MINUS: {
-            out = buildSub(c);
+            out = buildSub(
+                c,
+                left.as.success.imm.typeKind,
+                right.as.success.imm.typeKind
+            );
             break;
         }
         case CT_TIMES: {
-            out = buildMul(c);
+            out = buildMul(
+                c,
+                left.as.success.imm.typeKind,
+                right.as.success.imm.typeKind
+            );
+            break;
+        }
+        case CT_DIVIDE: {
+            out = buildDiv(
+                c,
+                left.as.success.imm.typeKind,
+                right.as.success.imm.typeKind
+            );
             break;
         }
 
@@ -198,7 +220,7 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
         }
 
         default: {
-            Estr errMsg = CREATE_ESTR("Invalid operator \"");
+            Estr errMsg = CREATE_ESTR("Invalid operator for int and int: \"");
             APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
             APPEND_ESTR(errMsg, "\"");
 
