@@ -165,15 +165,15 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         }
 
         case INST_ADDI: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
 
             push(vm, a + b);
             break;
         }
         case INST_ADDF: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
 
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
@@ -188,15 +188,15 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_SUBI: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
 
             push(vm, a - b);
             break;
         } 
         case INST_SUBF: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
 
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
@@ -211,15 +211,15 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         } 
         case INST_MULI: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
 
             push(vm, a * b);
             break;
         }
         case INST_MULF: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
 
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
@@ -234,8 +234,13 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_DIVI: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+
+            if (b == 0) {
+                return Error(voidPtr, charptr, "Division by zero");
+            }
+
+            int64_t a = pop(vm);
 
             double result = (double)a / (double)b;
             int64_t casted;
@@ -245,13 +250,21 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_DIVF: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            if (bDouble == 0) {
+                return Error(voidPtr, charptr, "Division by zero");
+            }
+
+            int64_t a = pop(vm);
+            
 
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
+
 
             double result = aDouble / bDouble;
             int64_t outputtedResult;
@@ -262,20 +275,23 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         }
 
         case INST_EQI: {
-            int64_t a = pop(vm);
             int64_t b = pop(vm);
+            int64_t a = pop(vm);
+            
 
             push(vm, a == b);
             break;
         }
         case INST_EQF: {
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
             int64_t a = pop(vm);
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
 
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
+            
 
             push(vm, aDouble == bDouble);
             break;
@@ -288,13 +304,13 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_LTF: {
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
             int64_t b = pop(vm);
             double bDouble;
             memcpy(&bDouble, &b, sizeof(double));
+
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
 
             push(vm, aDouble < bDouble);
             break;
@@ -307,13 +323,13 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_GTF: {
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
             int64_t b = pop(vm);
             double bDouble;
             memcpy(&bDouble, &b, sizeof(double));
+
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
 
             push(vm, aDouble > bDouble);
             break;
@@ -326,13 +342,13 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_LTEF: {
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
             int64_t b = pop(vm);
             double bDouble;
             memcpy(&bDouble, &b, sizeof(double));
+
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
 
             push(vm, aDouble <= bDouble);
             break;
@@ -345,13 +361,13 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
         case INST_GTEF: {
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
             int64_t b = pop(vm);
             double bDouble;
             memcpy(&bDouble, &b, sizeof(double));
+
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
 
             push(vm, aDouble >= bDouble);
             break;
