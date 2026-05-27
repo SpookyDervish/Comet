@@ -33,7 +33,6 @@ int main(int argc, char** argv) {
     clock_t start = clock();
     ResultType(int, charptr) result = startVM(newVm.as.success);
     clock_t end = clock();
-    
 
     if (result.error) {
         fprintf(stderr, "error while executing: %s\n", result.as.error);

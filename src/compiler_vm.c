@@ -139,6 +139,9 @@ ResultType(CometValueTypeKind, charptr) resolveType(CometCompiler* c, CometASTNo
                 APPEND_ESTR(errMsg, "\"");
                 return Error(CometValueTypeKind, charptr, errMsg.str);
             }
+
+            outType = varRecord->value.imm.typeKind;
+            break;
         }
         case AST_INFIX_EXPRESSION: {
             ResultType(CometValueTypeKind, charptr) left = resolveType(c, node->data.AST_INFIX_EXPRESSION.left);

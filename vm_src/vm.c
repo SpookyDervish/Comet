@@ -99,6 +99,8 @@ void pushOperand(CometVM* vm, CometOperand operand) {
             pushImm(vm, operand.imm);
             break;
         }
+
+        default: break;
     }
 }
 
