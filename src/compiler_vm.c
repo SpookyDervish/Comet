@@ -439,6 +439,47 @@ ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometAST
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_FOR_STATEMENT forStmt = node->data.AST_FOR_STATEMENT;
+
+    CometLabel* mainLabel = buildLabel(c);
+
+    ResultType(CometValueTypeKind, charptr) startType = resolveType(c, forStmt.start);
+    if (startType.error)
+        return Error(CometOperand, charptr, startType.as.error);
+    ResultType(CometValueTypeKind, charptr) endType = resolveType(c, forStmt.start);
+    if (endType.error)
+        return Error(CometOperand, charptr, endType.as.error);
+
+    CometValueTypeKind resultType = unifyType(startType.as.success, endType.as.success);
+
+    char* ident = forStmt.ident->data.AST_IDENTIFIER.ident;
+
+    CometEnvironment* forLoopEnv = newEnvironment("", c->env);
+    CometEnvironment* previousEnv = c->env;
+
+    ResultType(CometOperand, charptr) start = visitValue(c, forStmt.start);
+    if (startType.error)
+        return Error(CometOperand, charptr, startType.as.error);
+    ResultType(CometOperand, charptr) end  = visitValue(c, forStmt.start);
+    if (endType.error)
+        return Error(CometOperand, charptr, endType.as.error);
+
+    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, , bool isMutable)
+
+    c->env = forLoopEnv;
+
+    ResultType(CometOperand, charptr) start = visitValue(c, forStmt.start);
+    if (start.error)
+        return start;
+
+    c->env = previousEnv;
+    free(forLoopEnv);
+
+    buildEq(c, resultType);
+
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 // -- MAIN -- //
 CometCompiler* createCompilerVM() {
@@ -508,6 +549,8 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitIfStatement(c, node);
         case AST_WHILE_STATEMENT:
             return visitWhileStatement(c, node);
+        case AST_FOR_STATEMENT:
+            return visitForStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

@@ -1,6 +1,5 @@
 func main() -> int {
-    mut int x = 0
-    while (true) {
-        x = x + 1
+    for int i in 1 .. 10 {
+        
     }
 }
