@@ -44,6 +44,7 @@ typedef enum {
     AST_AS_FUNC_DEV,
     AST_NEW_STATEMENT,
     AST_OVERRIDE_STATEMENT,
+    AST_IMPORT_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION
@@ -122,6 +123,9 @@ struct CometASTNode {
             CometASTNode* structName;
             List(astNodePtr) args;
         } AST_NEW_STATEMENT;
+        struct AST_IMPORT_STATEMENT {
+            List(astNodePtr) importChain; // import chain. first item is the top level import
+        } AST_IMPORT_STATEMENT;
 
     } data;  
 };

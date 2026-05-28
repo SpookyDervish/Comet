@@ -44,6 +44,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_FUNC_DEF_STATEMENT";
         case AST_OVERRIDE_STATEMENT:
             return "AST_OVERRIDE_STATEMENT";
+        case AST_IMPORT_STATEMENT:
+            return "AST_IMPORT_STATEMENT";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";
