@@ -4,6 +4,7 @@
 #include "struct.h"
 #include "token.h"
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -439,6 +440,22 @@ void printNode(CometASTNode* node) {
             printf(")");
 
             break;
+        case AST_IMPORT_STATEMENT:
+            printf("import ");
+
+            List(astNodePtr) importChain = node->data.AST_IMPORT_STATEMENT.importChain;
+
+            for (size_t i = 0; i < importChain.count; i++) {
+                CometASTNode* ident = *get(importChain, i);
+                printf("%s", ident->data.AST_IDENTIFIER.ident);
+
+                if (i < importChain.count-1) {
+                    printf(".");
+                }
+            }
+            printf("\n");
+            break;
+
 
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
@@ -1149,6 +1166,29 @@ ResultType(astNodePtr, charptr) parseOverrideStatement(CometParser* parser, Fiel
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseImportStatement(CometParser* parser) {
+    parserNextToken(parser); // skip "import"
+
+    List(astNodePtr) importChain = newList(astNodePtr);
+
+    while (true) {
+        CometASTNode* importName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+        append(importChain, importName);
+
+
+        if (!peekTokenIs(parser, CT_DOT)) {
+            break;
+        }
+        parserNextToken(parser);
+        parserNextToken(parser);
+
+        
+    }
+
+    CometASTNode* stmt = AST_NODE(AST_IMPORT_STATEMENT, importChain);
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -1181,6 +1221,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute
         return parseStatement(parser, strcmp(keyword, "mut") == 0, fieldAttribStringToAttribEnum(keyword));
     } else if (strcmp(keyword, "override") == 0) {
          return parseOverrideStatement(parser, fieldAttrib);
+    } else if (strcmp(keyword, "import") == 0) {
+        return parseImportStatement(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);

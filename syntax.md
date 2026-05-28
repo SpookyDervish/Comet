@@ -40,7 +40,7 @@ bool mut my_bool2 = true -- values must have the "mut" keyword to be able to be 
 -- but MUST match what they're closing
 
 if 1+1 == 2 {
-    print("Math is working!")
+    io.print("Math is working!")
 } :if
 ```
 
@@ -48,7 +48,7 @@ if 1+1 == 2 {
 ```lua
 
 while true {
-    print("Hello, World!")
+    io.print("Hello, World!")
 } :while
 
 -- this is inclusive (will print numbers 1 to 10)
@@ -61,7 +61,7 @@ for int i in 1 .. 10 {
         break -- end the loop at 7
     }
 
-    print(i)
+    io.print(i)
 
     
 } :for
@@ -78,7 +78,7 @@ func square(int x) -> int => x * x
 
 
 int result = add(5, 2)
-print(result)
+io.print(result)
 ```
 
 
@@ -99,7 +99,7 @@ struct Player {
     private int socialSecurityNumber
 
     func greet() -> void {
-        print("Hello, " + self.name + "!")
+        io.print("Hello, " + self.name + "!")
     } :greet
 
     init(string name) {
@@ -142,7 +142,7 @@ struct Example2 <T: Number> { -- is numeric, we can also say Float, Int, or a sp
 ```lua
 struct Animal {
     func speak() -> void {
-        print("...")
+        io.print("...")
     }
 
     init() {} : init
@@ -152,7 +152,7 @@ struct Dog : Animal {
     readonly string ownerName
 
     override func speak() -> void {
-        print("Woof! My owner is " + self.ownerName as string)
+        io.print("Woof! My owner is " + self.ownerName as string)
     }
 
     init(string ownerName) {
@@ -172,14 +172,17 @@ enum Colour : int {
     Blue
 } :Colour
 
-print(Colour.Red) -- prints 0
+io.print(Colour.Red) -- prints 0
 ```
 
 ## Modules
 ```lua
-import collections -- imports everything from collections
+import collections.List -- imports List from collections
 
 List<int> my_list = new List<int>()
+
+import io -- imports everything from io
+io.print("Hi")
 ```
 
 ## Casting
@@ -195,7 +198,7 @@ struct MyStruct {
 } :MyStruct
 
 MyStruct new_struct = new MyStruct()
-print(new_struct to string) -- "<MyStruct test=123>"
+io.print(new_struct to string) -- "<MyStruct test=123>"
 ```
 
 ## Exceptions
@@ -204,7 +207,7 @@ print(new_struct to string) -- "<MyStruct test=123>"
 try {
     float x = 10 / 0
 } except (ZeroDivisionError) {
-    print("Attempt to divide by zero!")
+    io.print("Attempt to divide by zero!")
 }
 ```
 
