@@ -8,8 +8,16 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     env->name = name;
     env->parent = parent;
     env->records = NULL;
-    env->recordIdx = 0;
+
+    env->recordIdx = env->parent ? parent->recordIdx : 0;
     return env;
+}
+
+void increaseRecordIndex(CometEnvironment* env) {
+    env->recordIdx++;
+    if (env->parent) {
+        increaseRecordIndex(env->parent);
+    }
 }
 
 uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, bool isMutable) {
@@ -30,7 +38,7 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
     record->recordType = recordType;
 
     record->recordIdx = env->recordIdx;
-    env->recordIdx++;
+    increaseRecordIndex(env); // avoid index collisions
 
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
 

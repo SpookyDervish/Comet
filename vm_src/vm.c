@@ -2,6 +2,7 @@
 #include "args.h"
 #include "operand.h"
 #include "serialized.h"
+#include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -61,8 +62,13 @@ void push(CometVM* vm, int64_t value) {
     *vm->currentSp += 1;
 }
 
+int64_t getTop(CometVM* vm) {
+    assert((*vm->currentSp) > 0);
+    return (*vm->currentStack)[(*vm->currentSp)-1];
+}
+
 int64_t pop(CometVM* vm) {
-    int64_t value = (*vm->currentStack)[(*vm->currentSp)-1];
+    int64_t value = getTop(vm);
     *vm->currentSp -= 1;
     return value;
 }
@@ -262,11 +268,9 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             }
 
             int64_t a = pop(vm);
-            
 
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
-
 
             double result = aDouble / bDouble;
             int64_t outputtedResult;
@@ -279,7 +283,6 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         case INST_EQI: {
             int64_t b = pop(vm);
             int64_t a = pop(vm);
-            
 
             push(vm, a == b);
             break;
@@ -293,9 +296,26 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             double aDouble;
             memcpy(&aDouble, &a, sizeof(double));
 
-            
-
             push(vm, aDouble == bDouble);
+            break;
+        }
+        case INST_NEQI: {
+            int64_t b = pop(vm);
+            int64_t a = pop(vm);
+
+            push(vm, a != b);
+            break;
+        }
+        case INST_NEQF: {
+            int64_t b = pop(vm);
+            double bDouble;
+            memcpy(&bDouble, &b, sizeof(double));
+
+            int64_t a = pop(vm);
+            double aDouble;
+            memcpy(&aDouble, &a, sizeof(double));
+
+            push(vm, aDouble != bDouble);
             break;
         }
         case INST_LTI: {
@@ -375,8 +395,14 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
 
+        case INST_JMP: {
+            vm->currentFrame->ip = inst.a;
+            break;
+        }
+
         case INST_JMP_IF_FALSE: {
             int64_t a = pop(vm);
+
 
             if (!a) {
                 vm->currentFrame->ip = inst.a;
@@ -430,6 +456,14 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
 
+        case INST_DUP: {
+            int64_t value = getTop(vm);
+
+            push(vm, value);
+            push(vm, value);
+            break;
+        }
+
         default: {
             char* buffer = malloc(128);
             sprintf(buffer, "Reached invalid instruction! (%d)", inst.opcode);
@@ -475,7 +509,7 @@ ResultType(int, charptr) startVM(CometVM* vm) {
         }
     }
 
-   return Success(int, charptr, (*vm->currentStack)[0]);
+   return Success(int, charptr, (*vm->currentStack)[(*vm->currentSp)-1]);
 }
 
 

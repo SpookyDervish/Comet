@@ -443,40 +443,80 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
     struct AST_FOR_STATEMENT forStmt = node->data.AST_FOR_STATEMENT;
 
     CometLabel* mainLabel = buildLabel(c);
+    CometLabel* endLabel = buildLabel(c);
 
+    // resolve start and end types
     ResultType(CometValueTypeKind, charptr) startType = resolveType(c, forStmt.start);
     if (startType.error)
         return Error(CometOperand, charptr, startType.as.error);
-    ResultType(CometValueTypeKind, charptr) endType = resolveType(c, forStmt.start);
+    ResultType(CometValueTypeKind, charptr) endType = resolveType(c, forStmt.end);
     if (endType.error)
         return Error(CometOperand, charptr, endType.as.error);
-
     CometValueTypeKind resultType = unifyType(startType.as.success, endType.as.success);
 
     char* ident = forStmt.ident->data.AST_IDENTIFIER.ident;
 
+    // create env for for loop
     CometEnvironment* forLoopEnv = newEnvironment("", c->env);
     CometEnvironment* previousEnv = c->env;
+    c->env = forLoopEnv;
 
+    // define iterator variable
     ResultType(CometOperand, charptr) start = visitValue(c, forStmt.start);
-    if (startType.error)
-        return Error(CometOperand, charptr, startType.as.error);
-    ResultType(CometOperand, charptr) end  = visitValue(c, forStmt.start);
+    if (start.error)
+        return Error(CometOperand, charptr, start.as.error);
+
+    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, start.as.success, false);
+    buildStore(c, idx);
+
+    resolveLabel(c, mainLabel);
+
+    // if the iterator var is equal to the end value, then we jump to the exit of the for loop
+    buildLoad(c, idx);
+
+    ResultType(CometOperand, charptr) end  = visitValue(c, forStmt.end);
     if (endType.error)
         return Error(CometOperand, charptr, endType.as.error);
 
-    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, , bool isMutable)
+    buildNeq(c, startType.as.success);
+    buildJumpIfFalse(c, endLabel);
 
-    c->env = forLoopEnv;
+    // compile the body of the for loop
+    ResultType(CometOperand, charptr) bodyResult = compile(c, forStmt.program);
+    if (bodyResult.error)
+        return bodyResult;
 
-    ResultType(CometOperand, charptr) start = visitValue(c, forStmt.start);
-    if (start.error)
-        return start;
+    // compile the step value
+    ResultType(CometValueTypeKind, charptr) stepType = resolveType(c, forStmt.step);
+    if (stepType.error)
+        return Error(CometOperand, charptr, stepType.as.error);
 
+    buildLoad(c, idx);
+
+    ResultType(CometOperand, charptr) step = visitValue(c, forStmt.step);
+    if (step.error)
+        return Error(CometOperand, charptr, step.as.error);
+
+    CometValueTypeKind addType = unifyType(startType.as.success, stepType.as.success);
+
+    // add the step to the iterator var
+    buildAdd(c, addType);
+    buildDup(c);
+
+    // save the iterator value
+    buildStore(c, idx);
+
+    // jump back to the start of the for loop
+    buildJump(c, mainLabel);
+
+    // resolve label for end of loop
+    resolveLabel(c, endLabel);
+
+    // exit the for loop's env
     c->env = previousEnv;
     free(forLoopEnv);
 
-    buildEq(c, resultType);
+    
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }

@@ -20,6 +20,8 @@ typedef enum {
     INST_CALL,
     INST_EQI,
     INST_EQF,
+    INST_NEQI,
+    INST_NEQF,
     INST_GTI,
     INST_GTF,
     INST_LTI,
@@ -31,7 +33,8 @@ typedef enum {
     INST_JMP,
     INST_JMP_IF_FALSE,
     INST_NOT,
-    INST_I2F
+    INST_I2F,
+    INST_DUP
 } CometInstType;
 
 typedef struct {

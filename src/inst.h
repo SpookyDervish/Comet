@@ -27,6 +27,8 @@ typedef enum {
     INST_CALL,
     INST_EQI,
     INST_EQF,
+    INST_NEQI,
+    INST_NEQF,
     INST_GTI,
     INST_GTF,
     INST_LTI,
@@ -38,7 +40,8 @@ typedef enum {
     INST_JMP,
     INST_JMP_IF_FALSE,
     INST_NOT,
-    INST_I2F
+    INST_I2F,
+    INST_DUP
 } CometInstType;
 
 typedef struct {
@@ -104,6 +107,7 @@ CometOperand buildSub(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildMul(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildDiv(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildEq(CometCompiler* c, CometValueTypeKind resultType);
+CometOperand buildNeq(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildLt(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildGt(CometCompiler* c, CometValueTypeKind resultType);
 CometOperand buildLte(CometCompiler* c, CometValueTypeKind resultType);
@@ -116,6 +120,7 @@ void buildJump(CometCompiler* c, CometLabel* label);
 void buildJumpIfFalse(CometCompiler* c, CometLabel* label);
 CometOperand buildNot(CometCompiler* c);
 CometOperand buildI2F(CometCompiler* c);
+void buildDup(CometCompiler* c);
 CometValueTypeKind buildCast(CometCompiler* c, CometValueTypeKind before, CometValueTypeKind after);
 
 CometLabel* buildLabel(CometCompiler* c);

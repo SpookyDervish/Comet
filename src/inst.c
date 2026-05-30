@@ -121,6 +121,8 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_CALL         : return "    CALL            ";
         case INST_EQI          : return "    EQI             ";
         case INST_EQF          : return "    EQF             ";
+        case INST_NEQI         : return "    NEQI            ";
+        case INST_NEQF         : return "    NEQF            ";
         case INST_LTI          : return "    LTI             ";
         case INST_LTF          : return "    LTF             ";
         case INST_GTI          : return "    GTI             ";
@@ -133,6 +135,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_JMP_IF_FALSE : return "    JMP_IF_FALSE    ";
         case INST_NOT          : return "    NOT             ";
         case INST_I2F          : return "    I2F             ";
+        case INST_DUP          : return "    DUP             ";
         default                : return "    FIXME           ";
     }
 }
@@ -440,6 +443,20 @@ CometOperand buildEq(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
+CometOperand buildNeq(CometCompiler* c, CometValueTypeKind resultType) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_NEQI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_NEQF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
+
+    return dest;
+}
 CometOperand buildLt(CometCompiler* c, CometValueTypeKind resultType) {
     popVal(c);
     popVal(c);
@@ -570,6 +587,9 @@ CometOperand buildI2F(CometCompiler* c) {
     buildInst(c, INST_I2F, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 
     return dest;
+}
+void buildDup(CometCompiler* c) {
+    buildInst(c, INST_DUP, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
 CometValueTypeKind buildCast(CometCompiler* c, CometValueTypeKind before, CometValueTypeKind after) {
     if (typeIsInt(before) && !typeIsInt(after)) {
