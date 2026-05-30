@@ -267,6 +267,10 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
             out = buildEq(c, resultType);
             break;
         }
+        case CT_NOT_EQ: {
+            out = buildNeq(c, resultType);
+            break;
+        }
         case CT_LT: {
             out = buildLt(c, resultType);
             break;

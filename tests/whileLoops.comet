@@ -5,7 +5,7 @@ func main() -> int {
     int n = 92
     mut int i = 0
 
-    mut big temp
+    mut big temp = 0
 
     while i != n {
         temp = a + b
@@ -15,6 +15,5 @@ func main() -> int {
         i = i + 1
     }
 
-    print("The %dnd fib number is: %lld\n", n, a)
-    return a == 7540113804746346429
+    return a
 }
