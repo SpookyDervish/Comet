@@ -59,7 +59,7 @@ int max(int a, int b) {
 }
 
 void push(CometVM* vm, int64_t value) {
-    ((*vm->currentStack)[*vm->currentSp]) = value;
+    (*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;
 }
 
@@ -70,10 +70,8 @@ char* stackAsString(int64_t* stack, uint32_t sp) {
 
         char* buffer = malloc(64);
 
-        sprintf(buffer, "0x%" PRIx64 "%s", stack[i], i < sp ? ", " : "");
+        sprintf(buffer, "0x%" PRIx64 "%s", stack[i], i < sp-1 ? ", " : "");
         APPEND_ESTR(stackString, buffer);
-
-        free(buffer);
     }
 
     APPEND_ESTR(stackString, "]");
@@ -82,9 +80,9 @@ char* stackAsString(int64_t* stack, uint32_t sp) {
 }
 
 char* stackTrace(CometVM* vm) {
-    Estr stackTrace = CREATE_ESTR("\nCall Stack:\n");
+    Estr stackTrace = CREATE_ESTR("\nCall Stack (most recent call first):\n");
 
-    for (size_t i = 0; i < vm->callIdx+1; i++) {
+    for (size_t i = vm->callIdx; i > 0; i--) {
         Frame* call = vm->callStack[i];
 
         char* funcBuffer = malloc(128);
@@ -166,6 +164,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     callFrame->args = calloc(256, sizeof(int64_t));
     callFrame->sp = 0;
     callFrame->funcName = function->name;
+    callFrame->ip = function->startIdx;
 
     for (size_t i = function->numArgs; i > 0; i--) {
         callFrame->args[i - 1] = pop(vm);
@@ -176,7 +175,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
 
     vm->currentStack = &callFrame->stack;
     vm->currentFrame = callFrame;
-    vm->currentFrame->ip = function->startIdx;
+    vm->currentSp = &callFrame->sp;
 
 }
 
@@ -192,9 +191,10 @@ void returnFromFunc(CometVM* vm) {
 
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
-    *vm->currentSp = vm->currentFrame->sp;
-\
+    *vm->currentSp = vm->currentFrame->sp+1;
+
     push(vm, funcFrame->stack[funcFrame->sp]);
+    
 
     free(funcFrame);
 }
@@ -559,7 +559,7 @@ ResultType(int, charptr) startVM(CometVM* vm) {
         }
     }
 
-   return Success(int, charptr, (*vm->currentStack)[(*vm->currentSp)-1]);
+    return Success(int, charptr, (*vm->currentStack)[(*vm->currentSp)-1]);
 }
 
 
