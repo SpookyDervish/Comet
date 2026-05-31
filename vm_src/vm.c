@@ -489,6 +489,13 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             push(vm, obj->fields[inst.a]);
             break;
         }
+        case INST_SET_FIELD: {
+            CometObject* obj = (CometObject*)pop(vm);
+            int64_t newValue = pop(vm);
+
+            obj->fields[inst.a] = newValue;
+            break;
+        }
 
         default: {
             char* buffer = malloc(128);
