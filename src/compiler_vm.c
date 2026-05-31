@@ -515,8 +515,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
         return bodyResult;
 
     // return back to the parent scope
-    c->env = c->env->parent;
-    free(funcEnv);
+    c->env = destroyEnv(c->env);
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
@@ -641,7 +640,6 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 
     // create env for for loop
     CometEnvironment* forLoopEnv = newEnvironment("", c->env);
-    CometEnvironment* previousEnv = c->env;
     c->env = forLoopEnv;
 
     // define iterator variable
@@ -696,8 +694,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
     resolveLabel(c, endLabel);
 
     // exit the for loop's env
-    c->env = previousEnv;
-    free(forLoopEnv);
+    c->env = destroyEnv(forLoopEnv);
 
     
 
@@ -759,9 +756,8 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
     buildReturn(c);
 
     // return back to the parent scope
-    c->env = c->env->parent;
-    free(funcEnv);
-
+    c->env = destroyEnv(funcEnv);
+    
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, CometASTNode* node) {

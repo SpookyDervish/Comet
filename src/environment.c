@@ -1,4 +1,5 @@
 #include "environment.h"
+#include <stdlib.h>
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
@@ -44,6 +45,15 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
 
     return record->recordIdx;
+}
+
+CometEnvironment* destroyEnv(CometEnvironment* env) {
+    CometEnvironment* parent = env->parent;
+
+    parent->recordIdx -= env->recordIdx;
+    free(env);
+
+    return parent;
 }
 
 Record* lookup(CometEnvironment* env, char* name) {

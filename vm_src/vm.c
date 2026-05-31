@@ -1,8 +1,9 @@
 #include "vm.h"
 #include "args.h"
-#include "operand.h"
+#include "../include/operand.h"
 #include "serialized.h"
 #include <assert.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -62,9 +63,43 @@ void push(CometVM* vm, int64_t value) {
     *vm->currentSp += 1;
 }
 
+char* stackAsString(int64_t* stack, uint32_t sp) {
+    Estr stackString = CREATE_ESTR("[");
+
+    for (size_t i = 0; i < sp; i++) {
+
+        char* buffer = malloc(64);
+
+        sprintf(buffer, "0x%" PRIx64 "%s", stack[i], i < sp ? ", " : "");
+        APPEND_ESTR(stackString, buffer);
+
+        free(buffer);
+    }
+
+    APPEND_ESTR(stackString, "]");
+
+    return stackString.str;
+}
+
+char* stackTrace(CometVM* vm) {
+    Estr stackTrace = CREATE_ESTR("\nCall Stack:\n");
+
+    for (size_t i = 0; i < vm->callIdx+1; i++) {
+        Frame* call = vm->callStack[i];
+
+        char* funcBuffer = malloc(128);
+        sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)  %s\n", call->ip, call->funcName, call->sp, stackAsString(call->stack, call->sp));
+
+        APPEND_ESTR(stackTrace, funcBuffer);
+    }
+
+    return stackTrace.str;
+}
+
 int64_t getTop(CometVM* vm) {
     if ((*vm->currentSp) <= 0) {
         fprintf(stderr, "Attempted to pop top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
+        fprintf(stderr, "%s\n", stackTrace(vm));
         assert(false);
     }
 
@@ -502,21 +537,6 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
     }
 
     return Success(voidPtr, charptr, NULL);
-}
-
-char* stackTrace(CometVM* vm) {
-    Estr stackTrace = CREATE_ESTR("\nStack Trace:\n");
-
-    for (size_t i = 0; i < vm->callIdx; i++) {
-        Frame* call = vm->callStack[i];
-
-        char* funcBuffer = malloc(128);
-        sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)\n", call->ip, call->funcName, call->sp);
-
-        APPEND_ESTR(stackTrace, funcBuffer);
-    }
-
-    return stackTrace.str;
 }
 
 ResultType(int, charptr) startVM(CometVM* vm) {
