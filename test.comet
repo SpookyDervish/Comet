@@ -1,12 +1,12 @@
 struct Foo {
     int x
 
-    init() {
-        self.x = 123
+    init(int x) {
+        self.x = x
     }
 }
 
 func main() -> int {
-    Foo x = new Foo()
+    Foo x = new Foo(4)
     return x.x
 }

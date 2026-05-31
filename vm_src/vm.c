@@ -132,8 +132,8 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     callFrame->sp = 0;
     callFrame->funcName = function->name;
 
-    for (size_t i = 0; i < function->numArgs; i++) {
-        callFrame->args[i] = pop(vm);
+    for (size_t i = function->numArgs; i > 0; i--) {
+        callFrame->args[i - 1] = pop(vm);
     }
 
     vm->callStack[vm->callIdx] = callFrame;
