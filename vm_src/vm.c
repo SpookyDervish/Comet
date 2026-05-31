@@ -63,7 +63,11 @@ void push(CometVM* vm, int64_t value) {
 }
 
 int64_t getTop(CometVM* vm) {
-    assert((*vm->currentSp) > 0);
+    if ((*vm->currentSp) <= 0) {
+        fprintf(stderr, "Attempted to pop top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
+        assert(false);
+    }
+
     return (*vm->currentStack)[(*vm->currentSp)-1];
 }
 
@@ -412,6 +416,8 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
 
         case INST_STORE: {
             int64_t value = pop(vm);
+
+            printf("%d\n", inst.a);
             
             vm->variables[inst.a] = value;
             break;
@@ -424,7 +430,9 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         }
 
         case INST_CALL: {
+            
             CometSerializedFunc function = vm->functions[inst.a];
+            printf("calling %s\n", function.name);
             callFunction(vm, &function);
             break;
         }
@@ -461,6 +469,24 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
 
             push(vm, value);
             push(vm, value);
+            break;
+        }
+
+        case INST_NEW: {
+            CometObject* newObj = malloc(sizeof(CometObject));
+
+            newObj->vtable = vm->structs[inst.a].vtable;
+            newObj->fields = calloc(vm->structs[inst.a].numFields, sizeof(int64_t));
+            
+            push(vm, (int64_t)newObj);
+
+            break;
+        }
+
+        case INST_GET_FIELD: {
+            CometObject* obj = (CometObject*)pop(vm);
+
+            push(vm, obj->fields[inst.a]);
             break;
         }
 
@@ -529,25 +555,70 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         return Error(vmPtr, charptr, "failed to allocate memory for CometVM!");
     }
 
+    
+
     newVM->stackCapacity = max(max(64, loadedFile->numConsts), loadedFile->numConsts*2);
-    //newVM->currentStack = calloc(newvm->currentStackCapacity, sizeof(int64_t));
     newVM->instructions = calloc(loadedFile->numInstructions, sizeof(CometSerializedInst));
     newVM->constants = calloc(loadedFile->numConsts, sizeof(CometOperand));
+    newVM->structs = calloc(loadedFile->numStructs, sizeof(CometSerializedStruct));
     newVM->functions = calloc(loadedFile->numFunctions, sizeof(CometSerializedFunc));
+
+    char* cursor = ((char*)loadedFile) + sizeof(CometFile);
 
     size_t constantsTableSize = sizeof(CometOperand) * loadedFile->numConsts;
     size_t functionsTableSize = sizeof(CometSerializedFunc) * loadedFile->numFunctions;
-    memcpy(newVM->constants, ((char*)loadedFile) + sizeof(CometFile), constantsTableSize);
-    memcpy(newVM->functions, ((char*)loadedFile) + sizeof(CometFile) + constantsTableSize, sizeof(CometSerializedFunc) * loadedFile->numFunctions);
-    memcpy(newVM->instructions, ((char*)loadedFile) + sizeof(CometFile) + constantsTableSize + functionsTableSize, sizeof(CometSerializedInst) * loadedFile->numInstructions);
+    size_t structsTableSize = sizeof(CometSerializedStruct) * loadedFile->numStructs;
+
+    // constants
+    memcpy(newVM->constants,
+        cursor,
+        constantsTableSize);
+    cursor += constantsTableSize;
+
+    // functions
+    memcpy(newVM->functions,
+        cursor,
+        functionsTableSize);
+    cursor += functionsTableSize;
+
+    // structs
+    for (uint32_t i = 0; i < loadedFile->numStructs; i++) {
+        uint32_t numFields;
+        uint32_t numMethods;
+
+        memcpy(&numFields, cursor, sizeof(uint32_t));
+        cursor += sizeof(uint32_t);
+
+        memcpy(&numMethods, cursor, sizeof(uint32_t));
+        cursor += sizeof(uint32_t);
+
+        newVM->structs[i].numFields = numFields;
+        newVM->structs[i].numMethods = numMethods;
+
+        newVM->structs[i].vtable =
+            malloc(sizeof(uint32_t) * numMethods);
+
+        memcpy(newVM->structs[i].vtable,
+            cursor,
+            sizeof(uint32_t) * numMethods);
+
+        cursor += sizeof(uint32_t) * numMethods;
+    }
+
+    // instructions
+    memcpy(newVM->instructions,
+       cursor,
+       sizeof(CometSerializedInst) * loadedFile->numInstructions);
 
     newVM->numConstants = loadedFile->numConsts;
     newVM->numFunctions = loadedFile->numFunctions;
-    newVM->variables = calloc(newVM->numConstants * 2, sizeof(int64_t));
+    newVM->numStructs = loadedFile->numStructs;
+    newVM->variables = calloc(256, sizeof(int64_t));
     newVM->callStack = calloc(128, sizeof(Frame));
     newVM->currentSp = malloc(sizeof(uint32_t));
 
     *newVM->currentSp = 0;
+    newVM->callIdx = 0;
 
     return Success(vmPtr, charptr, newVM);
 }

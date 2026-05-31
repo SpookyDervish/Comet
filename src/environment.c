@@ -20,7 +20,7 @@ void increaseRecordIndex(CometEnvironment* env) {
     }
 }
 
-uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, bool isMutable) {
+uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, CometType type, bool isMutable) {
     Record* record;
     HASH_FIND_STR(env->records, name, record);
 
@@ -34,6 +34,7 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
     record = malloc(sizeof(Record));
     record->name = strdup(name);
     record->value = value;
+    record->type = type;
     record->isMutable = isMutable;
     record->recordType = recordType;
 

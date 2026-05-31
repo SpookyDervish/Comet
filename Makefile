@@ -6,10 +6,10 @@ VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -Wextra  -Wno-trigraphs -I/Users/nathaniel.chandler/.brew/opt/uthash/include
+CFLAGS=-Wall -Wextra -Wno-trigraphs
 LDFLAGS=
 LDLIBS=
-DEBUG_CFLAGS=-Wall -Wextra -ggdb -fsanitize=address -g
+DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -fsanitize=address
 
 COMPILER_TARGET=cometc
 VM_TARGET=comet

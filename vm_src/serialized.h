@@ -34,7 +34,10 @@ typedef enum {
     INST_JMP_IF_FALSE,
     INST_NOT,
     INST_I2F,
-    INST_DUP
+    INST_DUP,
+    INST_NEW,
+    INST_GET_FIELD,
+    INST_SET_FIELD
 } CometInstType;
 
 typedef struct {
@@ -51,11 +54,23 @@ typedef struct {
 } CometSerializedInst;
 
 typedef struct {
+    uint32_t numFields;
+    uint32_t numMethods;
+    uint32_t* vtable;
+} CometSerializedStruct;
+
+typedef struct {
+    uint32_t numFields;
+    uint32_t numMethods;
+} CometSerializedStructHeader;
+
+typedef struct {
     char magic[5];
     uint8_t version;
     uint32_t numConsts;
     uint32_t numInstructions;
     uint32_t numFunctions;
+    uint32_t numStructs;
 } CometFile;
 
 #endif

@@ -1,9 +1,12 @@
-func main() -> int {
-    mut int x = 1
+struct Foo {
+    int x
 
-    for int i in 1 .. 10 {
-       x = x + 1
+    init() {
+        self.x = 123
     }
+}
 
-    return x
+func main() -> int {
+    Foo x = new Foo()
+    return x.x
 }

@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "struct.h"
 
 typedef struct {
     char name[32];
@@ -17,7 +18,9 @@ typedef enum {
     COMET_BIG,
     COMET_FLOAT,
     COMET_DOUBLE,
-    COMET_BOOL
+    COMET_BOOL,
+    COMET_STRUCT,
+    COMET_FUNCTION
 } CometValueTypeKind;
 
 typedef struct {
@@ -42,8 +45,17 @@ typedef struct {
         float floatVal;
         double doubleVal;
         bool boolVal;
+        CometObject* objectVal;
     };
 } CometImmediate;
+
+typedef struct {
+    CometValueTypeKind typeKind;
+    union {
+        CometStruct* structType;
+        CometFunction* functionType;
+    };
+} CometType;
 
 typedef struct {
     CometOperandKind type;

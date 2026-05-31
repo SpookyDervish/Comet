@@ -1,51 +1,26 @@
-#include "struct.h"
+#include "../include/struct.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
 
-StructField* findField(StructInfo structInfo, char* fieldName) {
-    for (size_t i = 0; i < structInfo.fields.count; i++) {
-        StructField* field = get(structInfo.fields, i);
+FieldAttribute attribStringToFieldAttrib(char* str) {
+    if (strcmp(str, "private") == 0) {
+        return FIELD_PRIVATE;
+    } else if (strcmp(str, "protected") == 0) {
+        return FIELD_PROTECTED;
+    } else if (strcmp(str, "readonly") == 0) {
+        return FIELD_READ_ONLY;
+    } else {
+        return FIELD_PUBLIC;
+    }
+}
 
-        if (strcmp(field->name, fieldName) == 0) {
-            return field;
+int32_t getFieldIndex(CometStruct* structType, char* fieldName) {
+    for (int32_t i = 0; i < structType->fieldCount; i++) {
+        if (strcmp(structType->fieldNames[i], fieldName) == 0) {
+            return i;
         }
     }
 
-    return NULL;
-}
-
-const FieldNameAttributePair FIELD_STRING_MAP[] = {
-    {"private", FIELD_PRIVATE},
-    {"protected", FIELD_PROTECTED},
-    {"readonly", FIELD_READ_ONLY},
-};
-
-void printStructFields(structFieldList fields) {
-
-    for (size_t i = 0; i < fields->count; i++) {
-        StructField field = *get((*fields), i);
-
-        printf("  field: %s\n \
-    index: %d\n \
-    access: %d\n \
-    is const? %d\n \
-    is pointer? %d\n"
-    , field.name, field.index, field.attrib, field.isConst, field.isPointer);
-    }
-}
-
-void printStruct(StructInfo structInfo) {
-    printf("struct %s {\n", structInfo.name);
-    
-    printStructFields(&structInfo.fields);
-}
-
-FieldAttribute attribStringToFieldAttrib(char* keyword) {
-    for (size_t i = 0; i < sizeof(FIELD_STRING_MAP)/sizeof(FIELD_STRING_MAP[0]); i++) {
-        if (strcmp(FIELD_STRING_MAP[i].fieldName, keyword) == 0) {
-            return FIELD_STRING_MAP[i].attribType;
-        }
-    }
-
-    return FIELD_PUBLIC;
+    return -1;
 }

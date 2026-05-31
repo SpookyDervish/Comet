@@ -26,6 +26,9 @@ typedef struct {
 
     CometSerializedFunc* functions;
 
+    uint32_t numStructs;
+    CometSerializedStruct* structs;
+
     Frame** callStack;
     Frame* currentFrame;
     uint8_t callIdx;

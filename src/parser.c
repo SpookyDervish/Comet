@@ -1,7 +1,6 @@
 #include "parser.h"
 #include "ast.h"
 #include "lexer.h"
-#include "struct.h"
 #include "token.h"
 #include <stdbool.h>
 #include <stddef.h>

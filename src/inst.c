@@ -7,6 +7,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+bool typesAreEqual(CometType a, CometType b) {
+    if (a.typeKind != b.typeKind) {
+        return false;
+    }
+
+    if (a.typeKind == COMET_STRUCT) {
+        return a.structType == b.structType;
+    }
+
+    return true;
+}
+
 CometOperand createOperand(CometOperandKind type) {
     return (CometOperand){
         .type = type
@@ -17,12 +29,13 @@ char* cometImmediateToCStr(CometImmediate immediate) {
     switch (immediate.typeKind) {
         case COMET_SMALL: {
             char* buffer = malloc(4);
-            sprintf(buffer, "%hbd", immediate.smallVal);
+            sprintf(buffer, "%hhd", immediate.smallVal);
             return buffer;
         }
         case COMET_INT: {
             char* buffer = malloc(32);
             sprintf(buffer, "%d", immediate.intVal);
+            
             return buffer;
         }
         case COMET_BIG: {
@@ -136,7 +149,32 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_NOT          : return "    NOT             ";
         case INST_I2F          : return "    I2F             ";
         case INST_DUP          : return "    DUP             ";
+        case INST_NEW          : return "    NEW             ";
+        case INST_GET_FIELD    : return "    GET_FIELD       ";
         default                : return "    FIXME           ";
+    }
+}
+
+CometType getValueType(CometCompiler* c, CometOperand value) {
+    switch (value.type) {
+        case CO_IMMEDIATE: {
+            return (CometType){
+                .typeKind = value.imm.typeKind
+            };
+        }
+        case CO_SYMBOL: {
+            // find symbol
+            CometFunction* func = c->functions[value.symbolIdx];
+            return (CometType){
+                .typeKind = COMET_FUNCTION,
+                .functionType = func
+            };
+        }
+        default: {
+            return (CometType){
+                .typeKind = COMET_VOID
+            };
+        }
     }
 }
 
@@ -223,7 +261,23 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
     newCompiler->env = newEnvironment("root", NULL);
-
+    newCompiler->structs = newList(cometStructPtr);
+    newCompiler->typeMap = newList(CometTypeMapEntry);
+ 
+    // fill in type map
+    CometTypeMapEntry smallType =  { .name = "small",  .type = (CometType){.typeKind = COMET_SMALL}  };
+    CometTypeMapEntry intType =    { .name = "int",    .type = (CometType){.typeKind = COMET_INT}    };
+    CometTypeMapEntry bigType =    { .name = "big",    .type = (CometType){.typeKind = COMET_BIG}    };
+    CometTypeMapEntry boolType =   { .name = "bool",   .type = (CometType){.typeKind = COMET_BOOL}   };
+    CometTypeMapEntry floatType =  { .name = "float",  .type = (CometType){.typeKind = COMET_FLOAT}  };
+    CometTypeMapEntry doubleType = { .name = "double", .type = (CometType){.typeKind = COMET_DOUBLE} };
+    append(newCompiler->typeMap, smallType);
+    append(newCompiler->typeMap, intType);
+    append(newCompiler->typeMap, bigType);
+    append(newCompiler->typeMap, boolType);
+    append(newCompiler->typeMap, floatType);
+    append(newCompiler->typeMap, doubleType);
+    
     return Success(cometCompilerPtr, charptr, newCompiler);
 }
 
@@ -313,8 +367,8 @@ CometOperand findConst(CometCompiler* c, CometOperand value) {
     return NO_OPERAND;
 }
 
-bool typeIsInt(CometValueTypeKind kind) {
-    switch (kind) {
+bool typeIsInt(CometType type) {
+    switch (type.typeKind) {
         case COMET_SMALL:
         case COMET_INT:
         case COMET_BIG:
@@ -373,7 +427,7 @@ CometOperand buildLoad(CometCompiler* c, uint32_t idx) {
 
     return value;
 }
-CometOperand buildAdd(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildAdd(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -387,7 +441,7 @@ CometOperand buildAdd(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildSub(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildSub(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -401,7 +455,7 @@ CometOperand buildSub(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildMul(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildMul(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -415,7 +469,7 @@ CometOperand buildMul(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildDiv(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildDiv(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -429,7 +483,7 @@ CometOperand buildDiv(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildEq(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildEq(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -443,7 +497,7 @@ CometOperand buildEq(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildNeq(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildNeq(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -457,7 +511,7 @@ CometOperand buildNeq(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildLt(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildLt(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -471,7 +525,7 @@ CometOperand buildLt(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildGt(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildGt(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -485,7 +539,7 @@ CometOperand buildGt(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildLte(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildLte(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -499,7 +553,7 @@ CometOperand buildLte(CometCompiler* c, CometValueTypeKind resultType) {
 
     return dest;
 }
-CometOperand buildGte(CometCompiler* c, CometValueTypeKind resultType) {
+CometOperand buildGte(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);
 
@@ -591,7 +645,29 @@ CometOperand buildI2F(CometCompiler* c) {
 void buildDup(CometCompiler* c) {
     buildInst(c, INST_DUP, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
-CometValueTypeKind buildCast(CometCompiler* c, CometValueTypeKind before, CometValueTypeKind after) {
+CometOperand buildNew(CometCompiler* c, uint32_t idx) {
+    CometOperand dest = pushVal(c);
+
+    CometOperand indexOperand = createOperand(CO_IMMEDIATE);
+    indexOperand.imm.typeKind = COMET_INT;
+    indexOperand.imm.intVal = idx;
+
+    buildInst(c, INST_NEW, indexOperand, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometOperand buildGetField(CometCompiler* c, uint32_t idx) {
+    CometOperand dest = pushVal(c);
+
+    CometOperand indexOperand = createOperand(CO_IMMEDIATE);
+    indexOperand.imm.typeKind = COMET_INT;
+    indexOperand.imm.intVal = idx;
+
+    buildInst(c, INST_GET_FIELD, indexOperand, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && !typeIsInt(after)) {
         buildI2F(c);
     }

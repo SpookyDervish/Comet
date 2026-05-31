@@ -21,9 +21,10 @@ typedef struct {
     uint32_t numConsts;
     uint32_t numInstructions;
     uint32_t numFunctions;
+    uint32_t numStructs;
 } CometFile;
 
-Result(CometValueTypeKind, charptr);
+Result(CometType, charptr);
 
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node);
 ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath);

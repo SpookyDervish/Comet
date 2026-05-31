@@ -26,6 +26,26 @@ uint32_t serializeOperand(CometCompiler* c, CometOperand operand) {
     }
 }
 
+CometSerializedStruct* serializeStruct(CometCompiler* c, CometStruct* structType) {
+    CometSerializedStruct* serialized = calloc(1, sizeof(CometSerializedStruct));
+    
+    *serialized = (CometSerializedStruct){
+        .numFields = structType->fieldCount,
+        .vtable = calloc(structType->numMethods, sizeof(uint32_t)),
+        .numMethods = structType->numMethods
+    };
+
+    printf("0x%x\n", structType->vtable);
+
+
+    for (size_t i = 0; i < structType->numMethods; i++) {
+        serialized->vtable[i] = structType->vtable[i]->symbolIdx;
+    }
+
+    return serialized;
+    
+}
+
 CometSerializedInst* serializeInst(CometCompiler* c, CometInst inst) {
     CometSerializedInst* serialized = calloc(1, sizeof(CometSerializedInst));
     serialized->opcode = inst.opcode;

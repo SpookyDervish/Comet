@@ -18,6 +18,7 @@ typedef struct {
     UT_hash_handle hh;
     bool isMutable;
     CometOperand value;
+    CometType type;
     uint32_t recordIdx;
     RecordType recordType;
 } Record;
@@ -32,5 +33,5 @@ struct CometEnvironment {
 
 
 CometEnvironment* newEnvironment(char* name, CometEnvironment* parent);
-uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, bool isMutable);
+uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, CometType type, bool isMutable);
 Record* lookup(CometEnvironment* env, char* name);

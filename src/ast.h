@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "lexer.h"
-#include "struct.h"
+#include "../include/struct.h"
 #include "token.h"
 
 
