@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-uint32_t serializeOperand(CometCompiler* c, CometOperand operand) {
+uint32_t serializeOperand(CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE: {
             
@@ -26,7 +26,7 @@ uint32_t serializeOperand(CometCompiler* c, CometOperand operand) {
     }
 }
 
-CometSerializedStruct* serializeStruct(CometCompiler* c, CometStruct* structType) {
+CometSerializedStruct* serializeStruct(CometStruct* structType) {
     CometSerializedStruct* serialized = calloc(1, sizeof(CometSerializedStruct));
     
     *serialized = (CometSerializedStruct){
@@ -34,9 +34,6 @@ CometSerializedStruct* serializeStruct(CometCompiler* c, CometStruct* structType
         .vtable = calloc(structType->numMethods, sizeof(uint32_t)),
         .numMethods = structType->numMethods
     };
-
-    printf("0x%x\n", structType->vtable);
-
 
     for (size_t i = 0; i < structType->numMethods; i++) {
         serialized->vtable[i] = structType->vtable[i]->symbolIdx;
@@ -46,12 +43,12 @@ CometSerializedStruct* serializeStruct(CometCompiler* c, CometStruct* structType
     
 }
 
-CometSerializedInst* serializeInst(CometCompiler* c, CometInst inst) {
+CometSerializedInst* serializeInst(CometInst inst) {
     CometSerializedInst* serialized = calloc(1, sizeof(CometSerializedInst));
     serialized->opcode = inst.opcode;
-    serialized->a = serializeOperand(c, inst.a);
-    serialized->b = serializeOperand(c, inst.b);
-    serialized->c = serializeOperand(c, inst.c);
+    serialized->a = serializeOperand(inst.a);
+    serialized->b = serializeOperand(inst.b);
+    serialized->c = serializeOperand(inst.c);
 
     return serialized;
 }

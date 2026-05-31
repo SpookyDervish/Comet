@@ -4,6 +4,7 @@
 #include "inst.h"
 #include "lexer.h"
 #include "../include/operand.h"
+#include "parser.h"
 #include "serialize.h"
 #include "token.h"
 #include <stddef.h>
@@ -154,8 +155,79 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
     }
 }
 
-ResultType(CometOperand, charptr) visitLVal(CometCompiler* c, CometASTNode* node) {
-    return Success(CometOperand, charptr, NO_OPERAND);
+ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node);
+ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
+    switch (node->nodeType) {
+        case AST_IDENTIFIER: {
+            char* varName = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(c->env, varName);
+
+            if (varRecord == NULL) {
+                Estr errMsg = CREATE_ESTR("Undefined variable \"");
+                APPEND_ESTR(errMsg, varName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometType, charptr, errMsg.str);
+            }
+
+            uint32_t idx = varRecord->recordIdx;
+
+            switch (varRecord->recordType) {
+                case RECORD_LOCAL: 
+                   buildLoad(c, idx);
+                   break;
+                case RECORD_ARG:
+                    buildLoadArg(c, idx);
+                    break;
+                
+            }
+  
+            return Success(CometType, charptr, varRecord->type);
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
+
+            ResultType(CometType, charptr) leftType = resolveType(c, expr.left);
+            if (leftType.error)
+                return Error(CometType, charptr, leftType.as.error);
+
+            ResultType(CometOperand, charptr) left = visitValue(c, expr.left);
+            if (left.error)
+                return Error(CometType, charptr, left.as.error);
+
+            switch (expr.op.type) {
+                case CT_DOT: {
+                    if (leftType.as.success.typeKind != COMET_STRUCT) 
+                        return Error(CometType, charptr, "Attempted to set field of something that isn't a struct!");
+                    
+
+                    uint32_t fieldIndex = getFieldIndex(leftType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
+                    buildGetField(c, fieldIndex);
+                    break;
+                }
+
+                default: {
+                    Estr errMsg = CREATE_ESTR("Cannot use operator \"");
+                    APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
+                    APPEND_ESTR(errMsg, "\" in lvalue.");
+                    return Error(CometType, charptr, errMsg.str);
+                }
+            }
+
+            break;
+        }
+
+        default: {
+            Estr errMsg = CREATE_ESTR("\"");
+            APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));
+            APPEND_ESTR(errMsg, "\" cannot be an lvalue.");
+            return Error(CometType, charptr, errMsg.str);
+        }
+    }
+
+    return Success(CometType, charptr, (CometType){
+        .typeKind = COMET_VOID
+    });
 }
 
 ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node) {
@@ -255,10 +327,16 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
-ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* field, CometOperand newValue) {
-    ResultType(CometOperand, charptr) fieldPtr = visitValue(c, field);
-    if (fieldPtr.error)
-        return fieldPtr;
+ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* infixExpr, CometOperand newValue) {
+    struct AST_INFIX_EXPRESSION expr = infixExpr->data.AST_INFIX_EXPRESSION;
+
+    ResultType(CometType, charptr) structType = visitLValue(c, expr.left);
+    if (structType.error)
+        return Error(CometOperand, charptr, structType.as.error);
+
+    int32_t fieldIndex = getFieldIndex(structType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
+
+    buildSetField(c, fieldIndex);
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
@@ -580,8 +658,8 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
     buildLoad(c, idx);
 
     ResultType(CometOperand, charptr) end  = visitValue(c, forStmt.end);
-    if (endType.error)
-        return Error(CometOperand, charptr, endType.as.error);
+    if (end.error)
+        return Error(CometOperand, charptr, end.as.error);
 
     buildNeq(c, startType.as.success);
     buildJumpIfFalse(c, endLabel);
@@ -841,7 +919,7 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
 
     for (size_t structIdx = 0; structIdx < c->structs.count; structIdx++) {
         CometStruct* structType = *get(c->structs, structIdx);
-        CometSerializedStruct* serializedStruct = serializeStruct(c, structType);
+        CometSerializedStruct* serializedStruct = serializeStruct(structType);
 
         CometSerializedStructHeader header = {
             .numFields = serializedStruct->numFields,
@@ -855,7 +933,7 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
 
     for (size_t instIdx = 0; instIdx < c->programIdx; instIdx++) {
         CometInst inst = c->outputProgram[instIdx];
-        CometSerializedInst* serializedInst = serializeInst(c, inst);
+        CometSerializedInst* serializedInst = serializeInst(inst);
 
         fwrite(serializedInst, sizeof(CometSerializedInst), 1, file);
         

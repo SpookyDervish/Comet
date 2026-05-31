@@ -29,8 +29,8 @@ typedef struct {
     uint32_t numMethods;
 } CometSerializedStructHeader;
 
-CometSerializedInst* serializeInst(CometCompiler* c, CometInst inst);
-CometSerializedStruct* serializeStruct(CometCompiler* c, CometStruct* structType);
-uint32_t serializeOperand(CometCompiler* c, CometOperand operand);
+CometSerializedInst* serializeInst(CometInst inst);
+CometSerializedStruct* serializeStruct(CometStruct* structType);
+uint32_t serializeOperand(CometOperand operand);
 
 #endif

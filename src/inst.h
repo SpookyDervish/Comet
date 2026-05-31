@@ -144,6 +144,7 @@ CometOperand buildI2F(CometCompiler* c);
 void buildDup(CometCompiler* c);
 CometOperand buildNew(CometCompiler* c, uint32_t idx);
 CometOperand buildGetField(CometCompiler* c, uint32_t idx);
+void buildSetField(CometCompiler* c, uint32_t idx);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
 CometLabel* buildLabel(CometCompiler* c);

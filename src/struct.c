@@ -16,7 +16,7 @@ FieldAttribute attribStringToFieldAttrib(char* str) {
 }
 
 int32_t getFieldIndex(CometStruct* structType, char* fieldName) {
-    for (int32_t i = 0; i < structType->fieldCount; i++) {
+    for (uint32_t i = 0; i < structType->fieldCount; i++) {
         if (strcmp(structType->fieldNames[i], fieldName) == 0) {
             return i;
         }

@@ -151,6 +151,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_DUP          : return "    DUP             ";
         case INST_NEW          : return "    NEW             ";
         case INST_GET_FIELD    : return "    GET_FIELD       ";
+        case INST_SET_FIELD    : return "    SET_FIELD       ";
         default                : return "    FIXME           ";
     }
 }
@@ -666,6 +667,13 @@ CometOperand buildGetField(CometCompiler* c, uint32_t idx) {
     buildInst(c, INST_GET_FIELD, indexOperand, NO_OPERAND, NO_OPERAND);
 
     return dest;
+}
+void buildSetField(CometCompiler* c, uint32_t idx) {
+    CometOperand indexOperand = createOperand(CO_IMMEDIATE);
+    indexOperand.imm.typeKind = COMET_INT;
+    indexOperand.imm.intVal = idx;
+
+    buildInst(c, INST_SET_FIELD, indexOperand, NO_OPERAND, NO_OPERAND);
 }
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && !typeIsInt(after)) {
