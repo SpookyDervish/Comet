@@ -416,8 +416,6 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
 
         case INST_STORE: {
             int64_t value = pop(vm);
-
-            printf("%d\n", inst.a);
             
             vm->variables[inst.a] = value;
             break;
@@ -432,7 +430,6 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         case INST_CALL: {
             
             CometSerializedFunc function = vm->functions[inst.a];
-            printf("calling %s\n", function.name);
             callFunction(vm, &function);
             break;
         }
