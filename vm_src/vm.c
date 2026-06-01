@@ -95,6 +95,7 @@ char* stackTrace(CometVM* vm) {
 }
 
 int64_t getTop(CometVM* vm) {
+    printf("%d\n", *vm->currentSp);
     if ((*vm->currentSp) <= 0) {
         fprintf(stderr, "Attempted to pop top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
         fprintf(stderr, "%s\n", stackTrace(vm));
@@ -158,16 +159,25 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 }
 
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
-
+    printf("calling %s (%d args)\n", function->name, function->numArgs);
     Frame* callFrame = malloc(sizeof(Frame));
     callFrame->stack = calloc(256, sizeof(int64_t));
     callFrame->args = calloc(256, sizeof(int64_t));
     callFrame->sp = 0;
-    callFrame->funcName = function->name;
+    callFrame->funcName = strdup(function->name);
     callFrame->ip = function->startIdx;
 
+    if (vm->currentStack) {
+        printf("%p, %p, %p\n", vm->currentStack, vm->currentFrame, vm->currentSp);
+        printf("stack before popping: %s\n", stackAsString(*vm->currentStack, *vm->currentSp));
+    }
     for (size_t i = function->numArgs; i > 0; i--) {
+        printf("popping arg...\n");
         callFrame->args[i - 1] = pop(vm);
+    }
+    if (vm->currentStack) {
+    printf("stack after popping: %s\n", stackAsString(*vm->currentStack, *vm->currentSp));
+
     }
 
     vm->callStack[vm->callIdx] = callFrame;
@@ -189,13 +199,16 @@ void returnFromFunc(CometVM* vm) {
         return;
     }
 
+    push(vm, funcFrame->stack[funcFrame->sp]);
+    printf("returning %lld from %s (sp = %d)\n", funcFrame->stack[funcFrame->sp], funcFrame->funcName, funcFrame->sp);
+
+
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
-    *vm->currentSp = vm->currentFrame->sp+1;
+    vm->currentSp = &vm->currentFrame->sp;
+    vm->currentFrame->sp++;
 
-    push(vm, funcFrame->stack[funcFrame->sp]);
     
-
     free(funcFrame);
 }
 
@@ -462,21 +475,22 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             break;
         }
 
-        case INST_CALL: {
-            
-            CometSerializedFunc function = vm->functions[inst.a];
-            callFunction(vm, &function);
-            break;
-        }
-
         case INST_LOAD_ARG: {
             Frame* currentFrame = vm->callStack[vm->callIdx-1];
-            push(vm, currentFrame->args[inst.a]);
+            push(vm, currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
+            printf("stack after loading arg: %s\n", stackAsString(*vm->currentStack, *vm->currentSp));
             break;
         }
 
         case INST_RET: {
             returnFromFunc(vm);
+            break;
+        }
+
+        case INST_CALL: {
+            
+            CometSerializedFunc function = vm->functions[inst.a];
+            callFunction(vm, &function);
             break;
         }
 
@@ -512,6 +526,8 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             
             push(vm, (int64_t)newObj);
 
+            printf("stack after new = %s\n", stackAsString(*vm->currentStack, *vm->currentSp));
+
             break;
         }
 
@@ -535,6 +551,10 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             return Error(voidPtr, charptr, buffer);
         };
     }
+
+    printf("%p, %p\n", *vm->currentStack, vm->currentSp);
+    printf("opcode = %d, stack = %s, sp = %d\n", inst.opcode, stackAsString(*vm->currentStack, *vm->currentSp), *vm->currentSp);
+
 
     return Success(voidPtr, charptr, NULL);
 }
@@ -639,9 +659,9 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->numStructs = loadedFile->numStructs;
     newVM->variables = calloc(256, sizeof(int64_t));
     newVM->callStack = calloc(128, sizeof(Frame));
-    newVM->currentSp = malloc(sizeof(uint32_t));
-
-    *newVM->currentSp = 0;
+    newVM->currentSp = NULL;
+    newVM->currentFrame = NULL,
+    newVM->currentStack = NULL;
     newVM->callIdx = 0;
 
     return Success(vmPtr, charptr, newVM);
