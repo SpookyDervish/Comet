@@ -20,14 +20,14 @@ class CometTest(unittest.TestCase):
 
 def make_test(case: str):
     def test(self):
-        obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.obj"
+        obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.out"
         program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
         
         result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-O0", "-o", obj_name])
-        self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (comet)!")
+        self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (cometc)!")
         
-        gcc_result = subprocess.run(["gcc", obj_name, "-o", program_name, "-no-pie"])
-        self.assertEqual(gcc_result.returncode, 0, f"{case} did not link successfully (gcc)!")
+        gcc_result = subprocess.run(["./comet", obj_name])
+        self.assertEqual(gcc_result.returncode, 0, f"{case} did not run successfully (comet)!")
         
         program_result = subprocess.run([program_name], stdout=subprocess.DEVNULL)
         self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
