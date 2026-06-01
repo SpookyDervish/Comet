@@ -175,11 +175,11 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     vm->currentStack = &callFrame->stack;
     vm->currentFrame = callFrame;
     vm->currentSp = &callFrame->sp;
-
 }
 
 void returnFromFunc(CometVM* vm) {
     Frame* funcFrame = vm->callStack[vm->callIdx-1];
+
     vm->callIdx--;
     
 
@@ -192,10 +192,6 @@ void returnFromFunc(CometVM* vm) {
     vm->currentStack = &vm->currentFrame->stack;
     vm->currentSp = &vm->currentFrame->sp;
     push(vm, funcFrame->stack[funcFrame->sp-1]);
-
-    //vm->currentFrame->sp++;
-
-    
     
     free(funcFrame);
 }
@@ -532,7 +528,7 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         }
 
         case INST_CALL_METHOD: {
-            CometObject* obj = (CometObject*)pop(vm);
+            CometObject* obj = (CometObject*)getTop(vm);
 
             uint32_t methodIdx = inst.a;
             uint32_t symbolIdx = obj->vtable[methodIdx];

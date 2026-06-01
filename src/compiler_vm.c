@@ -6,6 +6,7 @@
 #include "../include/operand.h"
 #include "serialize.h"
 #include "token.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -617,7 +618,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType, false);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -682,7 +683,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
         return Error(CometOperand, charptr, funcVal.as.error);
 
     CometFunction* func = c->functions[funcVal.as.success.value.symbolIdx];
-    uint32_t neededArgCount = func->argCount;
+    uint32_t neededArgCount = func->isMethod ? func->argCount - 1 : func->argCount;
 
     if (funcCall.args.count < neededArgCount) {
         Estr errMsg = CREATE_ESTR("Not enough args passed to function \"");
@@ -876,7 +877,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType) {
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
-    buildFunction(c, constructorName, constDef.args.count + 1, structType); // add 1 arg for self
+    buildFunction(c, constructorName, constDef.args.count + 1, structType, true); // add 1 arg for self
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
@@ -941,7 +942,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType, true);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType

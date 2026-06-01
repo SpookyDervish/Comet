@@ -134,7 +134,7 @@ CometOperand buildLt(CometCompiler* c, CometType resultType);
 CometOperand buildGt(CometCompiler* c, CometType resultType);
 CometOperand buildLte(CometCompiler* c, CometType resultType);
 CometOperand buildGte(CometCompiler* c, CometType resultType);
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType);
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod);
 void buildReturn(CometCompiler* c);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);

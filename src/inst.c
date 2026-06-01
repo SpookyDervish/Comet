@@ -199,6 +199,20 @@ char* cometInstructionToCStr(CometCompiler* c, CometInst inst) {
             );
             break;
 
+        case INST_CALL_METHOD: {
+            CometOperand func = createOperand(CO_SYMBOL);
+            func.symbolIdx = inst.a.imm.smallVal;
+
+            sprintf(
+                extra,
+                "; vtable[%d] = %s",
+
+                inst.a.imm.smallVal,
+                cometOperandToCStr(c, func)
+            );
+            break;
+        }
+
         case INST_JMP:
         case INST_JMP_IF_FALSE:
             if (inst.a.label->pos >= c->programIdx) {
@@ -569,10 +583,11 @@ CometOperand buildGte(CometCompiler* c, CometType resultType) {
 
     return dest;
 }
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType) {
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod) {
     CometFunction* newFunction = malloc(sizeof(CometFunction));
     newFunction->argCount = argCount;
     newFunction->returnType = returnType;
+    newFunction->isMethod = isMethod;
 
     strncpy(newFunction->name, name, 32);
     newFunction->startIdx = c->programIdx;

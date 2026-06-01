@@ -32,6 +32,7 @@ struct CometFunction {
     uint32_t startIdx;
     uint32_t argCount;
     CometType returnType;
+    bool isMethod;
 };
 
 typedef struct {
