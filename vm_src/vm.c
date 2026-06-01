@@ -59,7 +59,6 @@ int max(int a, int b) {
 }
 
 void push(CometVM* vm, int64_t value) {
-    printf("pushing value: 0x%" PRIx64 "\n", value);
     (*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;
 }
@@ -189,14 +188,9 @@ void returnFromFunc(CometVM* vm) {
         return;
     }
 
-    printf("returning from function %s\n", funcFrame->funcName);
-    printf("stack before ret: %s\n", stackAsString(*vm->currentStack, *vm->currentSp));
-
-
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
     vm->currentSp = &vm->currentFrame->sp;
-    
     push(vm, funcFrame->stack[funcFrame->sp-1]);
 
     //vm->currentFrame->sp++;
@@ -458,15 +452,14 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
 
         case INST_STORE: {
             int64_t value = pop(vm);
-            
-            printf("storing value: 0x%" PRIx64 " at index: 0x%" PRIx64 "\n", value, inst.a);
+
             vm->variables[inst.a] = value;
             break;
         } 
 
         case INST_LOAD: {
             int64_t value = vm->variables[inst.a];
-            printf("loading var at index: 0x%" PRIx64 "\n", value);
+
             push(vm, value);
             break;
         }
@@ -535,6 +528,17 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
             int64_t newValue = pop(vm);
 
             obj->fields[inst.a] = newValue;
+            break;
+        }
+
+        case INST_CALL_METHOD: {
+            CometObject* obj = (CometObject*)pop(vm);
+
+            uint32_t methodIdx = inst.a;
+            uint32_t symbolIdx = obj->vtable[methodIdx];
+            CometSerializedFunc* func = &vm->functions[symbolIdx];
+
+            callFunction(vm, func);
             break;
         }
 

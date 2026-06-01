@@ -10,6 +10,5 @@ struct Test {
 
 func main() -> int {
     Test test = new Test()
-    int x = test.foo()
-    return 0
+    return test.foo()
 }

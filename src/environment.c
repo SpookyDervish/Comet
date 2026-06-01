@@ -45,14 +45,10 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
     record->isMutable = isMutable;
     record->recordType = recordType;
 
-    printf("env name: %s\n", env->name);
-
     record->recordIdx = idx;
     if (recordType == RECORD_ARG) {
-        printf("defining arg %s at index: %d\n", name, idx);
         env->argIdx++;
     } else {
-        printf("defining var %s at index: %d\n", name, idx);
         increaseRecordIndex(env); // avoid index collisions
     }
 
