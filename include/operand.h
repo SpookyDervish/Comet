@@ -4,29 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "struct.h"
-
-typedef struct {
-    char name[32];
-    uint32_t startIdx;
-    uint32_t argCount;
-} CometFunction;
-
-typedef enum {
-    COMET_VOID,
-    COMET_SMALL,
-    COMET_INT,
-    COMET_BIG,
-    COMET_FLOAT,
-    COMET_DOUBLE,
-    COMET_BOOL,
-    COMET_STRUCT,
-    COMET_FUNCTION
-} CometValueTypeKind;
-
-typedef struct {
-    uint32_t pos;
-    bool resolved;
-} CometLabel;
+#include "type.h"
 
 typedef enum {
     CO_NONE,
@@ -48,14 +26,6 @@ typedef struct {
         CometObject* objectVal;
     };
 } CometImmediate;
-
-typedef struct {
-    CometValueTypeKind typeKind;
-    union {
-        CometStruct* structType;
-        CometFunction* functionType;
-    };
-} CometType;
 
 typedef struct {
     CometOperandKind type;

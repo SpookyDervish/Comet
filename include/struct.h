@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "type.h"
 
 typedef enum {
     FIELD_PRIVATE,
@@ -10,22 +11,6 @@ typedef enum {
     FIELD_READ_ONLY,
     FIELD_PUBLIC,
 } FieldAttribute;
-
-typedef struct {
-    uint32_t startIdx;
-    uint32_t argCount;
-    uint32_t symbolIdx;
-} CometMethod;
-
-
-// the actual struct type
-typedef struct {
-    CometMethod** vtable;
-    uint32_t numMethods;
-    uint32_t fieldCount;
-    char** fieldNames;
-    char* name;
-} CometStruct;
 
 // an instance of a struct
 typedef struct {

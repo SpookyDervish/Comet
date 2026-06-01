@@ -11,10 +11,11 @@ struct Foo {
 
     init(Bar x) {
         self.x = x
+        x.y = 50
     }
 }
 
 func main() -> int {
     Foo x = new Foo(new Bar(123))
-    return x.x
+    return x.x.y
 }

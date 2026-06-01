@@ -4,7 +4,6 @@
 #include "inst.h"
 #include "lexer.h"
 #include "../include/operand.h"
-#include "parser.h"
 #include "serialize.h"
 #include "token.h"
 #include <stddef.h>
@@ -259,13 +258,41 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
             return Success(CometType, charptr, structType);
         }
         case AST_INFIX_EXPRESSION: {
-            ResultType(CometType, charptr) left = resolveType(c, node->data.AST_INFIX_EXPRESSION.left);
-            ResultType(CometType, charptr) right = resolveType(c, node->data.AST_INFIX_EXPRESSION.right);
+            struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
-            // division always results in a double
-            if (node->data.AST_INFIX_EXPRESSION.op.type == CT_DIVIDE) {
-                return Success(CometType, charptr, COMET_DOUBLE);
+            ResultType(CometType, charptr) left = resolveType(c, expr.left);
+            
+
+            switch (expr.op.type) {
+                case CT_DIVIDE: // division always results in a double
+                    return Success(CometType, charptr, COMET_DOUBLE);
+
+                case CT_DOT: { // get type of field
+                    if (left.as.success.typeKind != COMET_STRUCT) 
+                        return Error(CometType, charptr, "Attempt to get a field of something that isn't a struct!");
+                    
+
+                    char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
+                    int32_t fieldIdx = getFieldIndex(left.as.success.structType, fieldName);
+                    if (fieldIdx == -1) {
+                        Estr errMsg = CREATE_ESTR("No such field \"");
+                        APPEND_ESTR(errMsg, fieldName);
+                        APPEND_ESTR(errMsg, "\" in struct \"");
+                        APPEND_ESTR(errMsg, left.as.success.structType->name);
+                        APPEND_ESTR(errMsg, "\"");
+
+                        return Error(CometType, charptr, errMsg.str);
+                    }
+
+                    CometType fieldType = left.as.success.structType->fieldTypes[fieldIdx];
+
+                    return Success(CometType, charptr, fieldType);
+                }
+                
+                default: break;
             }
+
+            ResultType(CometType, charptr) right = resolveType(c, expr.right);
 
             return Success(CometType, charptr, unifyType(left.as.success, right.as.success));
         }
@@ -381,30 +408,34 @@ ResultType(CometOperand, charptr) getField(CometCompiler* c, CometASTNode* struc
     if (structValue.error) 
         return structValue;
 
-    CometOperand dest = buildGetField(c, getFieldIndex(structType.as.success.structType, fieldName));
+    int32_t fieldIdx = getFieldIndex(structType.as.success.structType, fieldName);
+    CometOperand dest = buildGetField(c, fieldIdx);
 
     return Success(CometOperand, charptr, dest);
 }
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
-    ResultType(CometType, charptr) leftType = resolveType(c, expr.left);
-    if (leftType.error)
-        return Error(CometOperand, charptr, leftType.as.error);
-    ResultType(CometType, charptr) rightType = resolveType(c, expr.right);
-    if (rightType.error)
-        return Error(CometOperand, charptr, rightType.as.error);
-
     if (expr.op.type == CT_DOT) { // getting a field
         return getField(c, expr.left, expr.right);
     }
 
+    ResultType(CometType, charptr) leftType = resolveType(c, expr.left);
+    if (leftType.error)
+        return Error(CometOperand, charptr, leftType.as.error);
+
+    ResultType(CometType, charptr) rightType = resolveType(c, expr.right);
+    if (rightType.error)
+        return Error(CometOperand, charptr, rightType.as.error);
+
     CometType resultType = unifyType(leftType.as.success, rightType.as.success);
     
     visitValue(c, expr.left);
+
     if (typesAreEqual(leftType.as.success, resultType)) {
         leftType.as.success = buildCast(c, leftType.as.success, resultType);
     }
+
     visitValue(c, expr.right);
     if (typesAreEqual(rightType.as.success, resultType)) {
         rightType.as.success = buildCast(c, rightType.as.success, resultType);
@@ -795,6 +826,7 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     structType->fieldCount = fieldCount;
     structType->numMethods = methodCount;
     structType->fieldNames = calloc(structType->fieldCount, sizeof(char*));
+    structType->fieldTypes = calloc(structType->fieldCount, sizeof(CometType));
     structType->vtable = calloc(structType->numMethods, sizeof(CometMethod*));
 
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
@@ -803,6 +835,7 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
         switch (fieldDef->nodeType) {
             case AST_ASSIGN_STATEMENT:
                 structType->fieldNames[i] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+                structType->fieldTypes[i] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
                 break;
 
             default: break;

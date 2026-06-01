@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 FieldAttribute attribStringToFieldAttrib(char* str) {
     if (strcmp(str, "private") == 0) {
@@ -16,11 +17,16 @@ FieldAttribute attribStringToFieldAttrib(char* str) {
 }
 
 int32_t getFieldIndex(CometStruct* structType, char* fieldName) {
+    printf("struct name: %s\n", structType->name);
+    printf("field count: %d\n", structType->fieldCount);
     for (uint32_t i = 0; i < structType->fieldCount; i++) {
+        printf("field name: %s (name) vs %s (looking for) (index %d)\n", structType->fieldNames[i], fieldName, i);
         if (strcmp(structType->fieldNames[i], fieldName) == 0) {
+            printf("found it!\n");
             return i;
         }
     }
 
+    printf("didn't find it :(\n");
     return -1;
 }
