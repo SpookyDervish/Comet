@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include "parser.h"
 
 
 // -- HELPER METHODS -- //
@@ -34,6 +35,16 @@ int32_t getStructIndex(CometCompiler* c, char* structName) {
         CometStruct* structType = *get(c->structs, i);
 
         if (strcmp(structType->name, structName) == 0) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+int32_t getMethodIndex(CometCompiler* c, CometStruct* structType, char* methodName) {
+    for (size_t i = 0; i < structType->numMethods; i++) {
+        if (strcmp(structType->vtable[i]->name, methodName) == 0) {
             return i;
         }
     }
@@ -155,6 +166,55 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
 }
 
 ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node);
+ResultType(CometOperand, charptr) getFunction(CometCompiler* c, CometASTNode* node) {
+    switch (node->nodeType) {
+        case AST_IDENTIFIER: {
+            char* varName = node->data.AST_IDENTIFIER.ident;
+            Record* varRecord = lookup(c->env, varName);
+
+            if (varRecord == NULL) {
+                Estr errMsg = CREATE_ESTR("Undefined function \"");
+                APPEND_ESTR(errMsg, varName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometOperand, charptr, errMsg.str);
+            }
+
+            if (varRecord->type.typeKind != COMET_FUNCTION) {
+                break;
+            }
+
+            return Success(CometOperand, charptr, varRecord->value);
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
+
+
+            char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
+
+            ResultType(CometType, charptr) structType = resolveType(c, expr.left);
+            if (structType.error)
+                return Error(CometOperand, charptr, structType.as.error);
+
+            ResultType(CometOperand, charptr) structValue = visitValue(c, expr.left);
+            if (structValue.error)
+                return structValue;
+
+            int32_t methodIdx = getMethodIndex(c, *get(c->structs, structValue.as.success.imm.smallVal), fieldName);
+
+            CometOperand methodIdxValue = createOperand(CO_IMMEDIATE);
+            methodIdxValue.imm.typeKind = COMET_SMALL;
+            methodIdxValue.imm.smallVal = methodIdx;
+
+            return Success(CometOperand, charptr, methodIdxValue);
+        }
+
+        default: break;
+    }
+
+    return Error(CometOperand, charptr, "Attempted to call something which isn't a function!");
+}
+
 ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_IDENTIFIER: {
@@ -260,16 +320,20 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
         case AST_INFIX_EXPRESSION: {
             struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
+            printNode(expr.left);
+            printf("\n");
             ResultType(CometType, charptr) left = resolveType(c, expr.left);
-            
+            if (left.error)
+                return left;
 
             switch (expr.op.type) {
                 case CT_DIVIDE: // division always results in a double
                     return Success(CometType, charptr, COMET_DOUBLE);
 
                 case CT_DOT: { // get type of field
+                    printf("%d\n", left.as.success.typeKind);
                     if (left.as.success.typeKind != COMET_STRUCT) 
-                        return Error(CometType, charptr, "Attempt to get a field of something that isn't a struct!");
+                        return Error(CometType, charptr, "Attemptted to get a field of something that isn't a struct!");
                     
 
                     char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
@@ -291,6 +355,8 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
                 
                 default: break;
             }
+
+            
 
             ResultType(CometType, charptr) right = resolveType(c, expr.right);
 
@@ -561,17 +627,20 @@ ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometAS
 }
 ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node) {
     struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
-    char* funcName = funcCall.ident->data.AST_IDENTIFIER.ident;
+    
+    ResultType(CometType, charptr) funcParentType = resolveType(c, funcCall.ident);
+    if (funcParentType.error)
+        return Error(CometOperand, charptr, funcParentType.as.error);
 
-    int32_t funcSymbolIndex = getSymbolIndex(c, funcName);
-    if (funcSymbolIndex == -1) {
-        Estr errMsg = CREATE_ESTR("Attempt to call undefined function \"");
-        APPEND_ESTR(errMsg, funcName);
-        APPEND_ESTR(errMsg, "\"");
-        return Error(CometOperand, charptr, errMsg.str);
-    }
+    ResultType(CometOperand, charptr) funcVal = getFunction(c, funcCall.ident);
+    if (funcVal.error)
+        return funcVal;
 
-    uint32_t neededArgCount = c->functions[funcSymbolIndex]->argCount;
+
+    printf("func parent type = %d\n", funcParentType.as.success.typeKind);
+    printf("funcVal = %s\n", cometOperandToCStr(c, funcVal.as.success));
+
+    /*uint32_t neededArgCount = c->functions[funcSymbolIndex]->argCount;
     if (funcCall.args.count < neededArgCount) {
         Estr errMsg = CREATE_ESTR("Not enough args passed to function \"");
         APPEND_ESTR(errMsg, funcName);
@@ -596,7 +665,8 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     }
 
     CometOperand returnValue = buildCall(c, funcName, funcCallArgs);
-    return Success(CometOperand, charptr, returnValue);
+    return Success(CometOperand, charptr, returnValue);*/
+    return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_IF_STATEMENT ifStmt = node->data.AST_IF_STATEMENT;
@@ -812,6 +882,69 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
     
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType) {
+    struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
+    char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+
+    
+    // build the function start and define the function in the current scope
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count);
+    CometType funcType = {
+        .typeKind = COMET_FUNCTION,
+        .functionType = getValueType(c, funcValue).functionType
+    };
+    defineVar(c->env, funcName, RECORD_LOCAL, funcValue, funcType, false);
+
+    // create the new scope for the function
+    CometEnvironment* funcEnv = newEnvironment(funcName, c->env);
+    c->env = funcEnv;
+
+    CometOperand selfVal = createOperand(CO_IMMEDIATE);
+    selfVal.imm.typeKind = COMET_SMALL;
+    selfVal.imm.smallVal = 0;
+
+    defineVar(
+        c->env,
+        "self",
+        RECORD_ARG,
+        selfVal,
+        structType,
+        false
+    );
+
+    // define each argument in the functions scope
+    for (size_t argIdx = 0; argIdx < funcDef.args.count; argIdx++) {
+        CometASTNode* argNode = *get(funcDef.args, argIdx);
+        struct AST_ARG_DEF argument = argNode->data.AST_ARG_DEF;
+
+        ResultType(CometType, charptr) argType = resolveType(c, argNode);
+        if (argType.error)
+            return Error(CometOperand, charptr, argType.as.error);
+
+        CometOperand argValue = createOperand(CO_IMMEDIATE);
+        argValue.imm.typeKind = COMET_SMALL;
+        argValue.imm.smallVal = argIdx+1;
+
+        defineVar(
+            c->env,
+            argument.ident->data.AST_IDENTIFIER.ident, 
+            RECORD_ARG,
+            argValue, 
+            argType.as.success,
+            false
+        );
+    }
+
+    // build the functions body
+    ResultType(CometOperand, charptr) bodyResult = compile(c, funcDef.program);
+    if (bodyResult.error)
+        return bodyResult;
+
+    // return back to the parent scope
+    c->env = destroyEnv(c->env);
+
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
 
@@ -850,38 +983,10 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     structType->fieldTypes = calloc(structType->fieldCount, sizeof(CometType));
     structType->vtable = calloc(structType->numMethods, sizeof(CometMethod*));
 
-    for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
-        CometASTNode* fieldDef = *get(structDef.fieldDefs, i);
-
-        switch (fieldDef->nodeType) {
-            case AST_ASSIGN_STATEMENT:
-                structType->fieldNames[i] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-                structType->fieldTypes[i] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
-                break;
-
-            default: break;
-        }
-    }
-
-    // build constructor
-    if (!structDef.constructor) {
-        Estr errMsg = CREATE_ESTR("Struct \"");
-        APPEND_ESTR(errMsg, structName);
-        APPEND_ESTR(errMsg, "is missing a constructor!");
-
-        return Error(CometOperand, charptr, errMsg.str);
-    }
-    Estr constructorName = CREATE_ESTR(strdup(structName));
-    APPEND_ESTR(constructorName, "_INIT");
-
     CometType generalStructType = {
         .typeKind = COMET_STRUCT,
         .structType = structType
     };
-
-    ResultType(CometOperand, charptr) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType);
-    if (constructorResult.error)
-        return constructorResult;
 
     CometTypeMapEntry typeMapEntry = {
         .name = strdup(structName),
@@ -893,6 +998,58 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
 
     append(c->typeMap, typeMapEntry);
     append(c->structs, structType);
+
+    uint32_t vtableIdx = 0;
+    for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
+        CometASTNode* fieldDef = *get(structDef.fieldDefs, i);
+
+        switch (fieldDef->nodeType) {
+            case AST_ASSIGN_STATEMENT:
+                structType->fieldNames[i] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+                structType->fieldTypes[i] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
+                break;
+
+            case AST_FUNC_DEF_STATEMENT: {
+                ResultType(CometOperand, charptr) result = visitMethodDefStatement(c, fieldDef, generalStructType);
+                if (result.error)
+                    return result;
+
+                CometFunction* function = c->functions[result.as.success.symbolIdx];
+
+                Estr newFuncName = CREATE_ESTR(structName);
+                APPEND_ESTR(newFuncName, "_");
+                APPEND_ESTR(newFuncName, function->name);
+
+                CometMethod* newMethod = malloc(sizeof(CometMethod));
+                memcpy(function->name, newFuncName.str, newFuncName.size + 1);
+                newMethod->argCount = function->argCount;
+                newMethod->startIdx = function->startIdx,
+                newMethod->symbolIdx = result.as.success.symbolIdx;
+
+                DESTROY_ESTR(newFuncName);
+
+                structType->vtable[vtableIdx] = newMethod;
+                break;
+            }
+
+            default: break;
+        }
+    }
+
+    // build constructor
+    if (!structDef.constructor) {
+        Estr errMsg = CREATE_ESTR("Struct \"");
+        APPEND_ESTR(errMsg, structName);
+        APPEND_ESTR(errMsg, "\" is missing a constructor!");
+
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+    Estr constructorName = CREATE_ESTR(strdup(structName));
+    APPEND_ESTR(constructorName, "_INIT");
+
+    ResultType(CometOperand, charptr) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType);
+    if (constructorResult.error)
+        return constructorResult;
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }

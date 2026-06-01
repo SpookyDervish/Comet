@@ -50,6 +50,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    printNode(ast.as.success);
+    printf("\n");
+
     ResultType(cometCompilerPtr, charptr) compiler = newCompiler();
     if (compiler.error) {
         fprintf(stderr, "error while creating compiler: %s\n", ast.as.error);

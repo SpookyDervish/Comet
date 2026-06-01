@@ -25,7 +25,8 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_EQ_EQ, PRECEDENCE_EQUALS},
     {CT_NOT_EQ, PRECEDENCE_EQUALS},
     {CT_DOT, PRECEDENCE_INDEX},
-    {CT_EQ, PRECEDENCE_SET}
+    {CT_EQ, PRECEDENCE_SET},
+    {CT_OPEN_PAREN, PRECEDENCE_CALL},
 };
 
 ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser);
@@ -47,6 +48,7 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_KEYWORD, parseStructCreateStatement}
 };
 
+ResultType(astNodePtr, charptr) parseFunctionCall(CometParser* parser, CometASTNode* left);
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left);
 const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_EQ, parseInfixExpression},
@@ -63,7 +65,8 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_EQ_EQ, parseInfixExpression},
     {CT_NOT_EQ, parseInfixExpression},
     {CT_DOT, parseInfixExpression},
-    {CT_EQ, parseInfixExpression}
+    {CT_EQ, parseInfixExpression},
+    {CT_OPEN_PAREN, parseFunctionCall}
 };
 
 // -- HELPER METHODS -- //
@@ -568,28 +571,27 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
 
 ResultType(argList, charptr) parseFunctionCallArgs(CometParser* parser) {
     List(astNodePtr) args = newList(astNodePtr);
+    parserNextToken(parser); // skip open paren '('
 
-    parserNextToken(parser); // skip open paren
     while (parser->currentToken->type != CT_CLOSE_PAREN) {
         if (parser->peekToken->type == CT_EOF) {
             return Error(argList, charptr, "Function args were not closed!");
         }
 
-        
-
         ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
         if (expr.error) {
             return Error(argList, charptr, expr.as.error);
         }
-
         append(args, expr.as.success);
 
-        ResultType(int, charptr) expectComma = expectPeek(parser, CT_COMMA);
-        if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
-            return Error(argList, charptr, expectComma.as.error);
-        }
+        parserNextToken(parser);
 
-        parserNextToken(parser); // skip comma
+        // Only consume ',' if it's actually there
+        if (currentTokenIs(parser, CT_COMMA)) {
+            parserNextToken(parser);
+        } else if (!currentTokenIs(parser, CT_CLOSE_PAREN)) {
+            return Error(argList, charptr, "Expected ',' or ')' after function argument.");
+        }
     }
 
     return Success(argList, charptr, args);
@@ -614,21 +616,6 @@ ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser) {
 
 ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-
-    
-    if (peekTokenIs(parser, CT_OPEN_PAREN)) {
-        parserNextToken(parser);
-        
-
-        ResultType(argList, charptr) args = parseFunctionCallArgs(parser);
-        if (args.error) {
-            return Error(astNodePtr, charptr, args.as.error);
-        }
-
-        CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, ident, args.as.success);
-        return Success(astNodePtr, charptr, funcCallNode);
-    }
-
     return Success(astNodePtr, charptr, ident);
 }
 
@@ -1024,6 +1011,16 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, F
         fieldAttrib
     );
     return Success(astNodePtr, charptr, stmt);
+}
+
+ResultType(astNodePtr, charptr) parseFunctionCall(CometParser* parser, CometASTNode* left) {
+    // 'left' is the already-parsed expression before the '('
+    ResultType(argList, charptr) args = parseFunctionCallArgs(parser);
+    if (args.error) {
+        return Error(astNodePtr, charptr, args.as.error);
+    }
+    CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, left, args.as.success);
+    return Success(astNodePtr, charptr, funcCallNode);
 }
 
 ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
