@@ -6,7 +6,7 @@ struct Test {
     }
 
     func foo() -> int {
-        self.x = self.x * 2
+        self.x *= 2
         return self.x 
     }
 }

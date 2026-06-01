@@ -376,7 +376,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 break; 
             }
-            case '"':
+            case '\"':
             case '\'': {
                 
                 ResultType(CometToken, charptr) stringTok = lexerParseString(lexer, lexer->currentChar);
@@ -390,14 +390,28 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 break; 
             }
 
-            case '+': append(tokens, TOKEN_LITERAL(CT_PLUS, "+")); break;
+            case '+': {
+                ResultType(char, charptr) eq = lexerPeek(lexer);
+
+                if (!eq.error && eq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_PLUS_EQ, "+="));
+                    break;
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_PLUS, "+"));
+                break;
+            }
             case '-': {
                 ResultType(char, charptr) arrow = lexerPeek(lexer);
 
                 if (!arrow.error && arrow.as.success == '>') {
                     lexerConsume(lexer);
                     append(tokens, TOKEN_LITERAL(CT_ARROW, "->"));
-                 } else if (isdigit(arrow.as.success)) {
+                } else if (!arrow.error && arrow.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_MINUS_EQ, "-="));
+                } else if (isdigit(arrow.as.success)) {
 
                     ResultType(CometToken, charptr) numberTok = lexerParseNumber(lexer);
                     if (numberTok.error)
@@ -410,10 +424,50 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 break; 
             }
-            case '*': append(tokens, TOKEN_LITERAL(CT_TIMES, "*")); break;
-            case '/': append(tokens, TOKEN_LITERAL(CT_DIVIDE, "/")); break;
-            case '%': append(tokens, TOKEN_LITERAL(CT_MOD, "%")); break;
-            case '^': append(tokens, TOKEN_LITERAL(CT_POW, "^")); break;
+            case '*': {
+                ResultType(char, charptr) eq = lexerPeek(lexer);
+
+                if (!eq.error && eq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_TIMES_EQ, "+="));
+                    break;
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_TIMES, "+"));
+            }
+            case '/': {
+                ResultType(char, charptr) eq = lexerPeek(lexer);
+
+                if (!eq.error && eq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_DIVIDE_EQ, "/="));
+                    break;
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_TIMES, "/"));
+            }
+            case '%': {
+                ResultType(char, charptr) eq = lexerPeek(lexer);
+
+                if (!eq.error && eq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_MOD_EQ, "%="));
+                    break;
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_MOD, "%"));
+            }
+            case '^': {
+                ResultType(char, charptr) eq = lexerPeek(lexer);
+
+                if (!eq.error && eq.as.success == '=') {
+                    lexerConsume(lexer);
+                    append(tokens, TOKEN_LITERAL(CT_POW_EQ, "^="));
+                    break;
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_POW_EQ, "^"));
+            }
 
             case ',': append(tokens, TOKEN_LITERAL(CT_COMMA, ",")) break;
 

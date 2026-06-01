@@ -54,6 +54,18 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_MOD";
         case CT_POW:
             return "CT_POW";
+        case CT_PLUS_EQ:
+            return "CT_PLUS_EQ";
+        case CT_MINUS_EQ:
+            return "CT_MINUS_EQ";
+        case CT_TIMES_EQ:
+            return "CT_TIMES_EQ";
+        case CT_DIVIDE_EQ:
+            return "CT_DIVIDE_EQ";
+        case CT_MOD_EQ:
+            return "CT_MOD_EQ";
+        case CT_POW_EQ:
+            return "CT_POW_EQ";
         case CT_EOF:
             return "CT_EOF";
         case CT_ARROW:
