@@ -1,21 +1,7 @@
-struct Bar {
-    int y
-
-    init(int y) {
-        self.y = y
-    }
-}
-
-struct Foo {
-    Bar x
-
-    init(Bar x) {
-        self.x = x
-        x.y = 50
-    }
+func add(int a, int b) -> int {
+    return a + b
 }
 
 func main() -> int {
-    Foo x = new Foo(new Bar(123))
-    return x.x.y
+    return add(1, 3)
 }

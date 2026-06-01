@@ -188,13 +188,15 @@ void returnFromFunc(CometVM* vm) {
         return;
     }
 
-    push(vm, funcFrame->stack[funcFrame->sp]);
 
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
     vm->currentSp = &vm->currentFrame->sp;
-    vm->currentFrame->sp++;
+    push(vm, funcFrame->stack[funcFrame->sp-1]);
 
+    //vm->currentFrame->sp++;
+
+    
     
     free(funcFrame);
 }

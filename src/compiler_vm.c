@@ -563,6 +563,27 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
     char* funcName = funcCall.ident->data.AST_IDENTIFIER.ident;
 
+    int32_t funcSymbolIndex = getSymbolIndex(c, funcName);
+    if (funcSymbolIndex == -1) {
+        Estr errMsg = CREATE_ESTR("Attempt to call undefined function \"");
+        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    uint32_t neededArgCount = c->functions[funcSymbolIndex]->argCount;
+    if (funcCall.args.count < neededArgCount) {
+        Estr errMsg = CREATE_ESTR("Not enough args passed to function \"");
+        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometOperand, charptr, errMsg.str);
+    } else if (funcCall.args.count > neededArgCount) {
+        Estr errMsg = CREATE_ESTR("Too many args passed to function \"");
+        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
     List(CometOperand) funcCallArgs = newList(CometOperand);
     for (size_t argIdx = 0; argIdx < funcCall.args.count; argIdx++) {
         CometASTNode* argNode = *get(funcCall.args, argIdx);

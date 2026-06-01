@@ -1,4 +1,5 @@
 #include "environment.h"
+#include <stdint.h>
 #include <stdlib.h>
 
 
@@ -31,6 +32,8 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
         return 0;
     }
 
+    uint32_t idx = recordType == RECORD_LOCAL ? env->recordIdx : env->argIdx;
+
     // create a new record and save it to the hash map (or dictionary or whatever you wanna call it)
     record = malloc(sizeof(Record));
     record->name = strdup(name);
@@ -39,8 +42,14 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
     record->isMutable = isMutable;
     record->recordType = recordType;
 
-    record->recordIdx = env->recordIdx;
-    increaseRecordIndex(env); // avoid index collisions
+    record->recordIdx = idx;
+    if (recordType == RECORD_ARG) {
+        env->argIdx++;
+    } else {
+        increaseRecordIndex(env); // avoid index collisions
+    }
+
+    
 
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
 

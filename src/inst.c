@@ -311,7 +311,7 @@ bool immediatesAreEqual(CometImmediate a, CometImmediate b) {
     return false;
 }
 
-uint32_t getSymbolIndex(CometCompiler* c, const char* symbolName) {
+int32_t getSymbolIndex(CometCompiler* c, const char* symbolName) {
     for (size_t i = 0; i < c->functionCount; i++) {
         CometFunction* func = c->functions[i];
 

@@ -11,5 +11,5 @@ func main() -> int {
     mut bool my_bool2 = true
     my_bool2 = false
 
-    return 0
+    return my_bool2 == true
 }

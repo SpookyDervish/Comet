@@ -28,6 +28,7 @@ struct CometEnvironment {
     CometEnvironment* parent;
     char* name;
     uint32_t recordIdx;
+    uint32_t argIdx;
     Record* records;
 };
 
