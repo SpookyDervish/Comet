@@ -292,7 +292,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '!': {
                 ResultType(char, charptr) next = lexerPeek(lexer);
 
-                if (next.error) {
+                if (next.error || next.as.success != '=') {
                     append(tokens, TOKEN_LITERAL(CT_NOT, "!"));
                     break;
                 }

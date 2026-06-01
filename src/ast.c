@@ -83,6 +83,10 @@ void freeNode(CometASTNode* node) {
             freeNode(node->data.AST_INFIX_EXPRESSION.right);
             break;
         }
+        case AST_PREFIX_EXPRESSION: {
+            freeNode(node->data.AST_PREFIX_EXPRESSION.right);
+            break;
+        }
         case AST_EXPRESSION_STATEMENT: {
             freeNode(node->data.AST_EXPRESSION_STATEMENT.expression);
             break;
@@ -163,6 +167,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";
+        case AST_PREFIX_EXPRESSION:
+            return "AST_PREFIX_EXPRESSION";
         case AST_FUNC_CALL:
             return "AST_FUNC_CALL";
         case AST_ARG_DEF:

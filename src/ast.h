@@ -47,7 +47,8 @@ typedef enum {
     AST_IMPORT_STATEMENT,
 
     // expressions
-    AST_INFIX_EXPRESSION
+    AST_INFIX_EXPRESSION,
+    AST_PREFIX_EXPRESSION
 } CometASTNodeType;
 
 // Main ASTNode struct, this can hold the different types of nodes.

@@ -1,18 +1,4 @@
-struct Test {
-    int x
-
-    init(int x) {
-        self.x = x
-    }
-
-    func foo() -> int {
-        self.x *= 2
-        return self.x 
-    }
-}
-
 func main() -> int {
-    Test test = new Test(1)
-    test.foo()
-    return test.foo()
+    x += 1
+    return 0
 }
