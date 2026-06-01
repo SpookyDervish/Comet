@@ -6,8 +6,8 @@ struct Test {
     }
 
     func foo() -> int {
-        self.x = self.x + 1
-        return self.x
+        self.x = self.x * 2
+        return self.x 
     }
 }
 
@@ -16,6 +16,7 @@ func add(int a, int b) -> int {
 }
 
 func main() -> int {
-    Test test = new Test(123)
+    Test test = new Test(1)
+    test.foo()
     return test.foo()
 }

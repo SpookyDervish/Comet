@@ -195,7 +195,6 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
         case AST_INFIX_EXPRESSION: {
             struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
-
             char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
 
             ResultType(CometType, charptr) structType = resolveType(c, expr.left);
@@ -211,7 +210,7 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
             int32_t methodIdx = getMethodIndex(c, structType.as.success.structType, fieldName);
 
             CometOperand methodIdxValue = createOperand(CO_SYMBOL);
-            methodIdxValue.symbolIdx = methodIdx;
+            methodIdxValue.symbolIdx = structType.as.success.structType->vtable[methodIdx]->symbolIdx;
 
             CometFunctionTypeInfo methodInfo = {
                 .funcType = FUNC_METHOD,
@@ -997,7 +996,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     // return back to the parent scope
     c->env = destroyEnv(c->env);
 
-    return Success(CometOperand, charptr, NO_OPERAND);
+    return Success(CometOperand, charptr, funcValue);
 }
 ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
