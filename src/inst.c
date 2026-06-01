@@ -152,6 +152,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_NEW          : return "    NEW             ";
         case INST_GET_FIELD    : return "    GET_FIELD       ";
         case INST_SET_FIELD    : return "    SET_FIELD       ";
+        case INST_CALL_METHOD  : return "    CALL_METHOD     ";
         default                : return "    FIXME           ";
     }
 }
@@ -261,7 +262,7 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     newCompiler->outputProgram = calloc(2048, sizeof(CometInst));
     newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
-    newCompiler->env = newEnvironment("root", NULL);
+    newCompiler->env = newEnvironment("root", NULL, false);
     newCompiler->structs = newList(cometStructPtr);
     newCompiler->typeMap = newList(CometTypeMapEntry);
  
@@ -568,9 +569,10 @@ CometOperand buildGte(CometCompiler* c, CometType resultType) {
 
     return dest;
 }
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount) {
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType) {
     CometFunction* newFunction = malloc(sizeof(CometFunction));
     newFunction->argCount = argCount;
+    newFunction->returnType = returnType;
 
     strncpy(newFunction->name, name, 32);
     newFunction->startIdx = c->programIdx;
@@ -674,6 +676,20 @@ void buildSetField(CometCompiler* c, uint32_t idx) {
     indexOperand.imm.intVal = idx;
 
     buildInst(c, INST_SET_FIELD, indexOperand, NO_OPERAND, NO_OPERAND);
+}
+CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args) {
+    CometOperand funcValue = createOperand(CO_IMMEDIATE);
+    funcValue.imm.typeKind = COMET_SMALL;
+    funcValue.imm.smallVal = vtableIdx;
+
+    CometOperand returnValue = pushVal(c);
+
+    for (size_t argIdx = 0; argIdx < args.count; argIdx++) {
+        pushVal(c);
+    }
+
+    buildInst(c, INST_CALL_METHOD, funcValue, NO_OPERAND, NO_OPERAND);
+    return returnValue;
 }
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && !typeIsInt(after)) {

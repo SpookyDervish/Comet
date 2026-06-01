@@ -46,7 +46,8 @@ typedef enum {
     INST_DUP,
     INST_NEW,
     INST_GET_FIELD,
-    INST_SET_FIELD
+    INST_SET_FIELD,
+    INST_CALL_METHOD
 } CometInstType;
 
 typedef struct {
@@ -133,7 +134,7 @@ CometOperand buildLt(CometCompiler* c, CometType resultType);
 CometOperand buildGt(CometCompiler* c, CometType resultType);
 CometOperand buildLte(CometCompiler* c, CometType resultType);
 CometOperand buildGte(CometCompiler* c, CometType resultType);
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount);
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType);
 void buildReturn(CometCompiler* c);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
@@ -145,6 +146,7 @@ void buildDup(CometCompiler* c);
 CometOperand buildNew(CometCompiler* c, uint32_t idx);
 CometOperand buildGetField(CometCompiler* c, uint32_t idx);
 void buildSetField(CometCompiler* c, uint32_t idx);
+CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
 CometLabel* buildLabel(CometCompiler* c);

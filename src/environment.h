@@ -33,7 +33,7 @@ struct CometEnvironment {
 };
 
 
-CometEnvironment* newEnvironment(char* name, CometEnvironment* parent);
+CometEnvironment* newEnvironment(char* name, CometEnvironment* parent, bool isFunction);
 uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, CometType type, bool isMutable);
 Record* lookup(CometEnvironment* env, char* name);
 CometEnvironment* destroyEnv(CometEnvironment* env);

@@ -132,6 +132,7 @@ struct CometASTNode {
 
 // put a node on the heap
 CometASTNode* allocateNode(CometASTNode parent);
+void freeNode(CometASTNode* node);
 char* ASTNodeTypeToCStr(CometASTNodeType nodeType);
 
 #define AST_NODE(nodeType, ...) allocateNode((CometASTNode){nodeType, {.nodeType=(struct nodeType){__VA_ARGS__}}})

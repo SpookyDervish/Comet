@@ -37,7 +37,8 @@ typedef enum {
     INST_DUP,
     INST_NEW,
     INST_GET_FIELD,
-    INST_SET_FIELD
+    INST_SET_FIELD,
+    INST_CALL_METHOD
 } CometInstType;
 
 typedef struct {

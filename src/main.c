@@ -55,12 +55,14 @@ int main(int argc, char** argv) {
 
     ResultType(cometCompilerPtr, charptr) compiler = newCompiler();
     if (compiler.error) {
+        freeNode(ast.as.success);
         fprintf(stderr, "error while creating compiler: %s\n", ast.as.error);
         return 1;
     }
 
     ResultType(CometOperand, charptr) compileResult = compile(compiler.as.success, ast.as.success);
     if (compileResult.error) {
+        freeNode(ast.as.success);
         fprintf(stderr, "error while compiling: %s\n", compileResult.as.error);
         return 1;
     }
@@ -71,9 +73,12 @@ int main(int argc, char** argv) {
 
     ResultType(voidPtr, charptr) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath);
     if (writeSuccess.error) {
+        freeNode(ast.as.success);
         fprintf(stderr, "error while writing output: %s\n", writeSuccess.as.error);
         return 1;
     }
+
+    freeNode(ast.as.success);
 
     return 0;
 }

@@ -166,7 +166,7 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
 }
 
 ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node);
-ResultType(CometOperand, charptr) getFunction(CometCompiler* c, CometASTNode* node) {
+ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometASTNode* node, bool buildValues) {
     switch (node->nodeType) {
         case AST_IDENTIFIER: {
             char* varName = node->data.AST_IDENTIFIER.ident;
@@ -176,14 +176,19 @@ ResultType(CometOperand, charptr) getFunction(CometCompiler* c, CometASTNode* no
                 Estr errMsg = CREATE_ESTR("Undefined function \"");
                 APPEND_ESTR(errMsg, varName);
                 APPEND_ESTR(errMsg, "\"");
-                return Error(CometOperand, charptr, errMsg.str);
+                return Error(CometFunctionTypeInfo, charptr, errMsg.str);
             }
 
             if (varRecord->type.typeKind != COMET_FUNCTION) {
                 break;
             }
 
-            return Success(CometOperand, charptr, varRecord->value);
+            CometFunctionTypeInfo functionInfo = {
+                .funcType = FUNC_FUNC,
+                .value = varRecord->value
+            };
+
+            return Success(CometFunctionTypeInfo, charptr, functionInfo);
         }
 
         case AST_INFIX_EXPRESSION: {
@@ -194,25 +199,31 @@ ResultType(CometOperand, charptr) getFunction(CometCompiler* c, CometASTNode* no
 
             ResultType(CometType, charptr) structType = resolveType(c, expr.left);
             if (structType.error)
-                return Error(CometOperand, charptr, structType.as.error);
+                return Error(CometFunctionTypeInfo, charptr, structType.as.error);
 
-            ResultType(CometOperand, charptr) structValue = visitValue(c, expr.left);
-            if (structValue.error)
-                return structValue;
+            if (buildValues) {
+                ResultType(CometOperand, charptr) structValue = visitValue(c, expr.left);
+                if (structValue.error)
+                    return Error(CometFunctionTypeInfo, charptr, structValue.as.error);
+            }
 
-            int32_t methodIdx = getMethodIndex(c, *get(c->structs, structValue.as.success.imm.smallVal), fieldName);
+            int32_t methodIdx = getMethodIndex(c, structType.as.success.structType, fieldName);
 
-            CometOperand methodIdxValue = createOperand(CO_IMMEDIATE);
-            methodIdxValue.imm.typeKind = COMET_SMALL;
-            methodIdxValue.imm.smallVal = methodIdx;
+            CometOperand methodIdxValue = createOperand(CO_SYMBOL);
+            methodIdxValue.symbolIdx = methodIdx;
 
-            return Success(CometOperand, charptr, methodIdxValue);
+            CometFunctionTypeInfo methodInfo = {
+                .funcType = FUNC_METHOD,
+                .value = methodIdxValue
+            };
+
+            return Success(CometFunctionTypeInfo, charptr, methodInfo);
         }
 
         default: break;
     }
 
-    return Error(CometOperand, charptr, "Attempted to call something which isn't a function!");
+    return Error(CometFunctionTypeInfo, charptr, "Attempted to call something which isn't a function!");
 }
 
 ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
@@ -258,7 +269,6 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
                 case CT_DOT: {
                     if (leftType.as.success.typeKind != COMET_STRUCT) 
                         return Error(CometType, charptr, "Attempted to set field of something that isn't a struct!");
-                    
 
                     uint32_t fieldIndex = getFieldIndex(leftType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
                     buildGetField(c, fieldIndex);
@@ -320,8 +330,6 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
         case AST_INFIX_EXPRESSION: {
             struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
-            printNode(expr.left);
-            printf("\n");
             ResultType(CometType, charptr) left = resolveType(c, expr.left);
             if (left.error)
                 return left;
@@ -331,12 +339,37 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
                     return Success(CometType, charptr, COMET_DOUBLE);
 
                 case CT_DOT: { // get type of field
-                    printf("%d\n", left.as.success.typeKind);
                     if (left.as.success.typeKind != COMET_STRUCT) 
                         return Error(CometType, charptr, "Attemptted to get a field of something that isn't a struct!");
                     
-
                     char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
+
+                    ResultType(CometFunctionTypeInfo, charptr) funcInfo = getFunction(c, expr.right, false);
+                    if (!funcInfo.error) {
+                        // resolving type of method
+                        int32_t methodIdx = getMethodIndex(c, left.as.success.structType, fieldName);
+                        if (methodIdx == -1) {
+                            Estr errMsg = CREATE_ESTR("No such method \"");
+                            APPEND_ESTR(errMsg, fieldName);
+                            APPEND_ESTR(errMsg, "\" in struct \"");
+                            APPEND_ESTR(errMsg, left.as.success.structType->name);
+                            APPEND_ESTR(errMsg, "\"");
+
+                            return Error(CometType, charptr, errMsg.str);
+                        }
+
+                        CometMethod* method = left.as.success.structType->vtable[methodIdx];
+                        CometFunction* func = c->functions[method->symbolIdx];
+
+                        CometType funcType = {
+                            .typeKind = COMET_FUNCTION,
+                            .functionType = func
+                        };
+
+                        return Success(CometType, charptr, funcType);
+                    }
+
+                    
                     int32_t fieldIdx = getFieldIndex(left.as.success.structType, fieldName);
                     if (fieldIdx == -1) {
                         Estr errMsg = CREATE_ESTR("No such field \"");
@@ -365,6 +398,16 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
         case AST_ARG_DEF: {
             CometType argType = getType(c, node->data.AST_ARG_DEF.type->data.AST_IDENTIFIER.ident);
             return Success(CometType, charptr, argType);
+        }
+        case AST_FUNC_CALL: {
+            ResultType(CometFunctionTypeInfo, charptr) funcResult = getFunction(c, node->data.AST_FUNC_CALL.ident, false);
+            if (funcResult.error)
+                return Error(CometType, charptr, funcResult.as.error);
+
+            CometFunctionTypeInfo funcInfo = funcResult.as.success;
+            CometFunction* funcSymbol = c->functions[funcInfo.value.symbolIdx];
+
+            return Success(CometType, charptr, funcSymbol->returnType);
         }
 
         default: {
@@ -570,9 +613,11 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
+    // get return type
+    CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -580,7 +625,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     defineVar(c->env, funcName, RECORD_LOCAL, funcValue, funcType, false);
 
     // create the new scope for the function
-    CometEnvironment* funcEnv = newEnvironment(funcName, c->env);
+    CometEnvironment* funcEnv = newEnvironment(funcName, c->env, true);
     c->env = funcEnv;
 
     // define each argument in the functions scope
@@ -627,28 +672,26 @@ ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometAS
 }
 ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* node) {
     struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
-    
+
     ResultType(CometType, charptr) funcParentType = resolveType(c, funcCall.ident);
     if (funcParentType.error)
         return Error(CometOperand, charptr, funcParentType.as.error);
 
-    ResultType(CometOperand, charptr) funcVal = getFunction(c, funcCall.ident);
+    ResultType(CometFunctionTypeInfo, charptr) funcVal = getFunction(c, funcCall.ident, true);
     if (funcVal.error)
-        return funcVal;
+        return Error(CometOperand, charptr, funcVal.as.error);
 
+    CometFunction* func = c->functions[funcVal.as.success.value.imm.smallVal];
+    uint32_t neededArgCount = func->argCount;
 
-    printf("func parent type = %d\n", funcParentType.as.success.typeKind);
-    printf("funcVal = %s\n", cometOperandToCStr(c, funcVal.as.success));
-
-    /*uint32_t neededArgCount = c->functions[funcSymbolIndex]->argCount;
     if (funcCall.args.count < neededArgCount) {
         Estr errMsg = CREATE_ESTR("Not enough args passed to function \"");
-        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, func->name);
         APPEND_ESTR(errMsg, "\"");
         return Error(CometOperand, charptr, errMsg.str);
     } else if (funcCall.args.count > neededArgCount) {
         Estr errMsg = CREATE_ESTR("Too many args passed to function \"");
-        APPEND_ESTR(errMsg, funcName);
+        APPEND_ESTR(errMsg, func->name);
         APPEND_ESTR(errMsg, "\"");
         return Error(CometOperand, charptr, errMsg.str);
     }
@@ -664,9 +707,14 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
         append(funcCallArgs, argValue.as.success);
     }
 
-    CometOperand returnValue = buildCall(c, funcName, funcCallArgs);
-    return Success(CometOperand, charptr, returnValue);*/
-    return Success(CometOperand, charptr, NO_OPERAND);
+    CometOperand returnValue;
+    if (funcVal.as.success.funcType == FUNC_FUNC) {
+        returnValue = buildCall(c, func->name, funcCallArgs);
+    } else if (funcVal.as.success.funcType == FUNC_METHOD) {
+        returnValue = buildCallMethod(c, funcVal.as.success.value.imm.smallVal, funcCallArgs);
+    }
+
+    return Success(CometOperand, charptr, returnValue);
 }
 ResultType(CometOperand, charptr) visitIfStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_IF_STATEMENT ifStmt = node->data.AST_IF_STATEMENT;
@@ -719,7 +767,8 @@ ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometAST
     CometLabel* startLabel = buildLabel(c);
     CometLabel* endLabel = buildLabel(c);
 
-    
+    CometEnvironment* whileEnv = newEnvironment("whileLoop", c->env, false);
+    c->env = whileEnv;
 
     ResultType(CometOperand, charptr) condition = visitValue(c, whileStmt.expression);
     if (condition.error)
@@ -741,6 +790,8 @@ ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometAST
 
     resolveLabel(c, endLabel);
 
+    c->env = destroyEnv(whileEnv);
+
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNode* node) {
@@ -761,7 +812,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
     char* ident = forStmt.ident->data.AST_IDENTIFIER.ident;
 
     // create env for for loop
-    CometEnvironment* forLoopEnv = newEnvironment("", c->env);
+    CometEnvironment* forLoopEnv = newEnvironment("forLoop", c->env, false);
     c->env = forLoopEnv;
 
     // define iterator variable
@@ -825,10 +876,10 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType) {
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
-    buildFunction(c, constructorName, constDef.args.count + 1); // add 1 arg for self
+    buildFunction(c, constructorName, constDef.args.count + 1, structType); // add 1 arg for self
 
     // create the new scope for the function
-    CometEnvironment* funcEnv = newEnvironment("", c->env);
+    CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
     c->env = funcEnv;
 
     // define self
@@ -886,9 +937,11 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
+    // get return type
+    CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -896,7 +949,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     defineVar(c->env, funcName, RECORD_LOCAL, funcValue, funcType, false);
 
     // create the new scope for the function
-    CometEnvironment* funcEnv = newEnvironment(funcName, c->env);
+    CometEnvironment* funcEnv = newEnvironment(funcName, c->env, true);
     c->env = funcEnv;
 
     CometOperand selfVal = createOperand(CO_IMMEDIATE);
@@ -1021,6 +1074,7 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
                 APPEND_ESTR(newFuncName, function->name);
 
                 CometMethod* newMethod = malloc(sizeof(CometMethod));
+                memcpy(newMethod->name, function->name, strlen(function->name) + 1);
                 memcpy(function->name, newFuncName.str, newFuncName.size + 1);
                 newMethod->argCount = function->argCount;
                 newMethod->startIdx = function->startIdx,

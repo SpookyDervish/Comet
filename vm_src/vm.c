@@ -59,6 +59,7 @@ int max(int a, int b) {
 }
 
 void push(CometVM* vm, int64_t value) {
+    printf("pushing value: 0x%" PRIx64 "\n", value);
     (*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;
 }
@@ -80,18 +81,18 @@ char* stackAsString(int64_t* stack, uint32_t sp) {
 }
 
 char* stackTrace(CometVM* vm) {
-    Estr stackTrace = CREATE_ESTR("\nCall Stack (most recent call first):\n");
+    Estr stackTraceStr = CREATE_ESTR("\nCall Stack (most recent call first):\n");
 
-    for (size_t i = vm->callIdx; i > 0; i--) {
+    for (size_t i = vm->callIdx; i-- > 0;) {
         Frame* call = vm->callStack[i];
 
         char* funcBuffer = malloc(128);
         sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)  %s\n", call->ip, call->funcName, call->sp, stackAsString(call->stack, call->sp));
 
-        APPEND_ESTR(stackTrace, funcBuffer);
+        APPEND_ESTR(stackTraceStr, funcBuffer);
     }
 
-    return stackTrace.str;
+    return stackTraceStr.str;
 }
 
 int64_t getTop(CometVM* vm) {
@@ -188,10 +189,14 @@ void returnFromFunc(CometVM* vm) {
         return;
     }
 
+    printf("returning from function %s\n", funcFrame->funcName);
+    printf("stack before ret: %s\n", stackAsString(*vm->currentStack, *vm->currentSp));
+
 
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
     vm->currentSp = &vm->currentFrame->sp;
+    
     push(vm, funcFrame->stack[funcFrame->sp-1]);
 
     //vm->currentFrame->sp++;
@@ -454,12 +459,14 @@ ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
         case INST_STORE: {
             int64_t value = pop(vm);
             
+            printf("storing value: 0x%" PRIx64 " at index: 0x%" PRIx64 "\n", value, inst.a);
             vm->variables[inst.a] = value;
             break;
         } 
 
         case INST_LOAD: {
             int64_t value = vm->variables[inst.a];
+            printf("loading var at index: 0x%" PRIx64 "\n", value);
             push(vm, value);
             break;
         }

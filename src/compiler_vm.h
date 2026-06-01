@@ -25,6 +25,7 @@ typedef struct {
 } CometFile;
 
 Result(CometType, charptr);
+Result(CometFunctionTypeInfo, charptr);
 
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node);
 ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath);

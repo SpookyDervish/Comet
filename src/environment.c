@@ -1,9 +1,10 @@
 #include "environment.h"
 #include <stdint.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 
-CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
+CometEnvironment* newEnvironment(char* name, CometEnvironment* parent, bool isFunction) {
     // parent can be NULL if its the root environment
 
     CometEnvironment* env = (CometEnvironment*)malloc(sizeof(CometEnvironment));
@@ -12,6 +13,8 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent) {
     env->records = NULL;
 
     env->recordIdx = env->parent ? parent->recordIdx : 0;
+    env->argIdx = isFunction ? 0 : env->parent ? parent->argIdx : 0;
+
     return env;
 }
 
@@ -42,10 +45,14 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
     record->isMutable = isMutable;
     record->recordType = recordType;
 
+    printf("env name: %s\n", env->name);
+
     record->recordIdx = idx;
     if (recordType == RECORD_ARG) {
+        printf("defining arg %s at index: %d\n", name, idx);
         env->argIdx++;
     } else {
+        printf("defining var %s at index: %d\n", name, idx);
         increaseRecordIndex(env); // avoid index collisions
     }
 

@@ -37,4 +37,9 @@ typedef struct {
     };
 } CometOperand;
 
+typedef struct {
+    CometFunctionType funcType;
+    CometOperand value;
+} CometFunctionTypeInfo;
+
 #endif
