@@ -681,7 +681,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     if (funcVal.error)
         return Error(CometOperand, charptr, funcVal.as.error);
 
-    CometFunction* func = c->functions[funcVal.as.success.value.imm.smallVal];
+    CometFunction* func = c->functions[funcVal.as.success.value.symbolIdx];
     uint32_t neededArgCount = func->argCount;
 
     if (funcCall.args.count < neededArgCount) {
