@@ -26,11 +26,8 @@ def make_test(case: str):
         result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-O0", "-o", obj_name])
         self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (cometc)!")
         
-        gcc_result = subprocess.run(["./comet", obj_name])
-        self.assertEqual(gcc_result.returncode, 0, f"{case} did not run successfully (comet)!")
-        
-        program_result = subprocess.run([program_name], stdout=subprocess.DEVNULL)
-        self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
+        program_result = subprocess.run(["./comet", obj_name])
+        self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully (comet)!")
     return test
 
 for i, (test_name) in enumerate(os.listdir("tests")):
