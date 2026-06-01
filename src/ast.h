@@ -71,6 +71,7 @@ struct CometASTNode {
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
 
         struct AST_INFIX_EXPRESSION { CometASTNode* left; CometASTNode* right; CometToken op; } AST_INFIX_EXPRESSION;
+        struct AST_PREFIX_EXPRESSION { CometToken op; CometASTNode* right; } AST_PREFIX_EXPRESSION;
 
         struct AST_EXPRESSION_STATEMENT { CometASTNode* expression; } AST_EXPRESSION_STATEMENT;
         struct AST_ASSIGN_STATEMENT { CometASTNode* ident; CometASTNode* expression; CometASTNode* type; bool isMutable; FieldAttribute attrib; } AST_ASSIGN_STATEMENT;
