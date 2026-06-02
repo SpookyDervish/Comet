@@ -24,13 +24,14 @@ int main(int argc, char** argv) {
         return 0;
     }
 
+    clock_t startWarmup = clock();
     ResultType(vmPtr, charptr) newVm = newCometVM(args.as.success.filePath);
     if (newVm.error) {
         fprintf(stderr, "error while loading file: %s\n", newVm.as.error);
         return 1;
     }
-
-    clock_t start = clock();
+    
+    clock_t startExec = clock();
     ResultType(int, charptr) result = startVM(newVm.as.success);
     clock_t end = clock();
 
@@ -39,8 +40,10 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("Execution took %f seconds\n", time_spent);
+    double timeSpentTotal = (double)(end - startWarmup) / CLOCKS_PER_SEC;
+    double timeSpentExec = (double)(end - startExec) / CLOCKS_PER_SEC;
+    printf("Execution took %f seconds (warmup + exec)\n", timeSpentTotal);
+    printf("Execution took %f seconds (exec)\n", timeSpentExec);
 
     return result.as.success;
 }

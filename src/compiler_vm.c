@@ -62,7 +62,7 @@ int32_t getStructIndex(CometCompiler* c, char* structName) {
     return -1;
 }
 
-int32_t getMethodIndex(CometCompiler* c, CometStruct* structType, char* methodName) {
+int32_t getMethodIndex(CometStruct* structType, char* methodName) {
     for (size_t i = 0; i < structType->numMethods; i++) {
         if (strcmp(structType->vtable[i]->name, methodName) == 0) {
             return i;
@@ -226,7 +226,7 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
                     return Error(CometFunctionTypeInfo, charptr, structValue.as.error);
             }
 
-            int32_t methodIdx = getMethodIndex(c, structType.as.success.structType, fieldName);
+            int32_t methodIdx = getMethodIndex(structType.as.success.structType, fieldName);
 
             CometOperand methodIdxValue = createOperand(CO_SYMBOL);
             methodIdxValue.symbolIdx = structType.as.success.structType->vtable[methodIdx]->symbolIdx;
@@ -355,7 +355,7 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
 
             switch (expr.op.type) {
                 case CT_DIVIDE: // division always results in a double
-                    return Success(CometType, charptr, COMET_DOUBLE);
+                    return Success(CometType, charptr, {.typeKind = COMET_DOUBLE});
 
                 case CT_DOT: { // get type of field
                     if (left.as.success.typeKind != COMET_STRUCT) 
@@ -366,7 +366,7 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
                     ResultType(CometFunctionTypeInfo, charptr) funcInfo = getFunction(c, expr.right, false);
                     if (!funcInfo.error) {
                         // resolving type of method
-                        int32_t methodIdx = getMethodIndex(c, left.as.success.structType, fieldName);
+                        int32_t methodIdx = getMethodIndex(left.as.success.structType, fieldName);
                         if (methodIdx == -1) {
                             Estr errMsg = CREATE_ESTR("No such method \"");
                             APPEND_ESTR(errMsg, fieldName);
@@ -482,7 +482,7 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
-ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* infixExpr, CometOperand newValue) {
+ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* infixExpr) {
     struct AST_INFIX_EXPRESSION expr = infixExpr->data.AST_INFIX_EXPRESSION;
 
     ResultType(CometType, charptr) structType = visitLValue(c, expr.left);
@@ -538,7 +538,7 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
         return exprResult;
 
     if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident, exprResult.as.success);
+        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident);
     }
 
     
@@ -780,7 +780,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     CometOperand returnValue;
     if (funcVal.as.success.funcType == FUNC_FUNC) {
         returnValue = buildCall(c, func->name, funcCallArgs);
-    } else if (funcVal.as.success.funcType == FUNC_METHOD) {
+    } else { // FUNC_METHOD
         returnValue = buildCallMethod(c, funcVal.as.success.value.imm.smallVal, funcCallArgs);
     }
 
@@ -890,7 +890,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
     if (start.error)
         return Error(CometOperand, charptr, start.as.error);
 
-    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, start.as.success, startType.as.success, false);
+    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, start.as.success, resultType, false);
     buildStore(c, idx);
 
     resolveLabel(c, mainLabel);

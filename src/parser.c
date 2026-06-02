@@ -506,9 +506,6 @@ void printNode(CometASTNode* node) {
 
 // -- EXPRESSION METHODS -- //
 ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPrecedenceType precedence) {
-
-
-    printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
     ResultType(prefixFuncType, charptr) prefixFunc = getPrefixFunc(parser->currentToken->type);
 
     if (prefixFunc.error) {
@@ -522,10 +519,7 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
 
     ResultType(astNodePtr, charptr) leftExpr = prefixFunc.as.success(parser);
 
-    printf("peek precedence: %d\n", peekPrecedence(parser));
-
     while (precedence < peekPrecedence(parser)) {
-        printf("peek token: %s\n", tokenToCStr(*parser->peekToken));
         ResultType(infixFuncType, charptr) infixFunc = getInfixFunc(parser->peekToken->type);
 
         if (infixFunc.error)
@@ -538,29 +532,16 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
         leftExpr = infixFunc.as.success(parser, leftExpr.as.success);
     }
 
-    printf("parsed expr:");
-    printNode(leftExpr.as.success);
-    printf("\n");
-
     return leftExpr;
 }
 
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left) {
-    printf("asdasdasdasdasDasdasd = %s, %d\n", tokenToCStr(*parser->currentToken), currentTokenIsAssignment(parser));
     if (currentTokenIsAssignment(parser)) {
         CometToken op = *parser->currentToken;
 
         parserNextToken(parser);
 
-        printf("expr start tok = %s\n", tokenToCStr(*parser->currentToken));
-
         ResultType(astNodePtr, charptr) right = parseExpression(parser, PRECEDENCE_LOWEST);
-
-        printf("parsed reassign = ");
-        printNode(right.as.success);
-        printf("\n");
-
-        printf("new current tok = %s\n", tokenToCStr(*parser->currentToken));
 
         CometASTNode* assign = AST_NODE(AST_REASSIGN_STATEMENT, left, right.as.success, op);
         return Success(astNodePtr, charptr, assign);
@@ -680,7 +661,7 @@ ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
 }
 
 ResultType(astNodePtr, charptr) parsePrefixExpression(CometParser* parser) {
-    CometASTNode* expr = AST_NODE(AST_PREFIX_EXPRESSION, *parser->currentToken);
+    CometASTNode* expr = AST_NODE(AST_PREFIX_EXPRESSION, *parser->currentToken, NULL);
 
     parserNextToken(parser);
 

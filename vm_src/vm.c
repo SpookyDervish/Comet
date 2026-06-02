@@ -15,7 +15,7 @@
 CometFile* getFileContents(const char* filename) {
     // https://stackoverflow.com/questions/3747086/reading-the-whole-text-file-into-a-char-array-in-c
     FILE* fp;
-    long lSize;
+    size_t lSize;
     CometFile* file;
 
     fp = fopen(filename, "rb");
@@ -132,6 +132,8 @@ void pushImm(CometVM* vm, CometImmediate imm) {
             break;
         }
         case COMET_BOOL: push(vm, (int64_t)imm.boolVal); break;
+        case COMET_STRUCT: push(vm, (int64_t)imm.objectVal); break;
+        case COMET_FUNCTION: push(vm, (int64_t)imm.smallVal); break;
         case COMET_VOID: break;
     }
 }
@@ -600,7 +602,6 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
     size_t constantsTableSize = sizeof(CometOperand) * loadedFile->numConsts;
     size_t functionsTableSize = sizeof(CometSerializedFunc) * loadedFile->numFunctions;
-    size_t structsTableSize = sizeof(CometSerializedStruct) * loadedFile->numStructs;
 
     // constants
     memcpy(newVM->constants,
