@@ -496,7 +496,9 @@ void printNode(CometASTNode* node) {
             }
             printf("\n");
             break;
-
+        case AST_BREAKPOINT_STATEMENT:
+            printf("breakpoint\n");
+            break;
 
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
@@ -1213,6 +1215,11 @@ ResultType(astNodePtr, charptr) parseImportStatement(CometParser* parser) {
     return Success(astNodePtr, charptr, stmt);
 }
 
+ResultType(astNodePtr, charptr) parseBreakpointStatement(CometParser* parser) {
+    CometASTNode* stmt = AST_NODE(AST_BREAKPOINT_STATEMENT);
+    return Success(astNodePtr, charptr, stmt);
+}
+
 ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -1247,6 +1254,8 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute
          return parseOverrideStatement(parser, fieldAttrib);
     } else if (strcmp(keyword, "import") == 0) {
         return parseImportStatement(parser);
+    } else if (strcmp(keyword, "breakpoint") == 0) {
+        return parseBreakpointStatement(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);

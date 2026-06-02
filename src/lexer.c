@@ -28,7 +28,8 @@ const char* KEYWORDS[] = {
     "else",
     "break",
     "continue",
-    "new"
+    "new",
+    "breakpoint"
 };
 
 #define TOKEN_LITERAL(tokType, tokValue) (CometToken){ .literalType = CL_STRING, .type = tokType, .value.literal = tokValue }

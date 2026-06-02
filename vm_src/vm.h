@@ -22,6 +22,8 @@ typedef struct {
     int64_t** currentStack;
 
     uint32_t numFunctions;
+
+    uint64_t numInstructions;
     CometSerializedInst* instructions;
 
     CometSerializedFunc* functions;

@@ -495,6 +495,10 @@ ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
+    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (exprResult.error)
+        return exprResult;
+
     if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
         return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident);
     }
@@ -536,9 +540,6 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
         return Error(CometOperand, charptr, errMsg.str);
     }
 
-    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
-    if (exprResult.error)
-        return exprResult;
 
     
 
@@ -1214,6 +1215,10 @@ ResultType(CometOperand, charptr) visitNewStatement(CometCompiler* c, CometASTNo
     // return
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitBreakpointStatement(CometCompiler* c) {
+    buildBreakpoint(c);
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 // -- MAIN -- //
 ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath) {
@@ -1301,6 +1306,8 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitStructDefStatement(c, node);
         case AST_NEW_STATEMENT:
             return visitNewStatement(c, node);
+        case AST_BREAKPOINT_STATEMENT:
+            return visitBreakpointStatement(c);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

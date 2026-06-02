@@ -153,6 +153,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_GET_FIELD    : return "    GET_FIELD       ";
         case INST_SET_FIELD    : return "    SET_FIELD       ";
         case INST_CALL_METHOD  : return "    CALL_METHOD     ";
+        case INST_BREAKPOINT   : return "    BREAKPOINT      ";
         default                : return "    FIXME           ";
     }
 }
@@ -705,6 +706,9 @@ CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOpe
 
     buildInst(c, INST_CALL_METHOD, funcValue, NO_OPERAND, NO_OPERAND);
     return returnValue;
+}
+void buildBreakpoint(CometCompiler* c) {
+    buildInst(c, INST_BREAKPOINT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && !typeIsInt(after)) {

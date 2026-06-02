@@ -48,6 +48,7 @@ typedef enum {
     INST_GET_FIELD,
     INST_SET_FIELD,
     INST_CALL_METHOD,
+    INST_BREAKPOINT,
     INST_MAX
 } CometInstType;
 
@@ -148,6 +149,7 @@ CometOperand buildNew(CometCompiler* c, uint32_t idx);
 CometOperand buildGetField(CometCompiler* c, uint32_t idx);
 void buildSetField(CometCompiler* c, uint32_t idx);
 CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args);
+void buildBreakpoint(CometCompiler* c);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
 CometLabel* buildLabel(CometCompiler* c);

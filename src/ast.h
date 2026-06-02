@@ -45,6 +45,7 @@ typedef enum {
     AST_NEW_STATEMENT,
     AST_OVERRIDE_STATEMENT,
     AST_IMPORT_STATEMENT,
+    AST_BREAKPOINT_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION,
@@ -128,6 +129,7 @@ struct CometASTNode {
         struct AST_IMPORT_STATEMENT {
             List(astNodePtr) importChain; // import chain. first item is the top level import
         } AST_IMPORT_STATEMENT;
+        struct AST_BREAKPOINT_STATEMENT {} AST_BREAKPOINT_STATEMENT;
 
     } data;  
 };

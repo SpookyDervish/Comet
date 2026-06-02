@@ -1,6 +1,3 @@
-#include "vm.h"
-#include "args.h"
-#include "../include/operand.h"
 #include "serialized.h"
 #include <assert.h>
 #include <inttypes.h>
@@ -10,7 +7,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "vm.h"
+#include "args.h"
+#include "../include/operand.h"
 #include "../lib/estr.h"
+#include "debugger.h"
 
 // For Clang and GCC on macOS
 #define FORCE_INLINE __attribute__((always_inline)) static inline
@@ -64,37 +65,6 @@ static inline int max(int a, int b) {
 FORCE_INLINE void push(CometVM* vm, int64_t value) {
     (*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;
-}
-
-char* stackAsString(int64_t* stack, uint32_t sp) {
-    Estr stackString = CREATE_ESTR("[");
-
-    for (size_t i = 0; i < sp; i++) {
-
-        char* buffer = malloc(64);
-
-        sprintf(buffer, "0x%" PRIx64 "%s", stack[i], i < sp-1 ? ", " : "");
-        APPEND_ESTR(stackString, buffer);
-    }
-
-    APPEND_ESTR(stackString, "]");
-
-    return stackString.str;
-}
-
-char* stackTrace(CometVM* vm) {
-    Estr stackTraceStr = CREATE_ESTR("\nCall Stack (most recent call first):\n");
-
-    for (size_t i = vm->callIdx; i-- > 0;) {
-        Frame* call = vm->callStack[i];
-
-        char* funcBuffer = malloc(128);
-        sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)  %s\n", call->ip, call->funcName, call->sp, stackAsString(call->stack, call->sp));
-
-        APPEND_ESTR(stackTraceStr, funcBuffer);
-    }
-
-    return stackTraceStr.str;
 }
 
 static inline int64_t getTop(CometVM* vm) {
@@ -250,7 +220,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&NEW,
         &&GET_FIELD,
         &&SET_FIELD,
-        &&CALL_METHOD
+        &&CALL_METHOD,
+        &&BREAKPOINT
     };
 
     #define DISPATCH() if (!vm->running) {return Success(voidPtr, charptr, NULL);} inst = fetchNextInst(vm); if (inst.opcode < 0 || inst.opcode > INST_MAX) { return invalidInstruction(inst); } goto *dispatchTable[inst.opcode];
@@ -563,6 +534,10 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         callFunction(vm, func);
         DISPATCH();
     }
+    BREAKPOINT: {
+        startDebugger(vm);
+        DISPATCH();
+    }
 
 
     return Success(voidPtr, charptr, NULL);
@@ -663,6 +638,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->numConstants = loadedFile->numConsts;
     newVM->numFunctions = loadedFile->numFunctions;
     newVM->numStructs = loadedFile->numStructs;
+    newVM->numInstructions = loadedFile->numInstructions;
     newVM->variables = calloc(256, sizeof(int64_t));
     newVM->callStack = calloc(128, sizeof(Frame));
     newVM->currentSp = NULL;

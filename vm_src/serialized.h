@@ -39,6 +39,7 @@ typedef enum {
     INST_GET_FIELD,
     INST_SET_FIELD,
     INST_CALL_METHOD,
+    INST_BREAKPOINT,
     INST_MAX
 } CometInstType;
 

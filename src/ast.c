@@ -124,6 +124,7 @@ void freeNode(CometASTNode* node) {
             freeNode(node->data.AST_FOR_STATEMENT.type);
             break;
         }
+        case AST_BREAKPOINT_STATEMENT: break;
 
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));
@@ -174,6 +175,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_OVERRIDE_STATEMENT";
         case AST_IMPORT_STATEMENT:
             return "AST_IMPORT_STATEMENT";
+        case AST_BREAKPOINT_STATEMENT:
+            return "AST_BREAKPOINT_STATEMENT";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";

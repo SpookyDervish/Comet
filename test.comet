@@ -1,9 +1,16 @@
-func main() -> int {
-    mut int x = 0
-    
-    for int i in 0 .. 1000000 {
-        x += i
-    }
+struct Foo {
+    int x
 
-    return x
+    init(int x) {
+        self.x = x
+    }
+}
+
+func main() -> int {
+    Foo foo = new Foo(123)
+    foo.x = 50
+
+    breakpoint
+
+    return foo.x
 }
