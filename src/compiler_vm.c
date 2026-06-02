@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "parser.h"
 
 
 // -- HELPER METHODS -- //
@@ -496,6 +495,10 @@ ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
+    if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
+        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    }
+
     ResultType(CometType, charptr) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
     if (varType.error)
         return Error(CometOperand, charptr, varType.as.error);
@@ -536,10 +539,6 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
     ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
-
-    if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident);
-    }
 
     
 

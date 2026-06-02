@@ -166,7 +166,8 @@ bool currentTokenIsAssignment(CometParser* parser) {
         CT_TIMES_EQ,
         CT_DIVIDE_EQ,
         CT_MOD_EQ,
-        CT_POW_EQ
+        CT_POW_EQ,
+        CT_EQ
     };
 
     for (size_t i = 0; i < sizeof(assignmentOperators)/sizeof(assignmentOperators[0]); i++) {
