@@ -114,6 +114,15 @@ void freeNode(CometASTNode* node) {
             freeNode(node->data.AST_RETURN_STATEMENT.expression);
             break;
         }
+        case AST_FOR_STATEMENT: {
+            freeNode(node->data.AST_FOR_STATEMENT.start);
+            freeNode(node->data.AST_FOR_STATEMENT.end);
+            freeNode(node->data.AST_FOR_STATEMENT.step);
+            freeNode(node->data.AST_FOR_STATEMENT.ident);
+            freeNode(node->data.AST_FOR_STATEMENT.program);
+            freeNode(node->data.AST_FOR_STATEMENT.type);
+            break;
+        }
 
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));
