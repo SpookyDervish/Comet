@@ -4,6 +4,7 @@
 #include "../lib/ansi.h"
 #include "serialized.h"
 #include "vm.h"
+#include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -96,13 +97,28 @@ ResultType(voidPtr, charptr) continueHandler(CometDebugger* dbgr, int argc, char
     return Success(voidPtr, charptr, NULL);
 }
 
+ResultType(voidPtr, charptr) breakHandler(CometDebugger* dbgr, int argc, char** argv) {
+    if (argc < 1) 
+        return Error(voidPtr, charptr, "1 arg required");
+    return Success(voidPtr, charptr, NULL);
+    
+}   
+
 ResultType(voidPtr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** argv) {
 
     if (argc < 1) {
         dbgr->vm->instructionsLeftToExec = 1;
     } else {
-        uint64_t value = strtoul(argv[0], NULL, 0);
-        if (value == 0) {
+        char* end;
+        errno = 0;
+        uint64_t value = strtoul(argv[0], &end, 0);
+
+        bool ok =
+            errno == 0 &&
+            end != argv[0] &&
+            *end == '\0';
+
+        if (!ok) {
             return Error(voidPtr, charptr, "invalid number input!");
         }
 
@@ -182,7 +198,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"help", helpHandler, "display a list of all commnads or get help about a specific command", "h | h <command>", helpAliases},
     {"quit", NULL, "exit the debugger and stop the vm", "q", quitAliases},
     {"disassemble", disassembleHandler, "disassemble a line or range of lines", "d | d <line> | d <start>:<end>", disassembleAliases},
-    {"break", NULL, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
+    {"break", breakHandler, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
     {"unbreak", NULL, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
     {"stack", NULL, "display the current state of the stack", "st | st <index>", stackAliases},
     {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
