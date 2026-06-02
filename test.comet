@@ -1,9 +1,9 @@
 func main() -> int {
     mut int x = 0
     
-    while true {
-        x += 1
+    for int i in 0 .. 1000000 {
+        x += i
     }
 
-    return 0
+    return x
 }
