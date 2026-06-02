@@ -500,18 +500,6 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
     if (varType.error)
         return Error(CometOperand, charptr, varType.as.error);
 
-    ResultType(CometType, charptr) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
-    if (exprType.error)
-        return Error(CometOperand, charptr, exprType.as.error);
-
-    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
-    if (exprResult.error)
-        return exprResult;
-
-    if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident, exprResult.as.success);
-    }
-    
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
     Record* varRecord = lookup(c->env, ident);
@@ -519,14 +507,6 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
         Estr errMsg = CREATE_ESTR("Cannot reassign undefined variable \"");
         APPEND_ESTR(errMsg, ident);
         APPEND_ESTR(errMsg, "\"");
-        return Error(CometOperand, charptr, errMsg.str);
-    }
-
-    CometType resultType = unifyType(varType.as.success, exprType.as.success);
-    if (resultType.typeKind != varType.as.success.typeKind) {
-        Estr errMsg = CREATE_ESTR("Attempted to reassign type of variable \"");
-        APPEND_ESTR(errMsg, ident);
-        APPEND_ESTR(errMsg, "\" at runtime!");
         return Error(CometOperand, charptr, errMsg.str);
     }
 
@@ -540,6 +520,28 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
     if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
         buildLoad(c, varRecord->recordIdx);
     }
+
+    ResultType(CometType, charptr) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
+    if (exprType.error)
+        return Error(CometOperand, charptr, exprType.as.error);
+
+    CometType resultType = unifyType(varType.as.success, exprType.as.success);
+    if (resultType.typeKind != varType.as.success.typeKind) {
+        Estr errMsg = CREATE_ESTR("Attempted to reassign type of variable \"");
+        APPEND_ESTR(errMsg, ident);
+        APPEND_ESTR(errMsg, "\" at runtime!");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    if (exprResult.error)
+        return exprResult;
+
+    if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
+        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident, exprResult.as.success);
+    }
+
+    
 
     switch (node->data.AST_REASSIGN_STATEMENT.op.type) {
         case CT_PLUS_EQ: {
