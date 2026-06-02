@@ -4,6 +4,10 @@ struct Foo {
     init(int x) {
         self.x = x
     }
+
+    func test() -> int {
+        return self.x
+    }
 }
 
 func main() -> int {
@@ -12,5 +16,5 @@ func main() -> int {
 
     breakpoint
 
-    return foo.x
+    return foo.test()
 }

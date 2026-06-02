@@ -96,10 +96,6 @@ ResultType(cometCompilerPtr, charptr) newCompiler();
 
 bool typesAreEqual(CometType a, CometType b);
 
-char* cometImmediateToCStr(CometImmediate immediate);
-char* cometOperandToCStr(CometCompiler* c ,CometOperand operand);
-char* cometInstructionToCStr(CometCompiler* c, CometInst inst);
-char* cometInstOpcodeToCStr(CometInstType instType);
 
 CometType getValueType(CometCompiler* c, CometOperand value);
 

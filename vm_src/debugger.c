@@ -10,10 +10,36 @@
 #include <string.h>
 #include <inttypes.h>
 
+
+
 ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
     if (argc < 1) {
         return Error(voidPtr, charptr, "command needs 1 arg");
     }
+
+    Range range = parseRange(argv[0]);
+
+    if (range.start < 0) {
+        return Error(voidPtr, charptr, "can't start disassembly at negative address!");
+    }
+
+    if (range.start > range.end) {
+        uint32_t newEnd = range.start;
+        range.start = range.end;
+        range.end = newEnd;
+    }
+
+    for (size_t i = range.start; i <= range.end; i++) {
+        if (i >= dbgr->vm->numInstructions) {
+            printf("0x%04lx    ??? (outside bytecode)\n", i);
+            break;
+        }
+
+        printf("%s\n", cometInstructionToCStr(dbgr->vm, dbgr->vm->instructions[i], i));
+    }
+    
+
+    return Success(voidPtr, charptr, NULL);
 }
 
 ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
@@ -105,7 +131,33 @@ ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** a
     return Success(voidPtr, charptr, NULL);
 }
 
+Range parseRange(const char* str) {
+    Range r = {0};
 
+    char* colon = strchr(str, ':');
+
+    if (!colon) {
+        // single value: "3"
+        r.start = strtoul(str, NULL, 0);
+        r.end = r.start;
+        r.hasEnd = 0;
+        return r;
+    }
+
+    // split in-place copy (safe version uses temp buffer)
+    char buf[64];
+    strncpy(buf, str, sizeof(buf));
+    buf[63] = '\0';
+
+    char* c = strchr(buf, ':');
+    *c = '\0';
+
+    r.start = strtoul(buf, NULL, 0);
+    r.end = strtoul(c + 1, NULL, 0);
+    r.hasEnd = 1;
+
+    return r;
+}
 
 char* cometImmediateToCStr(CometImmediate immediate) {
     switch (immediate.typeKind) {
