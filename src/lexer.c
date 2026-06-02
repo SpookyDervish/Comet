@@ -434,6 +434,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 }
 
                 append(tokens, TOKEN_LITERAL(CT_TIMES, "+"));
+                break;
             }
             case '/': {
                 ResultType(char, charptr) eq = lexerPeek(lexer);
@@ -445,6 +446,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 }
 
                 append(tokens, TOKEN_LITERAL(CT_TIMES, "/"));
+                break;
             }
             case '%': {
                 ResultType(char, charptr) eq = lexerPeek(lexer);
@@ -456,6 +458,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 }
 
                 append(tokens, TOKEN_LITERAL(CT_MOD, "%"));
+                break;
             }
             case '^': {
                 ResultType(char, charptr) eq = lexerPeek(lexer);
@@ -467,6 +470,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 }
 
                 append(tokens, TOKEN_LITERAL(CT_POW_EQ, "^"));
+                break;
             }
 
             case ',': append(tokens, TOKEN_LITERAL(CT_COMMA, ",")) break;

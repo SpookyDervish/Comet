@@ -589,7 +589,7 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, Come
     newFunction->returnType = returnType;
     newFunction->isMethod = isMethod;
 
-    strncpy(newFunction->name, name, 32);
+    strncpy(newFunction->name, name, 31);
     newFunction->startIdx = c->programIdx;
 
     c->functions[c->functionCount] = newFunction;
