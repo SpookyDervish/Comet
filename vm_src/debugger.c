@@ -11,13 +11,23 @@
 #include <inttypes.h>
 
 ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
-
+    if (argc < 1) {
+        return Error(voidPtr, charptr, "command needs 1 arg");
+    }
 }
 
 ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
+
+static const char* helpAliases[] = {"h", NULL};
+static const char* disassembleAliases[] = {"d", NULL};
+static const char* breakAliases[] = {"b", NULL};
+static const char* unbreakAliases[] = {"ubreak", "u", "ub", NULL};
+
 const CometDebugCommand DBGR_COMMANDS[] = {
     {"help", helpHandler, "display a list of all commnads", "h | h <command>", helpAliases},
     {"disassemble", disassembleHandler, "disassemble a line", "d <line> | d <start>:<end>", disassembleAliases},
+    {"break", NULL, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
+    {"unbreak", NULL, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
 };
 
 const CometDebugCommand* getCommandByName(char* cmdName) {
@@ -39,7 +49,7 @@ const CometDebugCommand* getCommandByName(char* cmdName) {
                 break;
             }
 
-            
+            aliasIdx++;
         }
     }
 
@@ -55,6 +65,8 @@ void printAliases(CometDebugCommand cmd) {
         }
 
         printf("%s, ", cmd.aliases[aliasIdx]);
+
+        aliasIdx++;
     }
 }
 
@@ -473,7 +485,7 @@ ResultType(voidPtr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
 
     ResultType(voidPtr, charptr) cmdResult = cmd->handler(dbgr, argc - 1, &argv[1]);
     if (cmdResult.error) {
-        fprintf(stderr, "%s: %s\n", argv[0], cmdResult.as.error);
+        fprintf(stderr, "%s: %s\n", cmd->name, cmdResult.as.error);
     }
 
     return Success(voidPtr, charptr, NULL);

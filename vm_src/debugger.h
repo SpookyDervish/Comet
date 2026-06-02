@@ -29,7 +29,4 @@ void startDebugger(CometVM* vm);
 char* stackTrace(CometVM* vm);
 char* stackAsString(int64_t* stack, uint32_t sp);
 
-static const char* helpAliases[] = {"h", NULL};
-static const char* disassembleAliases[] = {"d", NULL};
-
 #endif
