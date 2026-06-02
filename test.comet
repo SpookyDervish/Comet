@@ -2,7 +2,6 @@ struct Foo {
     int x
 
     init(int x) {
-        breakpoint
         self.x = x
     }
 
@@ -14,6 +13,8 @@ struct Foo {
 func main() -> int {
     Foo foo = new Foo(123)
     foo.x = 50
+
+    breakpoint
 
     return foo.test()
 }

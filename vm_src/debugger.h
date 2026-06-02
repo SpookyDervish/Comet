@@ -10,16 +10,23 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../lib/error.h"
-
-typedef struct {
-    CometVM* vm;
-} CometDebugger;
+#include "../lib/list.h"
 
 typedef struct {
     int hasEnd;
     uint32_t start;
     uint32_t end;
 } Range;
+
+struct DebuggerBreakpoint {
+    uint64_t address;
+    uint8_t id;
+};
+
+typedef struct {
+    CometVM* vm;
+    List(DebuggerBreakpoint)* breakpoints;
+} CometDebugger;
 
 typedef struct {
     const char* name;

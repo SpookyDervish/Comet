@@ -20,18 +20,16 @@ static inline int64_t min(int64_t a, int64_t b) {
 }
 
 ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
+    // get range to display
     Range range;
     if (argc < 1) {
         range = (Range){
             .start = max(dbgr->vm->currentFrame->ip - 5, 0),
-            .end = min(dbgr->vm->currentFrame->ip + 4, dbgr->vm->numInstructions-1)
+            .end = min(dbgr->vm->currentFrame->ip + 5, dbgr->vm->numInstructions-1)
         };
     } else {
         range = parseRange(argv[0]);
     }
-
-     
-
     if (range.start < 0) {
         return Error(voidPtr, charptr, "can't start disassembly at negative address!");
     }
@@ -42,21 +40,37 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
         range.end = newEnd;
     }
 
+    // go from start of range to end
     for (size_t i = range.start; i <= range.end; i++) {
-        
 
-        if (i < dbgr->vm->currentFrame->ip) {
+        // display breakpoints
+        bool isAtBreakpoint = false;
+        for (size_t bpIdx = 0; bpIdx < dbgr->breakpoints->count; bpIdx++) {
+            if (i == (*get((*dbgr->breakpoints), bpIdx)).address) {
+                printf(ESC_DIM " [" ESC_RESET ESC_BOLD ESC_BOLD ESC_RED_FG "B" ESC_RESET ESC_DIM "] " ESC_RESET);
+                isAtBreakpoint = true;
+                break;
+            }
+        }
+
+        if (!isAtBreakpoint)
+            printf("     ");
+
+        
+        // if...
+        if (i < dbgr->vm->currentFrame->ip-1) {                   // below current address? dim
             printf(ESC_DIM "    ");
-        } else if (i == dbgr->vm->currentFrame->ip) {
+        } else if (i == dbgr->vm->currentFrame->ip-1) {           // at current address? bright green
             printf(ESC_BOLD ESC_BRIGHT_GREEN_FG " -> ");
-        } else {
+        } else {                                                // after current address? normal colour
             
             printf("    ");
 
             
         }
 
-        // some instructions have a special colour to make it easier to spot loops
+        // some instructions have a special colour to make it easier to
+        // spot loops and that kind of thing
         switch (dbgr->vm->instructions[i].opcode) {
             case INST_JMP:
             case INST_JMP_IF_FALSE:
@@ -71,6 +85,7 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
                 break;
         }
 
+        // make sure we dont read garbage
         if (i >= dbgr->vm->numInstructions) {
             
 
@@ -78,6 +93,7 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
             break;
         }
 
+        // print the instruction
         printf("%s\n" ESC_RESET, cometInstructionToCStr(dbgr->vm, dbgr->vm->instructions[i], i));
     }
     
@@ -119,6 +135,7 @@ int tokenize(char* line, char** argv, int maxArgs) {
     return argc;
 }
 
+/// !==== INSTRUCTIONS ====! ///
 static const char* helpAliases[] = {"h", NULL};
 static const char* disassembleAliases[] = {"d", NULL};
 static const char* breakAliases[] = {"b", NULL};
@@ -128,10 +145,12 @@ static const char* localAliases[] = {"l", NULL};
 static const char* structsAliases[] = {"ls", NULL};
 static const char* stepAliases[] = {"s", NULL};
 static const char* continueAliases[] = {"c", "cont", NULL};
+static const char* quitAliases[] = {"q", "stop", "exit", NULL};
 
 ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
 const CometDebugCommand DBGR_COMMANDS[] = {
     {"help", helpHandler, "display a list of all commnads or get help about a specific command", "h | h <command>", helpAliases},
+    {"quit", NULL, "exit the debugger and stop the vm", "q", quitAliases},
     {"disassemble", disassembleHandler, "disassemble a line or range of lines", "d | d <line> | d <start>:<end>", disassembleAliases},
     {"break", NULL, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
     {"unbreak", NULL, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
@@ -141,6 +160,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"step", NULL, "execute next instruction", "s | s <numInstructions>", stepAliases},
     {"continue", NULL, "continue execution", "c", continueAliases},
 };
+/// !==== END OF INSTRUCTIONS ====! ///
 
 const CometDebugCommand* getCommandByName(char* cmdName) {
     for (size_t i = 0; i < sizeof(DBGR_COMMANDS)/sizeof(DBGR_COMMANDS[0]); i++) {
@@ -224,8 +244,9 @@ void debuggerLoop(CometDebugger* dbgr) {
 void startDebugger(CometVM* vm) {
     CometDebugger* newDbgr = malloc(sizeof(CometDebugger));
     newDbgr->vm = vm;
+    newDbgr->breakpoints = &vm->breakpoints;
 
-    printf(ESC_BOLD ESC_CYAN_FG "\nBREAKPOINT - COMET DEBUGGER" ESC_RESET "\n");
+    printf(ESC_BOLD ESC_CYAN_FG "\n!--- BREAKPOINT - COMET DEBUGGER ---!" ESC_RESET "\n");
     printf(ESC_BOLD "VM State:\n" ESC_RESET);
     printf("    - IP: 0x%016lx\n", vm->currentFrame->ip);
     printf("    - Current Inst: %s\n", cometInstructionToCStr(vm, vm->instructions[vm->currentFrame->ip], vm->currentFrame->ip));

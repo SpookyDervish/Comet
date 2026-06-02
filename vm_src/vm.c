@@ -62,14 +62,23 @@ static inline int max(int a, int b) {
     return (a > b) ? a : b;
 }
 
-FORCE_INLINE void push(CometVM* vm, int64_t value) {
+void createBreakpoint(CometVM* vm) {
+    DebuggerBreakpoint newBp = {
+        .address = vm->currentFrame->ip - 1,
+        .id = vm->nextBreakpointID++
+    };
+
+    append(vm->breakpoints, newBp);
+}
+
+FORCE_INLINE void pushValue(CometVM* vm, int64_t value) {
     (*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;
 }
 
 static inline int64_t getTop(CometVM* vm) {
     if ((*vm->currentSp) <= 0) {
-        fprintf(stderr, "Attempted to pop top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
+        fprintf(stderr, "Attempted to popValue top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
         fprintf(stderr, "%s\n", stackTrace(vm));
         assert(false);
     }
@@ -77,7 +86,7 @@ static inline int64_t getTop(CometVM* vm) {
     return (*vm->currentStack)[(*vm->currentSp)-1];
 }
 
-FORCE_INLINE int64_t pop(CometVM* vm) {
+FORCE_INLINE int64_t popValue(CometVM* vm) {
     int64_t value = getTop(vm);
     *vm->currentSp -= 1;
     return value;
@@ -89,24 +98,24 @@ CometOperand getConst(CometVM* vm, uint32_t idx) {
 
 void pushImm(CometVM* vm, CometImmediate imm) {
     switch (imm.typeKind) {
-        case COMET_SMALL: push(vm, (int64_t)imm.smallVal); break;
-        case COMET_INT: push(vm, (int64_t)imm.intVal); break;
-        case COMET_BIG: push(vm, (int64_t)imm.bigVal); break;
+        case COMET_SMALL: pushValue(vm, (int64_t)imm.smallVal); break;
+        case COMET_INT: pushValue(vm, (int64_t)imm.intVal); break;
+        case COMET_BIG: pushValue(vm, (int64_t)imm.bigVal); break;
         case COMET_FLOAT: {
             int64_t casted;
             memcpy(&casted, &imm.floatVal, sizeof(float));
-            push(vm, casted);
+            pushValue(vm, casted);
             break;
         }
         case COMET_DOUBLE: {
             int64_t casted;
             memcpy(&casted, &imm.doubleVal, sizeof(double));
-            push(vm, casted);
+            pushValue(vm, casted);
             break;
         }
-        case COMET_BOOL: push(vm, (int64_t)imm.boolVal); break;
-        case COMET_STRUCT: push(vm, (int64_t)imm.objectVal); break;
-        case COMET_FUNCTION: push(vm, (int64_t)imm.smallVal); break;
+        case COMET_BOOL: pushValue(vm, (int64_t)imm.boolVal); break;
+        case COMET_STRUCT: pushValue(vm, (int64_t)imm.objectVal); break;
+        case COMET_FUNCTION: pushValue(vm, (int64_t)imm.smallVal); break;
         case COMET_VOID: break;
     }
 }
@@ -141,7 +150,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     callFrame->ip = function->startIdx;
 
     for (size_t i = function->numArgs; i > 0; i--) {
-        callFrame->args[i - 1] = pop(vm);
+        callFrame->args[i - 1] = popValue(vm);
     }
 
     vm->callStack[vm->callIdx] = callFrame;
@@ -166,7 +175,7 @@ void returnFromFunc(CometVM* vm) {
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
     vm->currentSp = &vm->currentFrame->sp;
-    push(vm, funcFrame->stack[funcFrame->sp-1]);
+    pushValue(vm, funcFrame->stack[funcFrame->sp-1]);
     
     free(funcFrame);
 }
@@ -235,15 +244,15 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     ADDI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a + b);
+        pushValue(vm, a + b);
         DISPATCH();
     }
     ADDF: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
@@ -254,19 +263,19 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t outputtedResult;
         memcpy(&outputtedResult, &result, sizeof(int64_t));
 
-        push(vm, outputtedResult);
+        pushValue(vm, outputtedResult);
         DISPATCH();
     }
     SUBI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a - b);
+        pushValue(vm, a - b);
         DISPATCH();
     } 
     SUBF: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
@@ -277,19 +286,19 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t outputtedResult;
         memcpy(&outputtedResult, &result, sizeof(int64_t));
 
-        push(vm, outputtedResult);
+        pushValue(vm, outputtedResult);
         DISPATCH();
     } 
     MULI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a * b);
+        pushValue(vm, a * b);
         DISPATCH();
     }
     MULF: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
@@ -300,27 +309,27 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t outputtedResult;
         memcpy(&outputtedResult, &result, sizeof(int64_t));
 
-        push(vm, outputtedResult);
+        pushValue(vm, outputtedResult);
         DISPATCH();
     }
     DIVI: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
 
         if (b == 0) {
             return Error(voidPtr, charptr, "Division by zero");
         }
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
 
         double result = (double)a / (double)b;
         int64_t casted;
         memcpy(&casted, &result, sizeof(int64_t));
 
-        push(vm, a * b);
+        pushValue(vm, a * b);
         DISPATCH();
     }
     DIVF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
 
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
@@ -329,7 +338,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
             return Error(voidPtr, charptr, "Division by zero");
         }
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
 
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
@@ -338,121 +347,121 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t outputtedResult;
         memcpy(&outputtedResult, &result, sizeof(int64_t));
 
-        push(vm, outputtedResult);
+        pushValue(vm, outputtedResult);
         DISPATCH();
     }
     EQI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a == b);
+        pushValue(vm, a == b);
         DISPATCH();
     }
     EQF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
 
-        push(vm, aDouble == bDouble);
+        pushValue(vm, aDouble == bDouble);
         DISPATCH();
     }
     NEQI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a != b);
+        pushValue(vm, a != b);
         DISPATCH();
     }
     NEQF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
 
-        push(vm, aDouble != bDouble);
+        pushValue(vm, aDouble != bDouble);
         DISPATCH();
     }
     LTI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a < b);
+        pushValue(vm, a < b);
         DISPATCH();
     }
     LTF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
 
-        push(vm, aDouble < bDouble);
+        pushValue(vm, aDouble < bDouble);
         DISPATCH();
     }
     GTI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a > b);
+        pushValue(vm, a > b);
         DISPATCH();
     }
     GTF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
 
-        push(vm, aDouble > bDouble);
+        pushValue(vm, aDouble > bDouble);
         DISPATCH();
     }
     LTEI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a <= b);
+        pushValue(vm, a <= b);
         DISPATCH();
     }
     LTEF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
 
-        push(vm, aDouble <= bDouble);
+        pushValue(vm, aDouble <= bDouble);
         DISPATCH();
     }
     GTEI: {
-        int64_t b = pop(vm);
-        int64_t a = pop(vm);
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
 
-        push(vm, a >= b);
+        pushValue(vm, a >= b);
         DISPATCH();
     }
     GTEF: {
-        int64_t b = pop(vm);
+        int64_t b = popValue(vm);
         double bDouble;
         memcpy(&bDouble, &b, sizeof(double));
 
-        int64_t a = pop(vm);
+        int64_t a = popValue(vm);
         double aDouble;
         memcpy(&aDouble, &a, sizeof(double));
 
-        push(vm, aDouble >= bDouble);
+        pushValue(vm, aDouble >= bDouble);
         DISPATCH();
     }
     JMP: {
@@ -460,22 +469,22 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     JMP_IF_FALSE: {
-        if (!pop(vm)) {
+        if (!popValue(vm)) {
             vm->currentFrame->ip = inst.a;
         }
         DISPATCH();
     }
     STORE: {
-        vm->variables[inst.a] = pop(vm);
+        vm->variables[inst.a] = popValue(vm);
         DISPATCH();
     } 
     LOAD: {
-        push(vm, vm->variables[inst.a]);
+        pushValue(vm, vm->variables[inst.a]);
         DISPATCH();
     }
     LOAD_ARG: {
         Frame* currentFrame = vm->callStack[vm->callIdx-1];
-        push(vm, currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
+        pushValue(vm, currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
         DISPATCH();
     }
     RET: {
@@ -488,20 +497,20 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     NOT: {
-        push(vm, !pop(vm));
+        pushValue(vm, !popValue(vm));
         DISPATCH();
     }
     I2F: {
-        double value = pop(vm);
+        double value = popValue(vm);
 
         int64_t casted;
         memcpy(&casted, &value, sizeof(int64_t));
 
-        push(vm, casted);
+        pushValue(vm, casted);
         DISPATCH();
     }
     DUP: {
-        push(vm, getTop(vm));
+        pushValue(vm, getTop(vm));
         DISPATCH();
     }
     NEW: {
@@ -510,18 +519,18 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         newObj->vtable = vm->structs[inst.a].vtable;
         newObj->fields = calloc(vm->structs[inst.a].numFields, sizeof(int64_t));
         
-        push(vm, (int64_t)newObj);
+        pushValue(vm, (int64_t)newObj);
         DISPATCH();
     }
     GET_FIELD: {
-        CometObject* obj = (CometObject*)pop(vm);
+        CometObject* obj = (CometObject*)popValue(vm);
 
-        push(vm, obj->fields[inst.a]);
+        pushValue(vm, obj->fields[inst.a]);
         DISPATCH();
     }
     SET_FIELD: {
-        CometObject* obj = (CometObject*)pop(vm);
-        obj->fields[inst.a] = pop(vm);
+        CometObject* obj = (CometObject*)popValue(vm);
+        obj->fields[inst.a] = popValue(vm);
         DISPATCH();
     }
     CALL_METHOD: {
@@ -535,6 +544,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     BREAKPOINT: {
+        createBreakpoint(vm);
         startDebugger(vm);
         DISPATCH();
     }
@@ -645,6 +655,9 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->currentFrame = NULL,
     newVM->currentStack = NULL;
     newVM->callIdx = 0;
+
+    newVM->breakpoints = newList(DebuggerBreakpoint);
+    newVM->nextBreakpointID = 0;
 
     return Success(vmPtr, charptr, newVM);
 }

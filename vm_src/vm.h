@@ -2,9 +2,13 @@
 #define VM_H
 
 #include "../include/operand.h"
+#include "../lib/list.h"
 #include "args.h"
 #include "serialized.h"
 #include <stdint.h>
+
+typedef struct DebuggerBreakpoint DebuggerBreakpoint;
+UseList(DebuggerBreakpoint);
 
 typedef struct {
     int64_t* stack;
@@ -38,6 +42,9 @@ typedef struct {
     uint32_t* currentSp;
 
     int64_t* variables;
+
+    List(DebuggerBreakpoint) breakpoints;
+    uint8_t nextBreakpointID;
 
     bool running;
 } CometVM;
