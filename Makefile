@@ -6,7 +6,7 @@ VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -Wextra -Wno-trigraphs
+CFLAGS=-Wall -Wextra -Wno-trigraphs -O3
 LDFLAGS=
 LDLIBS=
 DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -fsanitize=address
