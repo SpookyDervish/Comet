@@ -1,21 +1,14 @@
+func add(int a, int b) -> int {
+    return a + b
+}
+
 func main() -> int {
-    mut big a = 0
-    mut big b = 1
-
-    int n = 92
-    mut int i = 0
-
-    mut big temp = 0
-
-    while i != n {
-        
-        temp = a + b
-        a = b
-        b = temp
-
-        i = i + 1
-    }
-
     breakpoint
-    return a != 7540113804746346429
+    mut int x = 25
+    mut int y = 30
+
+    x = add(x, y)
+    y = x
+
+    return x
 }

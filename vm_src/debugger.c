@@ -91,6 +91,16 @@ Range getRangeNearIP(CometDebugger* dbgr) {
     };
 }
 
+CometSerializedFunc* getFuncByName(CometDebugger* dbgr, char* name) {
+    for (size_t i = 0; i < dbgr->vm->numFunctions; i++) {
+        if (strcmp(dbgr->vm->functions[i].name, name) == 0) {
+            return &dbgr->vm->functions[i];
+        }
+    }
+
+    return NULL;
+}
+
 ResultType(voidPtr, charptr) continueHandler(CometDebugger* dbgr, int argc, char** argv) {
     dbgr->vm->instructionsLeftToExec = UINT64_MAX;
     dbgr->running = false;
@@ -100,6 +110,38 @@ ResultType(voidPtr, charptr) continueHandler(CometDebugger* dbgr, int argc, char
 ResultType(voidPtr, charptr) breakHandler(CometDebugger* dbgr, int argc, char** argv) {
     if (argc < 1) 
         return Error(voidPtr, charptr, "1 arg required");
+
+    errno = 0;
+    char* end;
+
+    unsigned long address = strtoul(argv[0], &end, 0);
+
+    bool isNumber =
+        errno == 0 &&
+        end != argv[0] &&
+        *end == '\0';
+
+    if (!isNumber) {
+        CometSerializedFunc* func = getFuncByName(dbgr, argv[0]);
+        if (!func) {
+            Estr errMsg = CREATE_ESTR("Could not find a function with the name \"");
+            APPEND_ESTR(errMsg, argv[0]);
+            APPEND_ESTR(errMsg, "\"");
+
+            return Error(voidPtr, charptr, errMsg.str);
+        }
+
+        dbgr->vm->breakpoints[func->startIdx] = 1;
+
+        printf("break: added breakpoint on function %s.\n", func->name);
+
+        return Success(voidPtr, charptr, NULL);
+    }
+
+    dbgr->vm->breakpoints[address] = 1;
+
+    printf("break: added breakpoint on address 0x%04lx.\n", address);
+
     return Success(voidPtr, charptr, NULL);
     
 }   

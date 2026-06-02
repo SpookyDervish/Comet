@@ -232,6 +232,9 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
                             return Success(voidPtr, charptr, NULL); \
                         } \
                          \
+                        if (vm->breakpoints[vm->currentFrame->ip] == 1) { \
+                            startDebugger(vm, false); \
+                        } \
                         if (vm->instructionsLeftToExec == 0) { \
                             startDebugger(vm, true); \
                         } \
