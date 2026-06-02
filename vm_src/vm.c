@@ -670,7 +670,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->currentStack = NULL;
     newVM->callIdx = 0;
 
-    newVM->instructionsLeftToExec = newVM->numInstructions;
+    newVM->instructionsLeftToExec = UINT64_MAX;
     newVM->breakpoints = calloc(newVM->numInstructions, sizeof(uint8_t));
 
     return Success(vmPtr, charptr, newVM);

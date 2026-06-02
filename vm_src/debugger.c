@@ -90,6 +90,12 @@ Range getRangeNearIP(CometDebugger* dbgr) {
     };
 }
 
+ResultType(voidPtr, charptr) continueHandler(CometDebugger* dbgr, int argc, char** argv) {
+    dbgr->vm->instructionsLeftToExec = UINT64_MAX;
+    dbgr->running = false;
+    return Success(voidPtr, charptr, NULL);
+}
+
 ResultType(voidPtr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** argv) {
 
     if (argc < 1) {
@@ -182,7 +188,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
     {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
     {"step", stepHandler, "execute next instruction", "s | s <numInstructions>", stepAliases},
-    {"continue", NULL, "continue execution", "c", continueAliases},
+    {"continue", continueHandler, "continue execution", "c", continueAliases},
 };
 /// !==== END OF INSTRUCTIONS ====! ///
 
