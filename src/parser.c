@@ -18,6 +18,12 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_DIVIDE, PRECEDENCE_PRODUCT},
     {CT_MOD, PRECEDENCE_PRODUCT},
     {CT_POW, PRECEDENCE_EXPONENT},
+    {CT_PLUS_EQ, PRECEDENCE_SET},
+    {CT_MINUS_EQ, PRECEDENCE_SET},
+    {CT_TIMES_EQ, PRECEDENCE_SET},
+    {CT_DIVIDE_EQ, PRECEDENCE_SET},
+    {CT_MOD_EQ, PRECEDENCE_SET},
+    {CT_POW_EQ, PRECEDENCE_SET},
     {CT_LT, PRECEDENCE_LESSGREATER},
     {CT_GT, PRECEDENCE_LESSGREATER},
     {CT_LTE, PRECEDENCE_LESSGREATER},
@@ -36,7 +42,6 @@ ResultType(astNodePtr, charptr) parseBoolLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseTypeName(CometParser* parser);
 ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser);
-ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser);
 ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser);
 ResultType(astNodePtr, charptr) parsePrefixExpression(CometParser* parser);
 const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
@@ -61,6 +66,12 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_DIVIDE, parseInfixExpression},
     {CT_MOD, parseInfixExpression},
     {CT_POW, parseInfixExpression},
+    {CT_PLUS_EQ, parseInfixExpression},
+    {CT_MINUS_EQ, parseInfixExpression},
+    {CT_TIMES_EQ, parseInfixExpression},
+    {CT_DIVIDE_EQ, parseInfixExpression},
+    {CT_MOD_EQ, parseInfixExpression},
+    {CT_POW_EQ, parseInfixExpression},
     {CT_LT, parseInfixExpression},
     {CT_GT, parseInfixExpression},
     {CT_LTE, parseInfixExpression},
@@ -148,7 +159,7 @@ bool peekTokenIs(CometParser* parser, CometTokenType tokenType) {
     return parser->peekToken->type == tokenType;
 }
 
-bool peekTokenIsAssignment(CometParser* parser) {
+bool currentTokenIsAssignment(CometParser* parser) {
     CometTokenType assignmentOperators[] = {
         CT_PLUS_EQ,
         CT_MINUS_EQ,
@@ -159,7 +170,7 @@ bool peekTokenIsAssignment(CometParser* parser) {
     };
 
     for (size_t i = 0; i < sizeof(assignmentOperators)/sizeof(assignmentOperators[0]); i++) {
-        if (peekTokenIs(parser, assignmentOperators[i])) {
+        if (currentTokenIs(parser, assignmentOperators[i])) {
             return true;
         }
     }
@@ -335,7 +346,7 @@ void printNode(CometASTNode* node) {
         }
         case AST_REASSIGN_STATEMENT:
             printNode(node->data.AST_REASSIGN_STATEMENT.ident);
-            printf(" = ");
+            printf(" %s ", node->data.AST_REASSIGN_STATEMENT.op.value.literal);
             printNode(node->data.AST_REASSIGN_STATEMENT.expression);
             break;
         case AST_WHILE_STATEMENT:
@@ -496,6 +507,8 @@ void printNode(CometASTNode* node) {
 // -- EXPRESSION METHODS -- //
 ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPrecedenceType precedence) {
 
+
+    printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
     ResultType(prefixFuncType, charptr) prefixFunc = getPrefixFunc(parser->currentToken->type);
 
     if (prefixFunc.error) {
@@ -504,7 +517,7 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
         return Error(astNodePtr, charptr, buffer);
     }
 
-    printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
+   
 
 
     ResultType(astNodePtr, charptr) leftExpr = prefixFunc.as.success(parser);
@@ -512,7 +525,7 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
     printf("peek precedence: %d\n", peekPrecedence(parser));
 
     while (precedence < peekPrecedence(parser)) {
-        
+        printf("peek token: %s\n", tokenToCStr(*parser->peekToken));
         ResultType(infixFuncType, charptr) infixFunc = getInfixFunc(parser->peekToken->type);
 
         if (infixFunc.error)
@@ -533,12 +546,23 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
 }
 
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left) {
-    if (parser->currentToken->type == CT_EQ) {
+    printf("asdasdasdasdasDasdasd = %s, %d\n", tokenToCStr(*parser->currentToken), currentTokenIsAssignment(parser));
+    if (currentTokenIsAssignment(parser)) {
+        CometToken op = *parser->currentToken;
+
         parserNextToken(parser);
+
+        printf("expr start tok = %s\n", tokenToCStr(*parser->currentToken));
 
         ResultType(astNodePtr, charptr) right = parseExpression(parser, PRECEDENCE_LOWEST);
 
-        CometASTNode* assign = AST_NODE(AST_REASSIGN_STATEMENT, left, right.as.success);
+        printf("parsed reassign = ");
+        printNode(right.as.success);
+        printf("\n");
+
+        printf("new current tok = %s\n", tokenToCStr(*parser->currentToken));
+
+        CometASTNode* assign = AST_NODE(AST_REASSIGN_STATEMENT, left, right.as.success, op);
         return Success(astNodePtr, charptr, assign);
     }
 
@@ -953,33 +977,6 @@ ResultType(astNodePtr, charptr) parseIfStatement(CometParser* parser) {
 
 
     return Success(astNodePtr, charptr, stmt);
-}
-
-ResultType(astNodePtr, charptr) parseReassignStatement(CometParser* parser) {
-    // basic format
-    // x = x + 1
-
-    /*CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-
-    if (peekTokenIs(parser, CT_OPEN_PAREN)) { // function call
-        return parseIdentifier(parser);
-    }
-
-    ResultType(int, charptr) expectEq = expectPeek(parser, CT_EQ);
-    if (expectEq.error) {
-        return Error(astNodePtr, charptr, expectEq.as.error);
-    }
-
-    parserNextToken(parser);
-
-    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
-    if (expr.error) {
-        return expr;
-    }
-
-    CometASTNode* stmt = AST_NODE(AST_REASSIGN_STATEMENT, ident, expr.as.success);
-    return Success(astNodePtr, charptr, stmt);*/
-    return parseExpressionStatement(parser);
 }
 
 ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, FieldAttribute fieldAttrib) {

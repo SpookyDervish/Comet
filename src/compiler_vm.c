@@ -31,6 +31,25 @@ CometType getType(CometCompiler* c, char* typeName) {
     };
 }
 
+bool isAssignmentOperator(CometASTNode* expr) {
+    CometTokenType assignmentOps[] = {
+        CT_PLUS_EQ,
+        CT_MINUS_EQ,
+        CT_TIMES_EQ,
+        CT_DIVIDE_EQ,
+        CT_MOD_EQ,
+        CT_POW_EQ
+    };
+
+    for (size_t i = 0; i < sizeof(assignmentOps)/sizeof(assignmentOps[0]); i++) {
+        if (expr->data.AST_INFIX_EXPRESSION.op.type == assignmentOps[i]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 int32_t getStructIndex(CometCompiler* c, char* structName) {
     for (size_t i = 0; i < c->structs.count; i++) {
         CometStruct* structType = *get(c->structs, i);
@@ -477,6 +496,14 @@ ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
+    ResultType(CometType, charptr) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    if (varType.error)
+        return Error(CometOperand, charptr, varType.as.error);
+
+    ResultType(CometType, charptr) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
+    if (exprType.error)
+        return Error(CometOperand, charptr, exprType.as.error);
+
     ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
@@ -495,11 +522,53 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
         return Error(CometOperand, charptr, errMsg.str);
     }
 
+    CometType resultType = unifyType(varType.as.success, exprType.as.success);
+    if (resultType.typeKind != varType.as.success.typeKind) {
+        Estr errMsg = CREATE_ESTR("Attempted to reassign type of variable \"");
+        APPEND_ESTR(errMsg, ident);
+        APPEND_ESTR(errMsg, "\" at runtime!");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
     if (!varRecord->isMutable) {
         Estr errMsg = CREATE_ESTR("Cannot change value of immutable variable \"");
         APPEND_ESTR(errMsg, ident);
         APPEND_ESTR(errMsg, "\", did you forget \"mut\"?");
         return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
+        buildLoad(c, varRecord->recordIdx);
+    }
+
+    switch (node->data.AST_REASSIGN_STATEMENT.op.type) {
+        case CT_PLUS_EQ: {
+            buildAdd(c, resultType);
+            break;
+        }
+        case CT_MINUS_EQ: {
+            buildSub(c, resultType);
+            break;
+        }
+        case CT_TIMES_EQ: {
+            buildMul(c, resultType);
+            break;
+        }
+        case CT_DIVIDE_EQ: {
+            buildDiv(c, resultType);
+            break;
+        }
+        case CT_EQ: break;
+        default: {
+            
+
+            Estr errMsg = CREATE_ESTR("Cannot use operator \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(node->data.AST_REASSIGN_STATEMENT.op.type));
+            APPEND_ESTR(errMsg, "\" to reassign varialbe \"");
+            APPEND_ESTR(errMsg, ident);
+            APPEND_ESTR(errMsg, "\".");
+            return Error(CometOperand, charptr, errMsg.str);
+        }
     }
 
     buildStore(c, varRecord->recordIdx);
@@ -540,7 +609,6 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
     CometType resultType = unifyType(leftType.as.success, rightType.as.success);
     
     visitValue(c, expr.left);
-
     if (typesAreEqual(leftType.as.success, resultType)) {
         leftType.as.success = buildCast(c, leftType.as.success, resultType);
     }
