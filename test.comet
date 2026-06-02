@@ -1,20 +1,9 @@
-struct Foo {
-    int x
-
-    init(int x) {
-        self.x = x
-    }
-
-    func test() -> int {
-        return self.x
-    }
-}
-
 func main() -> int {
-    Foo foo = new Foo(123)
-    foo.x = 50
-
+    
     breakpoint
+    for int i in 0 .. 1000000 {
+        
+    }
 
-    return foo.test()
+    return 0
 }

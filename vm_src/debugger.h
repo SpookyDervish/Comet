@@ -25,7 +25,8 @@ struct DebuggerBreakpoint {
 
 typedef struct {
     CometVM* vm;
-    List(DebuggerBreakpoint)* breakpoints;
+    uint8_t* breakpoints;
+    bool running;
 } CometDebugger;
 
 typedef struct {
@@ -43,7 +44,7 @@ char* cometOperandToCStr(CometVM* vm ,CometOperand operand);
 char* cometInstructionToCStr(CometVM* vm, CometSerializedInst inst, uint64_t instPos);
 char* cometInstOpcodeToCStr(CometInstType instType);
 
-void startDebugger(CometVM* vm);
+void startDebugger(CometVM* vm, bool startedFromStep);
 
 char* stackTrace(CometVM* vm);
 char* stackAsString(int64_t* stack, uint32_t sp);

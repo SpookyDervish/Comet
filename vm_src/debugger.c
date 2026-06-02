@@ -4,6 +4,7 @@
 #include "../lib/ansi.h"
 #include "serialized.h"
 #include "vm.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -19,21 +20,7 @@ static inline int64_t min(int64_t a, int64_t b) {
     return a < b ? a : b;
 }
 
-ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
-    // get range to display
-    Range range;
-    if (argc < 1) {
-        range = (Range){
-            .start = max(dbgr->vm->currentFrame->ip - 5, 0),
-            .end = min(dbgr->vm->currentFrame->ip + 5, dbgr->vm->numInstructions-1)
-        };
-    } else {
-        range = parseRange(argv[0]);
-    }
-    if (range.start < 0) {
-        return Error(voidPtr, charptr, "can't start disassembly at negative address!");
-    }
-
+void printDisassembly(CometDebugger* dbgr, Range range) {
     if (range.start > range.end) {
         uint32_t newEnd = range.start;
         range.start = range.end;
@@ -44,23 +31,20 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
     for (size_t i = range.start; i <= range.end; i++) {
 
         // display breakpoints
-        bool isAtBreakpoint = false;
-        for (size_t bpIdx = 0; bpIdx < dbgr->breakpoints->count; bpIdx++) {
-            if (i == (*get((*dbgr->breakpoints), bpIdx)).address) {
-                printf(ESC_DIM " [" ESC_RESET ESC_BOLD ESC_BOLD ESC_RED_FG "B" ESC_RESET ESC_DIM "] " ESC_RESET);
-                isAtBreakpoint = true;
-                break;
-            }
-        }
-
-        if (!isAtBreakpoint)
+        bool isAtBreakpoint = dbgr->breakpoints[i];
+        if (isAtBreakpoint) {
+            printf(ESC_DIM " [" ESC_RESET ESC_BOLD ESC_BOLD ESC_RED_FG "B" ESC_RESET ESC_DIM "] " ESC_RESET);
+            isAtBreakpoint = true;
+        } else {
             printf("     ");
+        }
+            
 
         
         // if...
-        if (i < dbgr->vm->currentFrame->ip-1) {                   // below current address? dim
+        if (i < dbgr->vm->currentFrame->ip) {                   // below current address? dim
             printf(ESC_DIM "    ");
-        } else if (i == dbgr->vm->currentFrame->ip-1) {           // at current address? bright green
+        } else if (i == dbgr->vm->currentFrame->ip) {           // at current address? bright green
             printf(ESC_BOLD ESC_BRIGHT_GREEN_FG " -> ");
         } else {                                                // after current address? normal colour
             
@@ -96,7 +80,47 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
         // print the instruction
         printf("%s\n" ESC_RESET, cometInstructionToCStr(dbgr->vm, dbgr->vm->instructions[i], i));
     }
+}
+
+Range getRangeNearIP(CometDebugger* dbgr) {
+
+    return (Range){
+        .start = max(((int64_t)dbgr->vm->currentFrame->ip) - 5, 0),
+        .end = min(dbgr->vm->currentFrame->ip + 5, dbgr->vm->numInstructions-1)
+    };
+}
+
+ResultType(voidPtr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** argv) {
+
+    if (argc < 1) {
+        dbgr->vm->instructionsLeftToExec = 1;
+    } else {
+        uint64_t value = strtoul(argv[0], NULL, 0);
+        if (value == 0) {
+            return Error(voidPtr, charptr, "invalid number input!");
+        }
+
+        dbgr->vm->instructionsLeftToExec = value;
+    }
     
+    dbgr->running = false;
+
+    return Success(voidPtr, charptr, NULL);
+}
+
+ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
+    // get range to display
+    Range range;
+    if (argc < 1) 
+        range = getRangeNearIP(dbgr);
+    else 
+        range = parseRange(argv[0]);
+    
+    if (range.start < 0) {
+        return Error(voidPtr, charptr, "can't start disassembly at negative address!");
+    }
+
+    printDisassembly(dbgr, range) ;
 
     return Success(voidPtr, charptr, NULL);
 }
@@ -157,7 +181,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"stack", NULL, "display the current state of the stack", "st | st <index>", stackAliases},
     {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
     {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
-    {"step", NULL, "execute next instruction", "s | s <numInstructions>", stepAliases},
+    {"step", stepHandler, "execute next instruction", "s | s <numInstructions>", stepAliases},
     {"continue", NULL, "continue execution", "c", continueAliases},
 };
 /// !==== END OF INSTRUCTIONS ====! ///
@@ -217,9 +241,7 @@ ResultType(voidPtr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
 }
 
 void debuggerLoop(CometDebugger* dbgr) {
-    bool looping = true;
-
-    while (looping) {
+    while (dbgr->running) {
         char* userInput = NULL;
         size_t size = 0;
         ssize_t charsRead;
@@ -232,7 +254,6 @@ void debuggerLoop(CometDebugger* dbgr) {
         }
 
         ResultType(voidPtr, charptr) commandResult = parseCommand(dbgr, userInput);
-        printf("\n");
 
         if (commandResult.error) 
             break;
@@ -241,10 +262,17 @@ void debuggerLoop(CometDebugger* dbgr) {
     }
 }
 
-void startDebugger(CometVM* vm) {
+void startDebugger(CometVM* vm, bool startedFromStep) {
     CometDebugger* newDbgr = malloc(sizeof(CometDebugger));
     newDbgr->vm = vm;
-    newDbgr->breakpoints = &vm->breakpoints;
+    newDbgr->breakpoints = vm->breakpoints;
+    newDbgr->running = true;
+
+    if (startedFromStep) {
+        printDisassembly(newDbgr, getRangeNearIP(newDbgr));
+        debuggerLoop(newDbgr);
+        return;
+    }
 
     printf(ESC_BOLD ESC_CYAN_FG "\n!--- BREAKPOINT - COMET DEBUGGER ---!" ESC_RESET "\n");
     printf(ESC_BOLD "VM State:\n" ESC_RESET);

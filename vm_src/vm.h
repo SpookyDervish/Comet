@@ -43,8 +43,9 @@ typedef struct {
 
     int64_t* variables;
 
-    List(DebuggerBreakpoint) breakpoints;
+    uint8_t* breakpoints;
     uint8_t nextBreakpointID;
+    uint64_t instructionsLeftToExec;
 
     bool running;
 } CometVM;

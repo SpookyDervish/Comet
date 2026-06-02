@@ -68,7 +68,7 @@ void createBreakpoint(CometVM* vm) {
         .id = vm->nextBreakpointID++
     };
 
-    append(vm->breakpoints, newBp);
+    vm->breakpoints[vm->currentFrame->ip - 1] = 1;
 }
 
 FORCE_INLINE void pushValue(CometVM* vm, int64_t value) {
@@ -233,7 +233,21 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&BREAKPOINT
     };
 
-    #define DISPATCH() if (!vm->running) {return Success(voidPtr, charptr, NULL);} inst = fetchNextInst(vm); if (inst.opcode < 0 || inst.opcode > INST_MAX) { return invalidInstruction(inst); } goto *dispatchTable[inst.opcode];
+    #define DISPATCH()  if (!vm->running) { \
+                            return Success(voidPtr, charptr, NULL); \
+                        } \
+                         \
+                        if (vm->instructionsLeftToExec == 0) { \
+                            startDebugger(vm, true); \
+                        } \
+                        vm->instructionsLeftToExec--; \
+                        inst = fetchNextInst(vm); \
+                         \
+                        if (inst.opcode < 0 || inst.opcode > INST_MAX) { \
+                            return invalidInstruction(inst); \
+                        } \
+                         \
+                        goto *dispatchTable[inst.opcode];
 
     DISPATCH();
 
@@ -545,7 +559,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     }
     BREAKPOINT: {
         createBreakpoint(vm);
-        startDebugger(vm);
+        startDebugger(vm, false);
         DISPATCH();
     }
 
@@ -656,8 +670,8 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->currentStack = NULL;
     newVM->callIdx = 0;
 
-    newVM->breakpoints = newList(DebuggerBreakpoint);
-    newVM->nextBreakpointID = 0;
+    newVM->instructionsLeftToExec = newVM->numInstructions;
+    newVM->breakpoints = calloc(newVM->numInstructions, sizeof(uint8_t));
 
     return Success(vmPtr, charptr, newVM);
 }
