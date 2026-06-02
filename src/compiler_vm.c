@@ -925,7 +925,6 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 
     // add the step to the iterator var
     buildAdd(c, addType);
-    buildDup(c);
 
     // save the iterator value
     buildStore(c, idx);

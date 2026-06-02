@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include "../lib/estr.h"
 
+// For Clang and GCC on macOS
+#define FORCE_INLINE __attribute__((always_inline)) static inline
+
 CometFile* getFileContents(const char* filename) {
     // https://stackoverflow.com/questions/3747086/reading-the-whole-text-file-into-a-char-array-in-c
     FILE* fp;
@@ -54,11 +57,11 @@ CometFile* getFileContents(const char* filename) {
     return file;
 }
 
-int max(int a, int b) {
+static inline int max(int a, int b) {
     return (a > b) ? a : b;
 }
 
-void push(CometVM* vm, int64_t value) {
+FORCE_INLINE void push(CometVM* vm, int64_t value) {
     (*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;
 }
@@ -94,7 +97,7 @@ char* stackTrace(CometVM* vm) {
     return stackTraceStr.str;
 }
 
-int64_t getTop(CometVM* vm) {
+static inline int64_t getTop(CometVM* vm) {
     if ((*vm->currentSp) <= 0) {
         fprintf(stderr, "Attempted to pop top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
         fprintf(stderr, "%s\n", stackTrace(vm));
@@ -104,7 +107,7 @@ int64_t getTop(CometVM* vm) {
     return (*vm->currentStack)[(*vm->currentSp)-1];
 }
 
-int64_t pop(CometVM* vm) {
+FORCE_INLINE int64_t pop(CometVM* vm) {
     int64_t value = getTop(vm);
     *vm->currentSp -= 1;
     return value;
@@ -198,354 +201,369 @@ void returnFromFunc(CometVM* vm) {
     free(funcFrame);
 }
 
-ResultType(voidPtr, charptr) vmClock(CometVM* vm) {
-    CometSerializedInst inst = vm->instructions[vm->currentFrame->ip];
-    vm->currentFrame->ip++;
-
-    switch (inst.opcode) {
-        case INST_PUSH_CONST: {
-            CometOperand value = getConst(vm, inst.a);
-            
-            pushOperand(vm, value);
-            break;
-        }
-
-        case INST_ADDI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a + b);
-            break;
-        }
-        case INST_ADDF: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            double result = aDouble + bDouble;
-            int64_t outputtedResult;
-            memcpy(&outputtedResult, &result, sizeof(int64_t));
-
-            push(vm, outputtedResult);
-            break;
-        }
-        case INST_SUBI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a - b);
-            break;
-        } 
-        case INST_SUBF: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            double result = aDouble - bDouble;
-            int64_t outputtedResult;
-            memcpy(&outputtedResult, &result, sizeof(int64_t));
-
-            push(vm, outputtedResult);
-            break;
-        } 
-        case INST_MULI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a * b);
-            break;
-        }
-        case INST_MULF: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            double result = aDouble * bDouble;
-            int64_t outputtedResult;
-            memcpy(&outputtedResult, &result, sizeof(int64_t));
-
-            push(vm, outputtedResult);
-            break;
-        }
-        case INST_DIVI: {
-            int64_t b = pop(vm);
-
-            if (b == 0) {
-                return Error(voidPtr, charptr, "Division by zero");
-            }
-
-            int64_t a = pop(vm);
-
-            double result = (double)a / (double)b;
-            int64_t casted;
-            memcpy(&casted, &result, sizeof(int64_t));
-
-            push(vm, a * b);
-            break;
-        }
-        case INST_DIVF: {
-            int64_t b = pop(vm);
-
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            if (bDouble == 0) {
-                return Error(voidPtr, charptr, "Division by zero");
-            }
-
-            int64_t a = pop(vm);
-
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            double result = aDouble / bDouble;
-            int64_t outputtedResult;
-            memcpy(&outputtedResult, &result, sizeof(int64_t));
-
-            push(vm, outputtedResult);
-            break;
-        }
-
-        case INST_EQI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a == b);
-            break;
-        }
-        case INST_EQF: {
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            push(vm, aDouble == bDouble);
-            break;
-        }
-        case INST_NEQI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a != b);
-            break;
-        }
-        case INST_NEQF: {
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            push(vm, aDouble != bDouble);
-            break;
-        }
-        case INST_LTI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a < b);
-            break;
-        }
-        case INST_LTF: {
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            push(vm, aDouble < bDouble);
-            break;
-        }
-        case INST_GTI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a > b);
-            break;
-        }
-        case INST_GTF: {
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            push(vm, aDouble > bDouble);
-            break;
-        }
-        case INST_LTEI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a <= b);
-            break;
-        }
-        case INST_LTEF: {
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            push(vm, aDouble <= bDouble);
-            break;
-        }
-        case INST_GTEI: {
-            int64_t b = pop(vm);
-            int64_t a = pop(vm);
-
-            push(vm, a >= b);
-            break;
-        }
-        case INST_GTEF: {
-            int64_t b = pop(vm);
-            double bDouble;
-            memcpy(&bDouble, &b, sizeof(double));
-
-            int64_t a = pop(vm);
-            double aDouble;
-            memcpy(&aDouble, &a, sizeof(double));
-
-            push(vm, aDouble >= bDouble);
-            break;
-        }
-
-        case INST_JMP: {
-            vm->currentFrame->ip = inst.a;
-            break;
-        }
-
-        case INST_JMP_IF_FALSE: {
-            int64_t a = pop(vm);
-
-
-            if (!a) {
-                vm->currentFrame->ip = inst.a;
-            }
-            break;
-        }
-
-        case INST_STORE: {
-            int64_t value = pop(vm);
-
-            vm->variables[inst.a] = value;
-            break;
-        } 
-
-        case INST_LOAD: {
-            int64_t value = vm->variables[inst.a];
-
-            push(vm, value);
-            break;
-        }
-
-        case INST_LOAD_ARG: {
-            Frame* currentFrame = vm->callStack[vm->callIdx-1];
-            push(vm, currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
-            break;
-        }
-
-        case INST_RET: {
-            returnFromFunc(vm);
-            break;
-        }
-
-        case INST_CALL: {
-            
-            CometSerializedFunc function = vm->functions[inst.a];
-            callFunction(vm, &function);
-            break;
-        }
-
-        case INST_NOT: {
-            int64_t value = pop(vm);
-            push(vm, !value);
-            break;
-        }
-
-        case INST_I2F: {
-            double value = pop(vm);
-
-            int64_t casted;
-            memcpy(&casted, &value, sizeof(int64_t));
-
-            push(vm, casted);
-            break;
-        }
-
-        case INST_DUP: {
-            int64_t value = getTop(vm);
-
-            push(vm, value);
-            push(vm, value);
-            break;
-        }
-
-        case INST_NEW: {
-            CometObject* newObj = malloc(sizeof(CometObject));
-
-            newObj->vtable = vm->structs[inst.a].vtable;
-            newObj->fields = calloc(vm->structs[inst.a].numFields, sizeof(int64_t));
-            
-            push(vm, (int64_t)newObj);
-
-            break;
-        }
-
-        case INST_GET_FIELD: {
-            CometObject* obj = (CometObject*)pop(vm);
-
-            push(vm, obj->fields[inst.a]);
-            break;
-        }
-        case INST_SET_FIELD: {
-            CometObject* obj = (CometObject*)pop(vm);
-            int64_t newValue = pop(vm);
-
-            obj->fields[inst.a] = newValue;
-            break;
-        }
-
-        case INST_CALL_METHOD: {
-            CometObject* obj = (CometObject*)getTop(vm);
-
-            uint32_t methodIdx = inst.a;
-            uint32_t symbolIdx = obj->vtable[methodIdx];
-            CometSerializedFunc* func = &vm->functions[symbolIdx];
-
-            callFunction(vm, func);
-            break;
-        }
-
-        default: {
-            char* buffer = malloc(128);
-            sprintf(buffer, "Reached invalid instruction! (%d)", inst.opcode);
-            return Error(voidPtr, charptr, buffer);
-        };
+FORCE_INLINE CometSerializedInst fetchNextInst(CometVM* vm) {
+    return vm->instructions[vm->currentFrame->ip++];
+}
+
+ResultType(voidPtr, charptr) invalidInstruction(CometSerializedInst inst) {
+    char* buffer = malloc(128);
+    sprintf(buffer, "Reached invalid instruction! (%d)", inst.opcode);
+    return Error(voidPtr, charptr, buffer);
+}
+
+ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
+    CometSerializedInst inst;
+
+    // computed goto table
+    static const void* dispatchTable[] = {
+        &&PUSH_CONST,
+        &&STORE,
+        &&LOAD,
+        &&ADDI,
+        &&ADDF,
+        &&SUBI,
+        &&SUBF,
+        &&MULI,
+        &&MULF,
+        &&DIVI,
+        &&DIVF,
+        &&EQI,
+        &&EQF,
+        &&NEQI,
+        &&NEQF,
+        &&GTI,
+        &&GTF,
+        &&LTI,
+        &&LTF,
+        &&GTEI,
+        &&GTEF,
+        &&LTEI,
+        &&LTEF,
+        &&LOAD_ARG,
+        &&RET,
+        &&CALL,
+        &&JMP,
+        &&JMP_IF_FALSE,
+        &&NOT,
+        &&I2F,
+        &&DUP,
+        &&NEW,
+        &&GET_FIELD,
+        &&SET_FIELD,
+        &&CALL_METHOD
+    };
+
+    #define DISPATCH() if (!vm->running) {return Success(voidPtr, charptr, NULL);} inst = fetchNextInst(vm); if (inst.opcode < 0 || inst.opcode > INST_MAX) { return invalidInstruction(inst); } goto *dispatchTable[inst.opcode];
+
+    DISPATCH();
+
+    PUSH_CONST: {
+        CometOperand value = getConst(vm, inst.a);
+        
+        pushOperand(vm, value);
+        DISPATCH();
     }
+    ADDI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a + b);
+        DISPATCH();
+    }
+    ADDF: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        double result = aDouble + bDouble;
+        int64_t outputtedResult;
+        memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+        push(vm, outputtedResult);
+        DISPATCH();
+    }
+    SUBI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a - b);
+        DISPATCH();
+    } 
+    SUBF: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        double result = aDouble - bDouble;
+        int64_t outputtedResult;
+        memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+        push(vm, outputtedResult);
+        DISPATCH();
+    } 
+    MULI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a * b);
+        DISPATCH();
+    }
+    MULF: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        double result = aDouble * bDouble;
+        int64_t outputtedResult;
+        memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+        push(vm, outputtedResult);
+        DISPATCH();
+    }
+    DIVI: {
+        int64_t b = pop(vm);
+
+        if (b == 0) {
+            return Error(voidPtr, charptr, "Division by zero");
+        }
+
+        int64_t a = pop(vm);
+
+        double result = (double)a / (double)b;
+        int64_t casted;
+        memcpy(&casted, &result, sizeof(int64_t));
+
+        push(vm, a * b);
+        DISPATCH();
+    }
+    DIVF: {
+        int64_t b = pop(vm);
+
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        if (bDouble == 0) {
+            return Error(voidPtr, charptr, "Division by zero");
+        }
+
+        int64_t a = pop(vm);
+
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        double result = aDouble / bDouble;
+        int64_t outputtedResult;
+        memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+        push(vm, outputtedResult);
+        DISPATCH();
+    }
+    EQI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a == b);
+        DISPATCH();
+    }
+    EQF: {
+        int64_t b = pop(vm);
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        int64_t a = pop(vm);
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        push(vm, aDouble == bDouble);
+        DISPATCH();
+    }
+    NEQI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a != b);
+        DISPATCH();
+    }
+    NEQF: {
+        int64_t b = pop(vm);
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        int64_t a = pop(vm);
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        push(vm, aDouble != bDouble);
+        DISPATCH();
+    }
+    LTI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a < b);
+        DISPATCH();
+    }
+    LTF: {
+        int64_t b = pop(vm);
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        int64_t a = pop(vm);
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        push(vm, aDouble < bDouble);
+        DISPATCH();
+    }
+    GTI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a > b);
+        DISPATCH();
+    }
+    GTF: {
+        int64_t b = pop(vm);
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        int64_t a = pop(vm);
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        push(vm, aDouble > bDouble);
+        DISPATCH();
+    }
+    LTEI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a <= b);
+        DISPATCH();
+    }
+    LTEF: {
+        int64_t b = pop(vm);
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        int64_t a = pop(vm);
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        push(vm, aDouble <= bDouble);
+        DISPATCH();
+    }
+    GTEI: {
+        int64_t b = pop(vm);
+        int64_t a = pop(vm);
+
+        push(vm, a >= b);
+        DISPATCH();
+    }
+    GTEF: {
+        int64_t b = pop(vm);
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        int64_t a = pop(vm);
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+
+        push(vm, aDouble >= bDouble);
+        DISPATCH();
+    }
+    JMP: {
+        vm->currentFrame->ip = inst.a;
+        DISPATCH();
+    }
+    JMP_IF_FALSE: {
+        if (!pop(vm)) {
+            vm->currentFrame->ip = inst.a;
+        }
+        DISPATCH();
+    }
+    STORE: {
+        vm->variables[inst.a] = pop(vm);
+        DISPATCH();
+    } 
+    LOAD: {
+        push(vm, vm->variables[inst.a]);
+        DISPATCH();
+    }
+    LOAD_ARG: {
+        Frame* currentFrame = vm->callStack[vm->callIdx-1];
+        push(vm, currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
+        DISPATCH();
+    }
+    RET: {
+        returnFromFunc(vm);
+        DISPATCH();
+    }
+    CALL: {
+        CometSerializedFunc function = vm->functions[inst.a];
+        callFunction(vm, &function);
+        DISPATCH();
+    }
+    NOT: {
+        push(vm, !pop(vm));
+        DISPATCH();
+    }
+    I2F: {
+        double value = pop(vm);
+
+        int64_t casted;
+        memcpy(&casted, &value, sizeof(int64_t));
+
+        push(vm, casted);
+        DISPATCH();
+    }
+    DUP: {
+        push(vm, getTop(vm));
+        DISPATCH();
+    }
+    NEW: {
+        CometObject* newObj = malloc(sizeof(CometObject));
+
+        newObj->vtable = vm->structs[inst.a].vtable;
+        newObj->fields = calloc(vm->structs[inst.a].numFields, sizeof(int64_t));
+        
+        push(vm, (int64_t)newObj);
+        DISPATCH();
+    }
+    GET_FIELD: {
+        CometObject* obj = (CometObject*)pop(vm);
+
+        push(vm, obj->fields[inst.a]);
+        DISPATCH();
+    }
+    SET_FIELD: {
+        CometObject* obj = (CometObject*)pop(vm);
+        obj->fields[inst.a] = pop(vm);
+        DISPATCH();
+    }
+    CALL_METHOD: {
+        CometObject* obj = (CometObject*)getTop(vm);
+
+        uint32_t methodIdx = inst.a;
+        uint32_t symbolIdx = obj->vtable[methodIdx];
+        CometSerializedFunc* func = &vm->functions[symbolIdx];
+
+        callFunction(vm, func);
+        DISPATCH();
+    }
+
 
     return Success(voidPtr, charptr, NULL);
 }
@@ -560,14 +578,12 @@ ResultType(int, charptr) startVM(CometVM* vm) {
     }
     callFunction(vm, mainFunc);
 
-    while (vm->running) {
-        ResultType(voidPtr, charptr) instResult = vmClock(vm);
-        if (instResult.error) {
-            Estr errMsg = CREATE_ESTR(instResult.as.error);
-            APPEND_ESTR(errMsg, stackTrace(vm));
+    ResultType(voidPtr, charptr) loopResult = vmMainLoop(vm);
+    if (loopResult.error) {
+        Estr errMsg = CREATE_ESTR(loopResult.as.error);
+        APPEND_ESTR(errMsg, stackTrace(vm));
 
-            return Error(int, charptr, errMsg.str);
-        }
+        return Error(int, charptr, errMsg.str);
     }
 
     return Success(int, charptr, (*vm->currentStack)[(*vm->currentSp)-1]);

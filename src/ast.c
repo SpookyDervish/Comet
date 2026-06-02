@@ -30,6 +30,7 @@ void freeNode(CometASTNode* node) {
         }
         case AST_INT: break;
         case AST_DOUBLE: break;
+        case AST_BOOL: break;
         case AST_IDENTIFIER: {
             free(node->data.AST_IDENTIFIER.ident);
             break;

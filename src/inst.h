@@ -24,9 +24,6 @@ typedef enum {
     INST_MULF,
     INST_DIVI,
     INST_DIVF,
-    INST_LOAD_ARG,
-    INST_RET,
-    INST_CALL,
     INST_EQI,
     INST_EQF,
     INST_NEQI,
@@ -39,6 +36,9 @@ typedef enum {
     INST_GTEF,
     INST_LTEI,
     INST_LTEF,
+    INST_LOAD_ARG,
+    INST_RET,
+    INST_CALL,
     INST_JMP,
     INST_JMP_IF_FALSE,
     INST_NOT,
@@ -47,7 +47,8 @@ typedef enum {
     INST_NEW,
     INST_GET_FIELD,
     INST_SET_FIELD,
-    INST_CALL_METHOD
+    INST_CALL_METHOD,
+    INST_MAX
 } CometInstType;
 
 typedef struct {
