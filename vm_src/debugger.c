@@ -11,13 +11,26 @@
 #include <inttypes.h>
 
 
+static inline int64_t max(int64_t a, int64_t b) {
+    return a > b ? a : b;
+}
+
+static inline int64_t min(int64_t a, int64_t b) {
+    return a < b ? a : b;
+}
 
 ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
+    Range range;
     if (argc < 1) {
-        return Error(voidPtr, charptr, "command needs 1 arg");
+        range = (Range){
+            .start = max(dbgr->vm->currentFrame->ip - 5, 0),
+            .end = min(dbgr->vm->currentFrame->ip + 4, dbgr->vm->numInstructions-1)
+        };
+    } else {
+        range = parseRange(argv[0]);
     }
 
-    Range range = parseRange(argv[0]);
+     
 
     if (range.start < 0) {
         return Error(voidPtr, charptr, "can't start disassembly at negative address!");
@@ -30,30 +43,103 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
     }
 
     for (size_t i = range.start; i <= range.end; i++) {
+        
+
+        if (i < dbgr->vm->currentFrame->ip) {
+            printf(ESC_DIM "    ");
+        } else if (i == dbgr->vm->currentFrame->ip) {
+            printf(ESC_BOLD ESC_BRIGHT_GREEN_FG " -> ");
+        } else {
+            
+            printf("    ");
+
+            
+        }
+
+        // some instructions have a special colour to make it easier to spot loops
+        switch (dbgr->vm->instructions[i].opcode) {
+            case INST_JMP:
+            case INST_JMP_IF_FALSE:
+            case INST_CALL:
+            case INST_CALL_METHOD:
+            case INST_RET:
+                printf(ESC_BOLD ESC_CYAN_FG);
+                break;
+
+            default:
+                
+                break;
+        }
+
         if (i >= dbgr->vm->numInstructions) {
-            printf("0x%04lx    ??? (outside bytecode)\n", i);
+            
+
+            printf("0x%04lx    ??? <invalid address>\n" ESC_RESET, i);
             break;
         }
 
-        printf("%s\n", cometInstructionToCStr(dbgr->vm, dbgr->vm->instructions[i], i));
+        printf("%s\n" ESC_RESET, cometInstructionToCStr(dbgr->vm, dbgr->vm->instructions[i], i));
     }
     
 
     return Success(voidPtr, charptr, NULL);
 }
 
-ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
+int tokenize(char* line, char** argv, int maxArgs) {
+    int argc = 0;
+
+    while (*line) {
+        // skip whitespace
+        while (*line == ' ' || *line == '\t' || *line == '\n')
+            line++;
+
+        if (*line == '\0')
+            break;
+
+        if (argc >= maxArgs)
+            break;
+
+        argv[argc++] = line;
+
+        // find end of token
+        while (*line &&
+              *line != ' ' &&
+              *line != '\t' &&
+              *line != '\n') {
+            line++;
+        }
+
+        // terminate token
+        if (*line) {
+            *line = '\0';
+            line++;
+        }
+    }
+
+    return argc;
+}
 
 static const char* helpAliases[] = {"h", NULL};
 static const char* disassembleAliases[] = {"d", NULL};
 static const char* breakAliases[] = {"b", NULL};
 static const char* unbreakAliases[] = {"ubreak", "u", "ub", NULL};
+static const char* stackAliases[] = {"st", NULL};
+static const char* localAliases[] = {"l", NULL};
+static const char* structsAliases[] = {"ls", NULL};
+static const char* stepAliases[] = {"s", NULL};
+static const char* continueAliases[] = {"c", "cont", NULL};
 
+ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
 const CometDebugCommand DBGR_COMMANDS[] = {
-    {"help", helpHandler, "display a list of all commnads", "h | h <command>", helpAliases},
-    {"disassemble", disassembleHandler, "disassemble a line", "d <line> | d <start>:<end>", disassembleAliases},
+    {"help", helpHandler, "display a list of all commnads or get help about a specific command", "h | h <command>", helpAliases},
+    {"disassemble", disassembleHandler, "disassemble a line or range of lines", "d | d <line> | d <start>:<end>", disassembleAliases},
     {"break", NULL, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
     {"unbreak", NULL, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
+    {"stack", NULL, "display the current state of the stack", "st | st <index>", stackAliases},
+    {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
+    {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
+    {"step", NULL, "execute next instruction", "s | s <numInstructions>", stepAliases},
+    {"continue", NULL, "continue execution", "c", continueAliases},
 };
 
 const CometDebugCommand* getCommandByName(char* cmdName) {
@@ -80,6 +166,74 @@ const CometDebugCommand* getCommandByName(char* cmdName) {
     }
 
     return NULL;
+}
+
+ResultType(voidPtr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
+
+    int maxArgs = 16;
+    char* argv[maxArgs];
+    int argc = tokenize(line, argv, maxArgs);
+
+    if (argc == 0)
+        return Success(voidPtr, charptr, NULL);
+
+    const CometDebugCommand* cmd = getCommandByName(argv[0]);
+    if (cmd == NULL) {
+        Estr errMsg = CREATE_ESTR("dbgr: no such command: \"");
+        APPEND_ESTR(errMsg, argv[0]);
+        APPEND_ESTR(errMsg, "\"");
+        fprintf(stderr, "%s\n", errMsg.str);
+        DESTROY_ESTR(errMsg);
+
+        return Success(voidPtr, charptr, NULL);
+    }
+
+    ResultType(voidPtr, charptr) cmdResult = cmd->handler(dbgr, argc - 1, &argv[1]);
+    if (cmdResult.error) {
+        fprintf(stderr, "%s: %s\n", cmd->name, cmdResult.as.error);
+    }
+
+    return Success(voidPtr, charptr, NULL);
+}
+
+void debuggerLoop(CometDebugger* dbgr) {
+    bool looping = true;
+
+    while (looping) {
+        char* userInput = NULL;
+        size_t size = 0;
+        ssize_t charsRead;
+
+        printf("dbgr > ");
+        charsRead = getline(&userInput, &size, stdin);
+        if (charsRead == -1) {
+            fprintf(stderr, "getline: failed to read input!");
+            return;
+        }
+
+        ResultType(voidPtr, charptr) commandResult = parseCommand(dbgr, userInput);
+        printf("\n");
+
+        if (commandResult.error) 
+            break;
+        
+        
+    }
+}
+
+void startDebugger(CometVM* vm) {
+    CometDebugger* newDbgr = malloc(sizeof(CometDebugger));
+    newDbgr->vm = vm;
+
+    printf(ESC_BOLD ESC_CYAN_FG "\nBREAKPOINT - COMET DEBUGGER" ESC_RESET "\n");
+    printf(ESC_BOLD "VM State:\n" ESC_RESET);
+    printf("    - IP: 0x%016lx\n", vm->currentFrame->ip);
+    printf("    - Current Inst: %s\n", cometInstructionToCStr(vm, vm->instructions[vm->currentFrame->ip], vm->currentFrame->ip));
+    printf("    - SP: 0x%08x\n", vm->currentFrame->sp);
+    printf("    - Stack: %s\n\n", stackAsString(*vm->currentStack, *vm->currentSp));
+    debuggerLoop(newDbgr);
+
+    free(newDbgr);
 }
 
 void printAliases(CometDebugCommand cmd) {
@@ -110,6 +264,7 @@ ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** a
         }
 
         printf(ESC_BOLD ESC_CYAN_FG "\\\\\\ %s ///\n\n" ESC_RESET, cmd->name);
+        printf(ESC_BOLD ESC_YELLOW_FG "Description:" ESC_RESET " %s\n", cmd->help);
         printf(ESC_BOLD ESC_YELLOW_FG "Usage:" ESC_RESET " %s\n", cmd->usage);
         printf(ESC_BOLD ESC_YELLOW_FG "Aliases: " ESC_RESET);
         printAliases(*cmd);
@@ -481,93 +636,6 @@ char* cometInstructionToCStr(CometVM* vm, CometSerializedInst inst, uint64_t ins
     return buffer;
 }
 
-int tokenize(char* line, char** argv, int maxArgs) {
-    int argc = 0;
-
-    while (*line) {
-        // skip whitespace
-        while (*line == ' ' || *line == '\t' || *line == '\n')
-            line++;
-
-        if (*line == '\0')
-            break;
-
-        if (argc >= maxArgs)
-            break;
-
-        argv[argc++] = line;
-
-        // find end of token
-        while (*line &&
-              *line != ' ' &&
-              *line != '\t' &&
-              *line != '\n') {
-            line++;
-        }
-
-        // terminate token
-        if (*line) {
-            *line = '\0';
-            line++;
-        }
-    }
-
-    return argc;
-}
-
-ResultType(voidPtr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
-
-    int maxArgs = 16;
-    char* argv[maxArgs];
-    int argc = tokenize(line, argv, maxArgs);
-
-    if (argc == 0)
-        return Success(voidPtr, charptr, NULL);
-
-    const CometDebugCommand* cmd = getCommandByName(argv[0]);
-    if (cmd == NULL) {
-        Estr errMsg = CREATE_ESTR("dbgr: no such command: \"");
-        APPEND_ESTR(errMsg, argv[0]);
-        APPEND_ESTR(errMsg, "\"");
-        fprintf(stderr, "%s\n", errMsg.str);
-        DESTROY_ESTR(errMsg);
-
-        return Success(voidPtr, charptr, NULL);
-    }
-
-    ResultType(voidPtr, charptr) cmdResult = cmd->handler(dbgr, argc - 1, &argv[1]);
-    if (cmdResult.error) {
-        fprintf(stderr, "%s: %s\n", cmd->name, cmdResult.as.error);
-    }
-
-    return Success(voidPtr, charptr, NULL);
-}
-
-void debuggerLoop(CometDebugger* dbgr) {
-    bool looping = true;
-
-    while (looping) {
-        char* userInput = NULL;
-        size_t size = 0;
-        ssize_t charsRead;
-
-        printf("dbgr > ");
-        charsRead = getline(&userInput, &size, stdin);
-        if (charsRead == -1) {
-            fprintf(stderr, "getline: failed to read input!");
-            return;
-        }
-
-        ResultType(voidPtr, charptr) commandResult = parseCommand(dbgr, userInput);
-        printf("\n");
-
-        if (commandResult.error) 
-            break;
-        
-        
-    }
-}
-
 char* stackAsString(int64_t* stack, uint32_t sp) {
     Estr stackString = CREATE_ESTR("[");
 
@@ -597,19 +665,4 @@ char* stackTrace(CometVM* vm) {
     }
 
     return stackTraceStr.str;
-}
-
-void startDebugger(CometVM* vm) {
-    CometDebugger* newDbgr = malloc(sizeof(CometDebugger));
-    newDbgr->vm = vm;
-
-    printf(ESC_BOLD ESC_CYAN_FG "\nBREAKPOINT - COMET DEBUGGER" ESC_RESET "\n");
-    printf(ESC_BOLD "VM State:\n" ESC_RESET);
-    printf("    - IP: 0x%016lx\n", vm->currentFrame->ip);
-    printf("    - Current Inst: %s\n", cometInstructionToCStr(vm, vm->instructions[vm->currentFrame->ip], vm->currentFrame->ip));
-    printf("    - SP: 0x%08x\n", vm->currentFrame->sp);
-    printf("    - Stack: %s\n\n", stackAsString(*vm->currentStack, *vm->currentSp));
-    debuggerLoop(newDbgr);
-
-    free(newDbgr);
 }
