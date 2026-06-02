@@ -63,11 +63,6 @@ static inline int max(int a, int b) {
 }
 
 void createBreakpoint(CometVM* vm) {
-    DebuggerBreakpoint newBp = {
-        .address = vm->currentFrame->ip - 1,
-        .id = vm->nextBreakpointID++
-    };
-
     vm->breakpoints[vm->currentFrame->ip - 1] = 1;
 }
 

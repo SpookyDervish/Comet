@@ -18,11 +18,6 @@ typedef struct {
     uint32_t end;
 } Range;
 
-struct DebuggerBreakpoint {
-    uint64_t address;
-    uint8_t id;
-};
-
 typedef struct {
     CometVM* vm;
     uint8_t* breakpoints;

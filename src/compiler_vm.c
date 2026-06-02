@@ -111,7 +111,7 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
 
         case AST_INT: {
             CometOperand new = createOperand(CO_IMMEDIATE);
-            new.imm.typeKind = COMET_INT;
+            new.imm.typeKind = COMET_BIG;
             new.imm.intVal = node->data.AST_INT.number;
 
             CometOperand idx = storeConst(c, new);
