@@ -321,6 +321,17 @@ void printStructInfo(CometDebugger* dbgr, uint32_t structIdx, CometSerializedStr
         printf(ESC_BOLD "                Number of arguments:" ESC_RESET " %d\n", func.numArgs);
         printf(ESC_BOLD "                Address:            " ESC_RESET " 0x%08lx\n", func.startIdx);
 
+        printf(ESC_BOLD "                Peek:\n" ESC_RESET);
+
+        Range r = {
+            .start = func.startIdx,
+            .end = min(func.startIdx + 4, dbgr->vm->numInstructions-1)
+        };
+        printDisassembly(dbgr, r);
+
+        if (r.end < dbgr->vm->numInstructions - 1)
+            printf(ESC_DIM "         ...\n" ESC_RESET);
+
     }
 
     printf("\n");

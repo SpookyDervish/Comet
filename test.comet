@@ -1,3 +1,8 @@
+func main() -> int {
+    breakpoint
+    return 123
+}
+
 struct Test {
     int abc
 
@@ -6,12 +11,6 @@ struct Test {
     }   
 
     func foo(int x) -> void {
-        self.abc += x
         return 0
     }
-}
-
-func main() -> int {
-    breakpoint
-    return 123
 }
