@@ -313,7 +313,7 @@ ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char
     }
 
     for (uint32_t i = range.start; i <= range.end; i++) {
-        printf("vars[%d] = 0x%08lx\n", i, dbgr->vm->variables[i]);
+        printf(ESC_BOLD "vars[%d]" ESC_RESET " = 0x%08lx\n", i, dbgr->vm->variables[i]);
     }
 
     return Success(charptr, charptr, NULL);
