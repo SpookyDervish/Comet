@@ -16,7 +16,7 @@ UseList(DebuggerBreakpoint);
 
 typedef struct {
     uint64_t ip;
-    uint32_t stackStart;
+    //uint32_t stackStart;
     int64_t args[128];
     char* funcName;
 } Frame;

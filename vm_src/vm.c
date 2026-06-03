@@ -141,7 +141,7 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
     Frame newFrame = {};
     newFrame.ip = function->startIdx;
-    newFrame.stackStart = vm->sp;
+    //newFrame.stackStart = vm->sp;
     newFrame.funcName = function->name;
 
     for (size_t i = function->numArgs; i > 0; i--) {
@@ -328,7 +328,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t casted;
         memcpy(&casted, &result, sizeof(int64_t));
 
-        pushValue(vm, a * b);
+        pushValue(vm, a / b);
         DISPATCH();
     }
     DIVF: {
@@ -492,8 +492,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     LOAD_ARG: {
-        Frame currentFrame = vm->callStack[vm->callIdx-1];
-        pushValue(vm, currentFrame.args[inst.a]); // 🍌 - i just kinda felt like adding this here
+        pushValue(vm, vm->currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
         DISPATCH();
     }
     RET: {
@@ -501,8 +500,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     CALL: {
-        CometSerializedFunc function = vm->functions[inst.a];
-        callFunction(vm, &function);
+        callFunction(vm, &vm->functions[inst.a]);
         DISPATCH();
     }
     NOT: {
