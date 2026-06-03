@@ -4,6 +4,7 @@
 #include "inst.h"
 #include "lexer.h"
 #include "../include/operand.h"
+#include "parser.h"
 #include "serialize.h"
 #include "token.h"
 #include <stdbool.h>
@@ -481,14 +482,67 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
-ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* infixExpr) {
-    struct AST_INFIX_EXPRESSION expr = infixExpr->data.AST_INFIX_EXPRESSION;
+ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_INFIX_EXPRESSION expr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
 
     ResultType(CometType, charptr) structType = visitLValue(c, expr.left);
     if (structType.error)
         return Error(CometOperand, charptr, structType.as.error);
 
     int32_t fieldIndex = getFieldIndex(structType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
+    ResultType(CometType, charptr) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
+    if (exprType.error)
+        return Error(CometOperand, charptr, exprType.as.error);
+
+    ResultType(CometType, charptr) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    if (varType.error) 
+        return Error(CometOperand, charptr, varType.as.error);
+    
+    if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
+        buildGetField(c, fieldIndex);
+    }
+
+    CometType resultType = unifyType(varType.as.success, exprType.as.success);
+    if (resultType.typeKind != varType.as.success.typeKind) {
+        Estr errMsg = CREATE_ESTR("Attempted to reassign type of field in struct \"");
+        APPEND_ESTR(errMsg, structType.as.success.structType->name);
+        APPEND_ESTR(errMsg, "\" at runtime!");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    switch (node->data.AST_REASSIGN_STATEMENT.op.type) {
+        case CT_PLUS_EQ: {
+            buildAdd(c, resultType);
+            break;
+        }
+        case CT_MINUS_EQ: {
+            buildSub(c, resultType);
+            break;
+        }
+        case CT_TIMES_EQ: {
+            buildMul(c, resultType);
+            break;
+        }
+        case CT_DIVIDE_EQ: {
+            buildDiv(c, resultType);
+            break;
+        }
+        case CT_EQ: break;
+        default: {
+            
+
+            Estr errMsg = CREATE_ESTR("Cannot use operator \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
+            APPEND_ESTR(errMsg, "\" to reassign field of struct \"");
+            APPEND_ESTR(errMsg, structType.as.success.structType->name);
+            APPEND_ESTR(errMsg, "\".");
+            return Error(CometOperand, charptr, errMsg.str);
+        }
+    }
+
+    if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
+        visitLValue(c, expr.left);
+    }
 
     buildSetField(c, fieldIndex);
 
@@ -500,7 +554,7 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
         return exprResult;
 
     if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        return visitFieldReassignStatement(c, node->data.AST_REASSIGN_STATEMENT.ident);
+        return visitFieldReassignStatement(c, node);
     }
 
     ResultType(CometType, charptr) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);

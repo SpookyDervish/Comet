@@ -1,14 +1,28 @@
-func add(int a, int b) -> int {
-    return a + b
+struct Test {
+    int x
+    int y
+    int z
+
+    init(int x, int y, int z) {
+        self.x = x
+        self.y = y
+        self.z = z
+    }
+
+    func add(Test other) -> void {
+        self.x += other.x
+        self.y += other.y
+        self.z += other.z
+        return 0
+    }
 }
 
 func main() -> int {
+    Test a = new Test(1, 4, 3)
+    Test b = new Test(2, 1, 4)
+
     breakpoint
-    mut int x = 25
-    mut int y = 30
+    a.add(b)
 
-    x = add(x, y)
-    y = x
-
-    return x
+    return a.x + a.y + a.z
 }
