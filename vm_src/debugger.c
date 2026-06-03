@@ -23,12 +23,6 @@ static inline int64_t min(int64_t a, int64_t b) {
 }
 
 void printDisassembly(CometDebugger* dbgr, Range range) {
-    if (range.start > range.end) {
-        uint32_t newEnd = range.start;
-        range.start = range.end;
-        range.end = newEnd;
-    }
-
     // go from start of range to end
     for (size_t i = range.start; i <= range.end; i++) {
 
@@ -301,19 +295,67 @@ ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char
 
     Range range = parseRange(argv[0]);
 
-    
-
     if (range.start < 0 || range.end >= MAX_VARIABLES) 
         return Error(charptr, charptr, "variable index out of bounds");
 
-    if (range.start > range.end) {
-        uint32_t newEnd = range.start;
-        range.start = range.end;
-        range.end = newEnd;
-    }
-
     for (uint32_t i = range.start; i <= range.end; i++) {
         printf(ESC_BOLD "vars[%d]" ESC_RESET " = 0x%08lx\n", i, dbgr->vm->variables[i]);
+    }
+
+    return Success(charptr, charptr, NULL);
+}
+
+void printStructInfo(CometDebugger* dbgr, uint32_t structIdx, CometSerializedStruct structType) {
+    printf(ESC_BOLD ESC_YELLOW_FG "    %%%d:\n" ESC_RESET, structIdx);
+    printf(ESC_BOLD "        Num of fields:    " ESC_RESET " %d\n", structType.numFields);
+    printf(ESC_BOLD "        Number of methods:" ESC_RESET " %d\n\n", structType.numMethods);
+
+    if (structType.numMethods > 0)
+        printf(ESC_BOLD "        Methods:\n" ESC_RESET);
+
+    for (uint32_t methodIdx = 0; methodIdx < structType.numMethods; methodIdx++) {
+        uint32_t symbolIdx = structType.vtable[methodIdx];
+        CometSerializedFunc func = dbgr->vm->functions[symbolIdx];
+
+        printf(ESC_BRIGHT_BLUE_FG "            %s:\n" ESC_RESET, func.name);
+        printf(ESC_BOLD "                Number of arguments:" ESC_RESET " %d\n", func.numArgs);
+        printf(ESC_BOLD "                Address:            " ESC_RESET " 0x%08lx\n", func.startIdx);
+
+    }
+
+    printf("\n");
+}
+
+ResultType(charptr, charptr) structsHandler(CometDebugger* dbgr, int argc, char** argv) {
+    printf(ESC_BOLD ESC_CYAN_FG "--> Structs <--\n\n" ESC_RESET);
+
+    if (argc < 1) { // print all structs
+        if (dbgr->vm->numStructs <= 0) {
+            printf(ESC_DIM "There are no structs in this program... :(\n" ESC_RESET);
+            return Success(charptr, charptr, NULL);
+        }
+
+
+        for (uint32_t i = 0; i < dbgr->vm->numStructs; i++) {
+            CometSerializedStruct structType = dbgr->vm->structs[i];
+            printStructInfo(dbgr, i, structType);
+        }
+    } else {
+        Range range = parseRange(argv[0]);
+
+        if (range.start > range.end) {
+            uint32_t newEnd = range.start;
+            range.start = range.end;
+            range.end = newEnd;
+        }
+
+        if (range.start < 0 || range.end >= dbgr->vm->numStructs) 
+            return Error(charptr, charptr, "struct index out of bounds");
+
+        for (uint32_t i = 0; i < dbgr->vm->numStructs; i++) {
+            CometSerializedStruct structType = dbgr->vm->structs[i];
+            printStructInfo(dbgr, i, structType);
+        }
     }
 
     return Success(charptr, charptr, NULL);
@@ -374,7 +416,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"unbreak", unbreakHandler, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
     {"stack", stackHandler, "display the current state of the stack", "st | st <index>", stackAliases},
     {"variable", variableHandler, "get the value of a variable / variables", "v <index> | v <startIndex>:<endIndex>", variableAliases},
-    {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
+    {"structs", structsHandler, "print all structs or display info about a struct", "ls | ls <index> | ls <startIndex>:<endIndex>", structsAliases},
     {"step", stepHandler, "execute next instruction", "s | s <numInstructions>", stepAliases},
     {"continue", continueHandler, "continue execution", "c", continueAliases},
 };

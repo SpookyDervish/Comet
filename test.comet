@@ -1,32 +1,17 @@
 struct Test {
-    int x
-    int y
-    int z
+    int abc
 
-    init(int x, int y, int z) {
-        self.x = x
-        self.y = y
-        self.z = z
-    }
+    init() {
+        self.abc = 123
+    }   
 
-    func add(Test other) -> void {
-        self.x += other.x
-        self.y += other.y
-        self.z += other.z
+    func foo(int x) -> void {
+        self.abc += x
         return 0
     }
 }
 
 func main() -> int {
     breakpoint
-    mut int i = 0
-    Test a = new Test(1, 4, 3)
-    Test b = new Test(2, 1, 4)
-
-    while (i < 10000000) {
-        a.add(b)
-        i += 1
-    }
-
-    return a.x + a.y + a.z
+    return 123
 }
