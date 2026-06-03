@@ -108,6 +108,10 @@ ResultType(charptr, charptr) continueHandler(CometDebugger* dbgr, int argc, char
     return Success(charptr, charptr, NULL);
 }
 
+ResultType(charptr, charptr) quitHandler(CometDebugger* dbgr, int argc, char** argv) {
+    exit(0);
+}
+
 ResultType(charptr, charptr) unbreakHandler(CometDebugger* dbgr, int argc, char** argv) {
     if (argc < 1) 
         return Error(charptr, charptr, "1 arg required");
@@ -261,6 +265,35 @@ ResultType(charptr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
     return Success(charptr, charptr, NULL);
 }
 
+ResultType(charptr, charptr) stackHandler(CometDebugger* dbgr, int argc, char** argv) {
+    if (argc > 0) {
+        char* end;
+        errno = 0;
+        uint64_t value = strtoul(argv[0], &end, 0);
+
+        bool ok =
+            errno == 0 &&
+            end != argv[0] &&
+            *end == '\0';
+
+        if (!ok) {
+            return Error(charptr, charptr, "invalid number input!");
+        }
+
+        if (value >= *dbgr->vm->currentSp) {
+            return Error(charptr, charptr, "index is past length of stack!");
+        }
+
+        printf("0x%08llx\n", (*dbgr->vm->currentStack)[value]);
+        return Success(charptr, charptr, NULL);
+    }
+
+    printf( ESC_BOLD "Stack: " ESC_RESET "%s\n", stackAsString(*dbgr->vm->currentStack, *dbgr->vm->currentSp));
+    printf( ESC_BOLD "SP:    " ESC_RESET "%d\n", *dbgr->vm->currentSp);
+
+    return Success(charptr, charptr, NULL);
+}
+
 int tokenize(char* line, char** argv, int maxArgs) {
     int argc = 0;
 
@@ -310,11 +343,11 @@ static const char* quitAliases[] = {"q", "stop", "exit", NULL};
 ResultType(charptr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
 const CometDebugCommand DBGR_COMMANDS[] = {
     {"help", helpHandler, "display a list of all commnads or get help about a specific command", "h | h <command>", helpAliases},
-    {"quit", NULL, "exit the debugger and stop the vm", "q", quitAliases},
+    {"quit", quitHandler, "exit the debugger and stop the vm", "q", quitAliases},
     {"disassemble", disassembleHandler, "disassemble a line or range of lines", "d | d <line> | d <start>:<end>", disassembleAliases},
     {"break", breakHandler, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
     {"unbreak", unbreakHandler, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
-    {"stack", NULL, "display the current state of the stack", "st | st <index>", stackAliases},
+    {"stack", stackHandler, "display the current state of the stack", "st | st <index>", stackAliases},
     {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
     {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
     {"step", stepHandler, "execute next instruction", "s | s <numInstructions>", stepAliases},
