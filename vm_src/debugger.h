@@ -12,6 +12,11 @@
 #include "../lib/error.h"
 #include "../lib/list.h"
 
+#define IS_OBJECT(x) _Generic((x), \
+    CometObject*: 1,        \
+    default: 0              \
+)
+
 typedef struct {
     int hasEnd;
     uint32_t start;

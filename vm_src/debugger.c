@@ -284,7 +284,7 @@ ResultType(charptr, charptr) stackHandler(CometDebugger* dbgr, int argc, char** 
             return Error(charptr, charptr, "index is past length of stack!");
         }
 
-        printf("0x%08llx\n", (*dbgr->vm->currentStack)[value]);
+        printf(ESC_BOLD "Stack[%ld]:" ESC_RESET " 0x%08llx\n", value, (*dbgr->vm->currentStack)[value]);
         return Success(charptr, charptr, NULL);
     }
 
