@@ -3,6 +3,7 @@
 
 #define MAX_CALL_FRAMES 1024
 #define MAX_DATA_STACK 65536
+#define MAX_VARIABLES 1024
 
 #include "../include/operand.h"
 #include "../lib/list.h"
@@ -42,7 +43,7 @@ typedef struct {
 
     uint32_t sp;
 
-    int64_t* variables;
+    int64_t variables[MAX_VARIABLES];
 
     uint8_t* breakpoints;
     uint8_t nextBreakpointID;

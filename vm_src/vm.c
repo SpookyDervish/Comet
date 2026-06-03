@@ -69,7 +69,6 @@ void createBreakpoint(CometVM* vm) {
 FORCE_INLINE void pushValue(CometVM* vm, int64_t value) {
     /*(*vm->currentStack)[*vm->currentSp] = value;
     *vm->currentSp += 1;*/
-    printf("%d\n", vm->sp);
     vm->stack[vm->sp++] = value;
 }
 
@@ -150,27 +149,8 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     }
 
     vm->callStack[vm->callIdx] = newFrame;
+    vm->currentFrame = &(vm->callStack[vm->callIdx]);
     vm->callIdx++;
-
-    vm->currentFrame = &vm->callStack[vm->callIdx];
-
-    /*Frame* callFrame = malloc(sizeof(Frame));
-    callFrame->stack = calloc(256, sizeof(int64_t));
-    callFrame->args = calloc(256, sizeof(int64_t));
-    callFrame->sp = 0;
-    callFrame->funcName = strdup(function->name);
-    callFrame->ip = function->startIdx;
-
-    for (size_t i = function->numArgs; i > 0; i--) {
-        callFrame->args[i - 1] = popValue(vm);
-    }
-
-    vm->callStack[vm->callIdx] = callFrame;
-    vm->callIdx++;
-
-    vm->currentStack = &callFrame->stack;
-    vm->currentFrame = callFrame;
-    vm->currentSp = &callFrame->sp;*/
 }
 
 void returnFromFunc(CometVM* vm) {
@@ -183,28 +163,6 @@ void returnFromFunc(CometVM* vm) {
     }
 
     vm->currentFrame = &vm->callStack[vm->callIdx-1];
-
-    /*Frame* funcFrame = vm->callStack[vm->callIdx-1];
-
-    vm->callIdx--;
-    
-
-    if (vm->callIdx == 0) {
-        vm->running = false;
-        return;
-    }
-
-    vm->currentFrame = vm->callStack[vm->callIdx-1];
-    vm->currentStack = &vm->currentFrame->stack;
-    vm->currentSp = &vm->currentFrame->sp;
-
-    if (funcFrame->sp > 0) {
-        pushValue(vm, funcFrame->stack[funcFrame->sp-1]);
-    }
-    
-    
-    free(funcFrame->stack);
-    free(funcFrame);*/
 }
 
 FORCE_INLINE CometSerializedInst fetchNextInst(CometVM* vm) {
@@ -642,9 +600,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         return Error(vmPtr, charptr, "failed to allocate memory for CometVM!");
     }
 
-    
-
-    //newVM->stackCapacity = max(max(64, loadedFile->numConsts), loadedFile->numConsts*2);
+    // allocate arrays
     newVM->instructions = calloc(loadedFile->numInstructions, sizeof(CometSerializedInst));
     newVM->constants = calloc(loadedFile->numConsts, sizeof(CometOperand));
     newVM->structs = calloc(loadedFile->numStructs, sizeof(CometSerializedStruct));
@@ -700,11 +656,8 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->numFunctions = loadedFile->numFunctions;
     newVM->numStructs = loadedFile->numStructs;
     newVM->numInstructions = loadedFile->numInstructions;
-    newVM->variables = calloc(256, sizeof(int64_t));
-    //newVM->callStack = calloc(128, sizeof(Frame));
-    //newVM->currentSp = NULL;
+
     newVM->currentFrame = NULL,
-    //newVM->currentStack = NULL;
     newVM->callIdx = 0;
 
     newVM->instructionsLeftToExec = UINT64_MAX;
