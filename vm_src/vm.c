@@ -67,24 +67,21 @@ void createBreakpoint(CometVM* vm) {
 }
 
 FORCE_INLINE void pushValue(CometVM* vm, int64_t value) {
-    /*(*vm->currentStack)[*vm->currentSp] = value;
-    *vm->currentSp += 1;*/
     vm->stack[vm->sp++] = value;
 }
 
-static inline int64_t getTop(CometVM* vm) {
+FORCE_INLINE int64_t getTop(CometVM* vm) {
     if (vm->sp <= 0) {
         fprintf(stderr, "Attempted to popValue top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
         fprintf(stderr, "%s\n", stackTrace(vm));
         assert(false);
     }
 
-    return vm->stack[vm->sp-1]; //(*vm->currentStack)[(*vm->currentSp)-1];
+    return vm->stack[vm->sp-1];
 }
 
 FORCE_INLINE int64_t popValue(CometVM* vm) {
     int64_t value = getTop(vm);
-    //*vm->currentSp -= 1;
     vm->sp--;
     return value;
 }
@@ -139,18 +136,17 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 }
 
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
-    Frame newFrame = {};
-    newFrame.ip = function->startIdx;
+    Frame* newFrame = &vm->callStack[vm->callIdx++];
+
+    newFrame->ip = function->startIdx;
     //newFrame.stackStart = vm->sp;
-    newFrame.funcName = function->name;
+    newFrame->funcName = function->name;
 
     for (size_t i = function->numArgs; i > 0; i--) {
-        newFrame.args[i - 1] = popValue(vm);
+        newFrame->args[i - 1] = popValue(vm);
     }
 
-    vm->callStack[vm->callIdx] = newFrame;
-    vm->currentFrame = &(vm->callStack[vm->callIdx]);
-    vm->callIdx++;
+    vm->currentFrame = newFrame;
 }
 
 void returnFromFunc(CometVM* vm) {
