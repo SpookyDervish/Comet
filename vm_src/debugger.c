@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
@@ -101,15 +102,15 @@ CometSerializedFunc* getFuncByName(CometDebugger* dbgr, char* name) {
     return NULL;
 }
 
-ResultType(voidPtr, charptr) continueHandler(CometDebugger* dbgr, int argc, char** argv) {
+ResultType(charptr, charptr) continueHandler(CometDebugger* dbgr, int argc, char** argv) {
     dbgr->vm->instructionsLeftToExec = UINT64_MAX;
     dbgr->running = false;
-    return Success(voidPtr, charptr, NULL);
+    return Success(charptr, charptr, NULL);
 }
 
-ResultType(voidPtr, charptr) breakHandler(CometDebugger* dbgr, int argc, char** argv) {
+ResultType(charptr, charptr) unbreakHandler(CometDebugger* dbgr, int argc, char** argv) {
     if (argc < 1) 
-        return Error(voidPtr, charptr, "1 arg required");
+        return Error(charptr, charptr, "1 arg required");
 
     errno = 0;
     char* end;
@@ -128,25 +129,96 @@ ResultType(voidPtr, charptr) breakHandler(CometDebugger* dbgr, int argc, char** 
             APPEND_ESTR(errMsg, argv[0]);
             APPEND_ESTR(errMsg, "\"");
 
-            return Error(voidPtr, charptr, errMsg.str);
+            return Error(charptr, charptr, errMsg.str);
+        }
+
+        if (!dbgr->vm->breakpoints[func->startIdx]) {
+            char* buffer = malloc(256);
+            sprintf(buffer, "no breakpoint set at function \"%s\" (0x%04lx).\n", func->name, func->startIdx);
+    
+            return Error(charptr, charptr, buffer);
+        }
+
+        dbgr->vm->breakpoints[func->startIdx] = 0;
+
+        printf("break: removed breakpoint on function %s.\n", func->name);
+
+        return Success(charptr, charptr, NULL);
+    }
+
+    if (!dbgr->vm->breakpoints[address]) {
+        char* buffer = malloc(128);
+        sprintf(buffer, "no breakpoint set at address 0x%04lx.\n", address);
+
+        return Error(charptr, charptr, buffer);
+    } else if (address >= dbgr->vm->numInstructions) {
+        return Error(charptr, charptr, "cannot remove breakpoint at invalid address.");
+    }
+
+    dbgr->vm->breakpoints[address] = 0;
+
+    printf("break: removed breakpoint on address 0x%04lx.\n", address);
+
+    return Success(charptr, charptr, NULL);
+    
+}   
+
+ResultType(charptr, charptr) breakHandler(CometDebugger* dbgr, int argc, char** argv) {
+    if (argc < 1) 
+        return Error(charptr, charptr, "1 arg required");
+
+    errno = 0;
+    char* end;
+
+    unsigned long address = strtoul(argv[0], &end, 0);
+
+    bool isNumber =
+        errno == 0 &&
+        end != argv[0] &&
+        *end == '\0';
+
+    if (!isNumber) {
+        CometSerializedFunc* func = getFuncByName(dbgr, argv[0]);
+        if (!func) {
+            Estr errMsg = CREATE_ESTR("Could not find a function with the name \"");
+            APPEND_ESTR(errMsg, argv[0]);
+            APPEND_ESTR(errMsg, "\"");
+
+            return Error(charptr, charptr, errMsg.str);
+        }
+
+        if (dbgr->vm->breakpoints[func->startIdx]) {
+            char* buffer = malloc(256);
+            sprintf(buffer, "breakpoint already set at function \"%s\" (0x%04lx).\n", func->name, func->startIdx);
+    
+            return Error(charptr, charptr, buffer);
         }
 
         dbgr->vm->breakpoints[func->startIdx] = 1;
 
         printf("break: added breakpoint on function %s.\n", func->name);
 
-        return Success(voidPtr, charptr, NULL);
+        return Success(charptr, charptr, NULL);
+    }
+
+    if (dbgr->vm->breakpoints[address]) {
+        char* buffer = malloc(128);
+        sprintf(buffer, "breakpoint already set at address 0x%04lx.\n", address);
+
+        return Error(charptr, charptr, buffer);
+    } else if (address >= dbgr->vm->numInstructions) {
+        return Error(charptr, charptr, "cannot create breakpoint at invalid address.");
     }
 
     dbgr->vm->breakpoints[address] = 1;
 
     printf("break: added breakpoint on address 0x%04lx.\n", address);
 
-    return Success(voidPtr, charptr, NULL);
+    return Success(charptr, charptr, NULL);
     
 }   
 
-ResultType(voidPtr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** argv) {
+ResultType(charptr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** argv) {
 
     if (argc < 1) {
         dbgr->vm->instructionsLeftToExec = 1;
@@ -161,7 +233,7 @@ ResultType(voidPtr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** a
             *end == '\0';
 
         if (!ok) {
-            return Error(voidPtr, charptr, "invalid number input!");
+            return Error(charptr, charptr, "invalid number input!");
         }
 
         dbgr->vm->instructionsLeftToExec = value;
@@ -169,10 +241,10 @@ ResultType(voidPtr, charptr) stepHandler(CometDebugger* dbgr, int argc, char** a
     
     dbgr->running = false;
 
-    return Success(voidPtr, charptr, NULL);
+    return Success(charptr, charptr, NULL);
 }
 
-ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
+ResultType(charptr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, char** argv) {
     // get range to display
     Range range;
     if (argc < 1) 
@@ -181,12 +253,12 @@ ResultType(voidPtr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
         range = parseRange(argv[0]);
     
     if (range.start < 0) {
-        return Error(voidPtr, charptr, "can't start disassembly at negative address!");
+        return Error(charptr, charptr, "can't start disassembly at negative address!");
     }
 
     printDisassembly(dbgr, range) ;
 
-    return Success(voidPtr, charptr, NULL);
+    return Success(charptr, charptr, NULL);
 }
 
 int tokenize(char* line, char** argv, int maxArgs) {
@@ -235,13 +307,13 @@ static const char* stepAliases[] = {"s", NULL};
 static const char* continueAliases[] = {"c", "cont", NULL};
 static const char* quitAliases[] = {"q", "stop", "exit", NULL};
 
-ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
+ResultType(charptr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
 const CometDebugCommand DBGR_COMMANDS[] = {
     {"help", helpHandler, "display a list of all commnads or get help about a specific command", "h | h <command>", helpAliases},
     {"quit", NULL, "exit the debugger and stop the vm", "q", quitAliases},
     {"disassemble", disassembleHandler, "disassemble a line or range of lines", "d | d <line> | d <start>:<end>", disassembleAliases},
     {"break", breakHandler, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
-    {"unbreak", NULL, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
+    {"unbreak", unbreakHandler, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
     {"stack", NULL, "display the current state of the stack", "st | st <index>", stackAliases},
     {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
     {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
@@ -276,14 +348,14 @@ const CometDebugCommand* getCommandByName(char* cmdName) {
     return NULL;
 }
 
-ResultType(voidPtr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
+ResultType(charptr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
 
     int maxArgs = 16;
     char* argv[maxArgs];
     int argc = tokenize(line, argv, maxArgs);
 
     if (argc == 0)
-        return Success(voidPtr, charptr, NULL);
+        return Success(charptr, charptr, NULL);
 
     const CometDebugCommand* cmd = getCommandByName(argv[0]);
     if (cmd == NULL) {
@@ -293,15 +365,15 @@ ResultType(voidPtr, charptr) parseCommand(CometDebugger* dbgr, char* line) {
         fprintf(stderr, "%s\n", errMsg.str);
         DESTROY_ESTR(errMsg);
 
-        return Success(voidPtr, charptr, NULL);
+        return Success(charptr, charptr, NULL);
     }
 
-    ResultType(voidPtr, charptr) cmdResult = cmd->handler(dbgr, argc - 1, &argv[1]);
+    ResultType(charptr, charptr) cmdResult = cmd->handler(dbgr, argc - 1, &argv[1]);
     if (cmdResult.error) {
-        fprintf(stderr, "%s: %s\n", cmd->name, cmdResult.as.error);
+        fprintf(stderr, ESC_BOLD ESC_BRIGHT_RED_FG "%s: error: %s\n" ESC_RESET, cmd->name, cmdResult.as.error);
     }
 
-    return Success(voidPtr, charptr, NULL);
+    return Success(charptr, charptr, NULL);
 }
 
 void debuggerLoop(CometDebugger* dbgr) {
@@ -317,7 +389,7 @@ void debuggerLoop(CometDebugger* dbgr) {
             return;
         }
 
-        ResultType(voidPtr, charptr) commandResult = parseCommand(dbgr, userInput);
+        ResultType(charptr, charptr) commandResult = parseCommand(dbgr, userInput);
 
         if (commandResult.error) 
             break;
@@ -363,7 +435,7 @@ void printAliases(CometDebugCommand cmd) {
     }
 }
 
-ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv) {
+ResultType(charptr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv) {
     // look for command with given name
     if (argc > 0) {
         char* cmdName = argv[0];
@@ -373,7 +445,7 @@ ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** a
             Estr errMsg = CREATE_ESTR("no such command: \"");
             APPEND_ESTR(errMsg, argv[0]);
             APPEND_ESTR(errMsg, "\"")
-            return Error(voidPtr, charptr, errMsg.str);
+            return Error(charptr, charptr, errMsg.str);
         }
 
         printf(ESC_BOLD ESC_CYAN_FG "\\\\\\ %s ///\n\n" ESC_RESET, cmd->name);
@@ -382,7 +454,7 @@ ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** a
         printf(ESC_BOLD ESC_YELLOW_FG "Aliases: " ESC_RESET);
         printAliases(*cmd);
 
-        return Success(voidPtr, charptr, NULL);
+        return Success(charptr, charptr, NULL);
     }
 
     // help command with no args
@@ -396,7 +468,7 @@ ResultType(voidPtr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** a
         printAliases(cmd);
     }
 
-    return Success(voidPtr, charptr, NULL);
+    return Success(charptr, charptr, NULL);
 }
 
 Range parseRange(const char* str) {

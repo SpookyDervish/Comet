@@ -45,7 +45,7 @@ typedef enum {
 
 typedef struct {
     char name[32];
-    uint32_t startIdx;
+    uint64_t startIdx;
     uint32_t numArgs;
 } CometSerializedFunc;
 

@@ -24,9 +24,11 @@ typedef struct {
     bool running;
 } CometDebugger;
 
+Result(charptr, charptr);
+
 typedef struct {
     const char* name;
-    ResultType(voidPtr, charptr) (*handler)(CometDebugger* dbgr, int argc, char** argv);
+    ResultType(charptr, charptr) (*handler)(CometDebugger* dbgr, int argc, char** argv);
     const char* help;
     const char* usage;
     const char** aliases;
