@@ -786,9 +786,11 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 ResultType(CometOperand, charptr) visitReturnStatement(CometCompiler* c, CometASTNode* node) {
-    ResultType(CometOperand, charptr) returnValue = visitValue(c, node->data.AST_RETURN_STATEMENT.expression);
-    if (returnValue.error)
-        return returnValue;
+    if (c->currentFunction->returnType.typeKind != COMET_VOID) {
+        ResultType(CometOperand, charptr) returnValue = visitValue(c, node->data.AST_RETURN_STATEMENT.expression);
+        if (returnValue.error)
+            return returnValue;
+    }
     
     buildReturn(c);
 
@@ -909,9 +911,7 @@ ResultType(CometOperand, charptr) visitWhileStatement(CometCompiler* c, CometAST
     if (condition.error)
         return condition;
 
-    buildNot(c);
-    buildJumpIfFalse(c, startLabel);
-
+    buildJumpIfTrue(c, startLabel);
     resolveLabel(c, endLabel);
 
     c->env = destroyEnv(whileEnv);

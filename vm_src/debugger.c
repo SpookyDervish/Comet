@@ -60,6 +60,7 @@ void printDisassembly(CometDebugger* dbgr, Range range) {
         switch (dbgr->vm->instructions[i].opcode) {
             case INST_JMP:
             case INST_JMP_IF_FALSE:
+            case INST_JMP_IF_TRUE:
             case INST_CALL:
             case INST_CALL_METHOD:
             case INST_RET:
@@ -280,16 +281,16 @@ ResultType(charptr, charptr) stackHandler(CometDebugger* dbgr, int argc, char** 
             return Error(charptr, charptr, "invalid number input!");
         }
 
-        if (value >= *dbgr->vm->currentSp) {
+        if (value >= dbgr->vm->sp) {
             return Error(charptr, charptr, "index is past length of stack!");
         }
 
-        printf(ESC_BOLD "Stack[%ld]:" ESC_RESET " 0x%08llx\n", value, (*dbgr->vm->currentStack)[value]);
+        printf(ESC_BOLD "Stack[%ld]:" ESC_RESET " 0x%08llx\n", value, dbgr->vm->stack[value]);
         return Success(charptr, charptr, NULL);
     }
 
-    printf( ESC_BOLD "Stack: " ESC_RESET "%s\n", stackAsString(*dbgr->vm->currentStack, *dbgr->vm->currentSp));
-    printf( ESC_BOLD "SP:    " ESC_RESET "%d\n", *dbgr->vm->currentSp);
+    printf( ESC_BOLD "Stack: " ESC_RESET "%s\n", stackAsString(dbgr->vm->stack, dbgr->vm->sp));
+    printf( ESC_BOLD "SP:    " ESC_RESET "%d\n", dbgr->vm->sp);
 
     return Success(charptr, charptr, NULL);
 }
@@ -447,8 +448,8 @@ void startDebugger(CometVM* vm, bool startedFromStep) {
     printf(ESC_BOLD "VM State:\n" ESC_RESET);
     printf("    - IP: 0x%016lx\n", vm->currentFrame->ip);
     printf("    - Current Inst: %s\n", cometInstructionToCStr(vm, vm->instructions[vm->currentFrame->ip], vm->currentFrame->ip));
-    printf("    - SP: 0x%08x\n", vm->currentFrame->sp);
-    printf("    - Stack: %s\n\n", stackAsString(*vm->currentStack, *vm->currentSp));
+    printf("    - SP: 0x%08x\n", vm->sp);
+    printf("    - Stack: %s\n\n", stackAsString(vm->stack, vm->sp));
     debuggerLoop(newDbgr);
 
     free(newDbgr);
@@ -643,6 +644,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_GTEF         : return "    GTEF            ";
         case INST_JMP          : return "    JMP             ";
         case INST_JMP_IF_FALSE : return "    JMP_IF_FALSE    ";
+        case INST_JMP_IF_TRUE  : return "    JMP_IF_TRUE     ";
         case INST_NOT          : return "    NOT             ";
         case INST_I2F          : return "    I2F             ";
         case INST_DUP          : return "    DUP             ";
@@ -691,7 +693,8 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_RET
         {COMET_FUNCTION, COMET_VOID, COMET_VOID}, // INST_CALL
         {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_JMP
-        {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_JMP_IF_FALSE
+        {COMET_INT,  COMET_VOID, COMET_VOID}, // INST_JMP_IF_FALSE
+        {COMET_INT,  COMET_VOID, COMET_VOID}, // INST_JMP_IF_TRUE
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_NOT
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_I2F
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_DUP
@@ -874,10 +877,10 @@ char* stackTrace(CometVM* vm) {
     Estr stackTraceStr = CREATE_ESTR("\nCall Stack (most recent call first):\n");
 
     for (size_t i = vm->callIdx; i-- > 0;) {
-        Frame* call = vm->callStack[i];
+        Frame call = vm->callStack[i];
 
         char* funcBuffer = malloc(128);
-        sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)  %s\n", call->ip, call->funcName, call->sp, stackAsString(call->stack, call->sp));
+        sprintf(funcBuffer, "    0x%04lx    %s    (sp: 0x%x)  %s\n", call.ip, call.funcName, vm->sp, stackAsString(vm->stack, vm->sp));
 
         APPEND_ESTR(stackTraceStr, funcBuffer);
     }

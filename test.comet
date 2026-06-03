@@ -18,11 +18,14 @@ struct Test {
 }
 
 func main() -> int {
+    mut int i = 0
     Test a = new Test(1, 4, 3)
     Test b = new Test(2, 1, 4)
 
-    breakpoint
-    a.add(b)
+    while (i < 10000000) {
+        a.add(b)
+        i += 1
+    }
 
     return a.x + a.y + a.z
 }

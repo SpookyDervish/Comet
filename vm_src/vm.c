@@ -67,23 +67,26 @@ void createBreakpoint(CometVM* vm) {
 }
 
 FORCE_INLINE void pushValue(CometVM* vm, int64_t value) {
-    (*vm->currentStack)[*vm->currentSp] = value;
-    *vm->currentSp += 1;
+    /*(*vm->currentStack)[*vm->currentSp] = value;
+    *vm->currentSp += 1;*/
+    printf("%d\n", vm->sp);
+    vm->stack[vm->sp++] = value;
 }
 
 static inline int64_t getTop(CometVM* vm) {
-    if ((*vm->currentSp) <= 0) {
+    if (vm->sp <= 0) {
         fprintf(stderr, "Attempted to popValue top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
         fprintf(stderr, "%s\n", stackTrace(vm));
         assert(false);
     }
 
-    return (*vm->currentStack)[(*vm->currentSp)-1];
+    return vm->stack[vm->sp-1]; //(*vm->currentStack)[(*vm->currentSp)-1];
 }
 
 FORCE_INLINE int64_t popValue(CometVM* vm) {
     int64_t value = getTop(vm);
-    *vm->currentSp -= 1;
+    //*vm->currentSp -= 1;
+    vm->sp--;
     return value;
 }
 
@@ -137,7 +140,21 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 }
 
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
-    Frame* callFrame = malloc(sizeof(Frame));
+    Frame newFrame = {};
+    newFrame.ip = function->startIdx;
+    newFrame.stackStart = vm->sp;
+    newFrame.funcName = function->name;
+
+    for (size_t i = function->numArgs; i > 0; i--) {
+        newFrame.args[i - 1] = popValue(vm);
+    }
+
+    vm->callStack[vm->callIdx] = newFrame;
+    vm->callIdx++;
+
+    vm->currentFrame = &vm->callStack[vm->callIdx];
+
+    /*Frame* callFrame = malloc(sizeof(Frame));
     callFrame->stack = calloc(256, sizeof(int64_t));
     callFrame->args = calloc(256, sizeof(int64_t));
     callFrame->sp = 0;
@@ -153,11 +170,21 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
 
     vm->currentStack = &callFrame->stack;
     vm->currentFrame = callFrame;
-    vm->currentSp = &callFrame->sp;
+    vm->currentSp = &callFrame->sp;*/
 }
 
 void returnFromFunc(CometVM* vm) {
-    Frame* funcFrame = vm->callStack[vm->callIdx-1];
+    Frame funcFrame = vm->callStack[vm->callIdx - 1];
+    vm->callIdx--;
+
+    if (vm->callIdx == 0) {
+        vm->running = false;
+        return;
+    }
+
+    vm->currentFrame = &vm->callStack[vm->callIdx-1];
+
+    /*Frame* funcFrame = vm->callStack[vm->callIdx-1];
 
     vm->callIdx--;
     
@@ -170,9 +197,14 @@ void returnFromFunc(CometVM* vm) {
     vm->currentFrame = vm->callStack[vm->callIdx-1];
     vm->currentStack = &vm->currentFrame->stack;
     vm->currentSp = &vm->currentFrame->sp;
-    pushValue(vm, funcFrame->stack[funcFrame->sp-1]);
+
+    if (funcFrame->sp > 0) {
+        pushValue(vm, funcFrame->stack[funcFrame->sp-1]);
+    }
     
-    free(funcFrame);
+    
+    free(funcFrame->stack);
+    free(funcFrame);*/
 }
 
 FORCE_INLINE CometSerializedInst fetchNextInst(CometVM* vm) {
@@ -218,6 +250,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&CALL,
         &&JMP,
         &&JMP_IF_FALSE,
+        &&JMP_IF_TRUE,
         &&NOT,
         &&I2F,
         &&DUP,
@@ -486,6 +519,12 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         }
         DISPATCH();
     }
+    JMP_IF_TRUE: {
+        if (popValue(vm)) {
+            vm->currentFrame->ip = inst.a;
+        }
+        DISPATCH();
+    }
     STORE: {
         vm->variables[inst.a] = popValue(vm);
         DISPATCH();
@@ -495,8 +534,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     LOAD_ARG: {
-        Frame* currentFrame = vm->callStack[vm->callIdx-1];
-        pushValue(vm, currentFrame->args[inst.a]); // 🍌 - i just kinda felt like adding this here
+        Frame currentFrame = vm->callStack[vm->callIdx-1];
+        pushValue(vm, currentFrame.args[inst.a]); // 🍌 - i just kinda felt like adding this here
         DISPATCH();
     }
     RET: {
@@ -583,7 +622,7 @@ ResultType(int, charptr) startVM(CometVM* vm) {
         return Error(int, charptr, errMsg.str);
     }
 
-    return Success(int, charptr, (*vm->currentStack)[(*vm->currentSp)-1]);
+    return Success(int, charptr, vm->stack[vm->sp-1]);//(*vm->currentStack)[(*vm->currentSp)-1]);
 }
 
 
@@ -605,7 +644,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
     
 
-    newVM->stackCapacity = max(max(64, loadedFile->numConsts), loadedFile->numConsts*2);
+    //newVM->stackCapacity = max(max(64, loadedFile->numConsts), loadedFile->numConsts*2);
     newVM->instructions = calloc(loadedFile->numInstructions, sizeof(CometSerializedInst));
     newVM->constants = calloc(loadedFile->numConsts, sizeof(CometOperand));
     newVM->structs = calloc(loadedFile->numStructs, sizeof(CometSerializedStruct));
@@ -662,10 +701,10 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->numStructs = loadedFile->numStructs;
     newVM->numInstructions = loadedFile->numInstructions;
     newVM->variables = calloc(256, sizeof(int64_t));
-    newVM->callStack = calloc(128, sizeof(Frame));
-    newVM->currentSp = NULL;
+    //newVM->callStack = calloc(128, sizeof(Frame));
+    //newVM->currentSp = NULL;
     newVM->currentFrame = NULL,
-    newVM->currentStack = NULL;
+    //newVM->currentStack = NULL;
     newVM->callIdx = 0;
 
     newVM->instructionsLeftToExec = UINT64_MAX;

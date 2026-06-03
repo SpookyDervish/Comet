@@ -1,4 +1,5 @@
 #include "inst.h"
+#include "ast.h"
 #include "environment.h"
 #include "../include/operand.h"
 #include <stdbool.h>
@@ -84,6 +85,7 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     newCompiler->env = newEnvironment("root", NULL, false);
     newCompiler->structs = newList(cometStructPtr);
     newCompiler->typeMap = newList(CometTypeMapEntry);
+    newCompiler->currentFunction = NULL;
  
     // fill in type map
     CometTypeMapEntry smallType =  { .name = "small",  .type = (CometType){.typeKind = COMET_SMALL}  };
@@ -404,6 +406,8 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, Come
 
     c->functionCount++;
 
+    c->currentFunction = newFunction;
+
     return funcValue;
 }
 void buildReturn(CometCompiler* c) {
@@ -446,6 +450,14 @@ void buildJumpIfFalse(CometCompiler* c, CometLabel* label) {
     popVal(c);
 
     buildInst(c, INST_JMP_IF_FALSE, labelOperand, NO_OPERAND, NO_OPERAND);
+}
+void buildJumpIfTrue(CometCompiler* c, CometLabel* label) {
+    CometOperand labelOperand = createOperand(CO_LABEL);
+    labelOperand.label = label;
+
+    popVal(c);
+
+    buildInst(c, INST_JMP_IF_TRUE, labelOperand, NO_OPERAND, NO_OPERAND);
 }
 CometOperand buildNot(CometCompiler* c) {
     popVal(c);

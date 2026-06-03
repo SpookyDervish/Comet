@@ -1,6 +1,9 @@
 #ifndef VM_H
 #define VM_H
 
+#define MAX_CALL_FRAMES 1024
+#define MAX_DATA_STACK 65536
+
 #include "../include/operand.h"
 #include "../lib/list.h"
 #include "args.h"
@@ -11,10 +14,9 @@ typedef struct DebuggerBreakpoint DebuggerBreakpoint;
 UseList(DebuggerBreakpoint);
 
 typedef struct {
-    int64_t* stack;
-    int64_t* args;
     uint64_t ip;
-    uint32_t sp;
+    uint32_t stackStart;
+    int64_t args[128];
     char* funcName;
 } Frame;
 
@@ -22,8 +24,7 @@ typedef struct {
     uint32_t numConstants;
     CometOperand* constants;
 
-    uint64_t stackCapacity;
-    int64_t** currentStack;
+    int64_t stack[MAX_DATA_STACK];
 
     uint32_t numFunctions;
 
@@ -35,11 +36,11 @@ typedef struct {
     uint32_t numStructs;
     CometSerializedStruct* structs;
 
-    Frame** callStack;
+    Frame callStack[MAX_CALL_FRAMES];
     Frame* currentFrame;
-    uint8_t callIdx;
+    uint32_t callIdx;
 
-    uint32_t* currentSp;
+    uint32_t sp;
 
     int64_t* variables;
 

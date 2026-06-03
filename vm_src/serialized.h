@@ -32,6 +32,7 @@ typedef enum {
     INST_CALL,
     INST_JMP,
     INST_JMP_IF_FALSE,
+    INST_JMP_IF_TRUE,
     INST_NOT,
     INST_I2F,
     INST_DUP,

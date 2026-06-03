@@ -41,6 +41,7 @@ typedef enum {
     INST_CALL,
     INST_JMP,
     INST_JMP_IF_FALSE,
+    INST_JMP_IF_TRUE,
     INST_NOT,
     INST_I2F,
     INST_DUP,
@@ -82,6 +83,7 @@ typedef struct {
     CometLabel* labels[512];
     CometInst* outputProgram;
     CometFunction* functions[128];
+    CometFunction* currentFunction;
     CometEnvironment* env;
     List(CometTypeMapEntry) typeMap;
     List(cometStructPtr) structs;
@@ -138,6 +140,7 @@ CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
 void buildJump(CometCompiler* c, CometLabel* label);
 void buildJumpIfFalse(CometCompiler* c, CometLabel* label);
+void buildJumpIfTrue(CometCompiler* c, CometLabel* label);
 CometOperand buildNot(CometCompiler* c);
 CometOperand buildI2F(CometCompiler* c);
 void buildDup(CometCompiler* c);
