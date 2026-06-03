@@ -150,7 +150,6 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
 }
 
 void returnFromFunc(CometVM* vm) {
-    Frame funcFrame = vm->callStack[vm->callIdx - 1];
     vm->callIdx--;
 
     if (vm->callIdx == 0) {

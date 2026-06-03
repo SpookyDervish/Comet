@@ -1,9 +1,4 @@
-func main() -> int {
-    breakpoint
-    return 123
-}
-
-struct Test {
+struct Foo {
     int abc
 
     init() {
@@ -11,6 +6,28 @@ struct Test {
     }   
 
     func foo(int x) -> void {
-        return 0
+        return x
     }
+}
+
+struct Bar : Foo {
+    int xyz
+
+    init() {
+        super(self)
+    }
+
+    func testFunc(int x) -> void {
+        return x
+    }
+}
+
+func main() -> int {
+    Bar test = new Bar()
+    int x = test.testFunc(2)
+
+    Foo test2 = new Foo()
+    int y = test.foo(4)
+
+    return x + y
 }

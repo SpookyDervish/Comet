@@ -810,6 +810,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     CometFunction* func = c->functions[funcVal.as.success.value.symbolIdx];
     uint32_t neededArgCount = func->isMethod ? func->argCount - 1 : func->argCount;
 
+    printf("passed arg count: %ld, need args: %d\n", funcCall.args.count, neededArgCount);
     if (funcCall.args.count < neededArgCount) {
         Estr errMsg = CREATE_ESTR("Not enough args passed to function \"");
         APPEND_ESTR(errMsg, func->name);
@@ -996,7 +997,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
-ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType) {
+ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct) {
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
     buildFunction(c, constructorName, constDef.args.count + 1, structType, true); // add 1 arg for self
@@ -1038,6 +1039,30 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
             RECORD_ARG,
             argValue, 
             argType.as.success,
+            false
+        );
+    }
+
+    // if we inherit from a struct, define parent constructor
+    if (parentStruct != NULL) {
+        Estr parentConstructorName = CREATE_ESTR(parentStruct->name);
+        APPEND_ESTR(parentConstructorName, "_INIT");
+
+        CometOperand superVal = createOperand(CO_SYMBOL);
+        superVal.symbolIdx = getSymbolIndex(c, parentConstructorName.str);
+
+        DESTROY_ESTR(parentConstructorName);
+
+        CometType superValType = getValueType(c, superVal);
+        printf("%d\n", superValType.functionType->argCount);
+        superValType.functionType->isMethod = false;
+
+        defineVar(
+            c->env,
+            "super",
+            RECORD_ARG,
+            superVal,
+            superValType,
             false
         );
     }
@@ -1129,19 +1154,52 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
 
     structType->name = structName;
 
+    
+
     // define fields
     size_t fieldCount = 0;
     size_t methodCount = 0;
+    size_t myFieldCount = 0;
+    size_t myMethodCount = 0;
+    size_t parentFieldCount = 0;
+    size_t parentMethodCount = 0;
+
+    // handle inheritance
+    CometStruct* parentStruct = NULL;
+    if (structDef.parentName) {
+        CometType parentStructType = getType(c, structDef.parentName->data.AST_IDENTIFIER.ident);
+        if (parentStructType.typeKind == COMET_VOID) {
+            Estr errMsg = CREATE_ESTR("Cannot inherit from undefined type \"");
+            APPEND_ESTR(errMsg, structDef.parentName->data.AST_IDENTIFIER.ident);
+            APPEND_ESTR(errMsg, "\"");
+            return Error(CometOperand, charptr, errMsg.str);
+        }
+
+        if (parentStructType.typeKind != COMET_STRUCT) {
+            Estr errMsg = CREATE_ESTR("Cannot inherit from non-struct type \"");
+            APPEND_ESTR(errMsg, structDef.parentName->data.AST_IDENTIFIER.ident);
+            APPEND_ESTR(errMsg, "\"");
+            return Error(CometOperand, charptr, errMsg.str);
+        }
+
+        parentStruct = parentStructType.structType;
+
+        // add parent field count
+        parentFieldCount = parentStruct->fieldCount;
+        parentMethodCount = parentStruct->numMethods;
+    }
+
+    // fill in fieldDefs
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldDef = *get(structDef.fieldDefs, i);
 
         switch (fieldDef->nodeType) {
             case AST_ASSIGN_STATEMENT:
-                fieldCount++;
+                myFieldCount++;
                 break;
 
             case AST_FUNC_DEF_STATEMENT:
-                methodCount++;
+                myMethodCount++;
                 break;
 
             default: {
@@ -1153,6 +1211,9 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
             }
         }
     }
+    fieldCount += myFieldCount + parentFieldCount;
+    methodCount += myMethodCount + parentMethodCount;
+
     structType->fieldCount = fieldCount;
     structType->numMethods = methodCount;
     structType->fieldNames = calloc(structType->fieldCount, sizeof(char*));
@@ -1175,14 +1236,15 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     append(c->typeMap, typeMapEntry);
     append(c->structs, structType);
 
-    uint32_t vtableIdx = 0;
+    uint32_t vtableIdx = parentMethodCount;
+    uint32_t fieldIdx = parentFieldCount;
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldDef = *get(structDef.fieldDefs, i);
 
         switch (fieldDef->nodeType) {
             case AST_ASSIGN_STATEMENT:
-                structType->fieldNames[i] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-                structType->fieldTypes[i] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
+                structType->fieldNames[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+                structType->fieldTypes[fieldIdx++] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
                 break;
 
             case AST_FUNC_DEF_STATEMENT: {
@@ -1205,12 +1267,22 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
 
                 DESTROY_ESTR(newFuncName);
 
-                structType->vtable[vtableIdx] = newMethod;
+                structType->vtable[vtableIdx++] = newMethod;
                 break;
             }
 
             default: break;
         }
+    }
+
+    // if we inherit from another struct then pull in its methods and fields
+    for (size_t i = 0; i < parentFieldCount; i++) {
+        structType->fieldNames[i] = parentStruct->fieldNames[i];
+        structType->fieldTypes[i] = parentStruct->fieldTypes[i];
+    }
+    for (size_t i = 0; i < parentMethodCount; i++) {
+        
+        structType->vtable[i] = parentStruct->vtable[i];
     }
 
     // build constructor
@@ -1224,9 +1296,11 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     Estr constructorName = CREATE_ESTR(strdup(structName));
     APPEND_ESTR(constructorName, "_INIT");
 
-    ResultType(CometOperand, charptr) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType);
+    ResultType(CometOperand, charptr) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct);
     if (constructorResult.error)
         return constructorResult;
+
+    
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
