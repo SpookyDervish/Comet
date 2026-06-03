@@ -18,6 +18,7 @@ struct Test {
 }
 
 func main() -> int {
+    breakpoint
     mut int i = 0
     Test a = new Test(1, 4, 3)
     Test b = new Test(2, 1, 4)

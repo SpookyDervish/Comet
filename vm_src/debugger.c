@@ -295,6 +295,30 @@ ResultType(charptr, charptr) stackHandler(CometDebugger* dbgr, int argc, char** 
     return Success(charptr, charptr, NULL);
 }
 
+ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char** argv) {
+    if (argc < 1) 
+        return Error(charptr, charptr, "1 arg required");
+
+    Range range = parseRange(argv[0]);
+
+    
+
+    if (range.start < 0 || range.end >= MAX_VARIABLES) 
+        return Error(charptr, charptr, "variable index out of bounds");
+
+    if (range.start > range.end) {
+        uint32_t newEnd = range.start;
+        range.start = range.end;
+        range.end = newEnd;
+    }
+
+    for (uint32_t i = range.start; i <= range.end; i++) {
+        printf("vars[%d] = 0x%08lx\n", i, dbgr->vm->variables[i]);
+    }
+
+    return Success(charptr, charptr, NULL);
+}
+
 int tokenize(char* line, char** argv, int maxArgs) {
     int argc = 0;
 
@@ -335,7 +359,7 @@ static const char* disassembleAliases[] = {"d", NULL};
 static const char* breakAliases[] = {"b", NULL};
 static const char* unbreakAliases[] = {"ubreak", "u", "ub", NULL};
 static const char* stackAliases[] = {"st", NULL};
-static const char* localAliases[] = {"l", NULL};
+static const char* variableAliases[] = {"v", "var", "vars", NULL};
 static const char* structsAliases[] = {"ls", NULL};
 static const char* stepAliases[] = {"s", NULL};
 static const char* continueAliases[] = {"c", "cont", NULL};
@@ -349,7 +373,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"break", breakHandler, "set a breakpoint", "b <address> | b <functionName>", breakAliases},
     {"unbreak", unbreakHandler, "delete a breakpoint", "ub <breakpointId>", unbreakAliases},
     {"stack", stackHandler, "display the current state of the stack", "st | st <index>", stackAliases},
-    {"local", NULL, "print all variables or get the value of a variable", "l | l <name>", localAliases},
+    {"variable", variableHandler, "get the value of a variable / variables", "v <index> | v <startIndex>:<endIndex>", variableAliases},
     {"structs", NULL, "print all structs or display info about a struct", "ls | ls <name>", structsAliases},
     {"step", stepHandler, "execute next instruction", "s | s <numInstructions>", stepAliases},
     {"continue", continueHandler, "continue execution", "c", continueAliases},
