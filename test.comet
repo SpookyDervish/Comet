@@ -10,7 +10,18 @@ struct Foo {
     }
 }
 
+struct OtherStruct : Foo {
+    init(int abc) {
+        super(self, abc)
+    }
+}
+
+func sub(int a, int b) -> int {
+    return a - b
+}
+
 func main() -> int {
-    Foo test = new Foo(123)
-    return test.foo(5)
+    breakpoint
+    OtherStruct test = new OtherStruct(123)
+    return sub(5, 2)
 }

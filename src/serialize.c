@@ -35,9 +35,7 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
         .numMethods = structType->numMethods
     };
 
-    printf("%d\n", structType->numMethods);
     for (size_t i = 0; i < structType->numMethods; i++) {
-        printf("%p\n", structType->vtable[i]);
         serialized->vtable[i] = structType->vtable[i]->symbolIdx;
     }
 

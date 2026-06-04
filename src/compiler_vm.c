@@ -810,7 +810,6 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     CometFunction* func = c->functions[funcVal.as.success.value.symbolIdx];
     uint32_t neededArgCount = func->isMethod ? func->argCount - 1 : func->argCount;
 
-    printf("passed arg count: %ld, need args: %d\n", funcCall.args.count, neededArgCount);
     if (funcCall.args.count < neededArgCount) {
         Estr errMsg = CREATE_ESTR("Not enough args passed to function \"");
         APPEND_ESTR(errMsg, func->name);
@@ -1008,7 +1007,7 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
     c->env = funcEnv;
 
-    // define self
+     // define self
     CometOperand selfValue = createOperand(CO_IMMEDIATE);
     selfValue.imm.typeKind = COMET_SMALL;
     selfValue.imm.smallVal = 0;
@@ -1033,7 +1032,7 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
 
         CometOperand argValue = createOperand(CO_IMMEDIATE);
         argValue.imm.typeKind = COMET_SMALL;
-        argValue.imm.smallVal = argIdx + 1; // add 1 for self
+        argValue.imm.smallVal = argIdx;
 
         defineVar(
             c->env,
@@ -1044,6 +1043,8 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
             false
         );
     }
+
+   
 
     // if we inherit from a struct, define parent constructor
     if (parentStruct != NULL) {
@@ -1056,7 +1057,6 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
         DESTROY_ESTR(parentConstructorName);
 
         CometType superValType = getValueType(c, superVal);
-        printf("%d\n", superValType.functionType->argCount);
         superValType.functionType->isMethod = false;
 
         defineVar(
