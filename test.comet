@@ -1,33 +1,16 @@
 struct Foo {
     int abc
 
-    init() {
-        self.abc = 123
+    init(int abc) {
+        self.abc = abc
     }   
 
-    func foo(int x) -> void {
-        return x
-    }
-}
-
-struct Bar : Foo {
-    int xyz
-
-    init() {
-        super(self)
-    }
-
-    func testFunc(int x) -> void {
-        return x
+    func foo(int a) -> int {
+        return self.abc + a
     }
 }
 
 func main() -> int {
-    Bar test = new Bar()
-    int x = test.testFunc(2)
-
-    Foo test2 = new Foo()
-    int y = test.foo(4)
-
-    return x + y
+    Foo test = new Foo(123)
+    return test.foo(5)
 }

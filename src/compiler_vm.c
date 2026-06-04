@@ -803,7 +803,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     if (funcParentType.error)
         return Error(CometOperand, charptr, funcParentType.as.error);
 
-    ResultType(CometFunctionTypeInfo, charptr) funcVal = getFunction(c, funcCall.ident, true);
+    ResultType(CometFunctionTypeInfo, charptr) funcVal = getFunction(c, funcCall.ident, false);
     if (funcVal.error)
         return Error(CometOperand, charptr, funcVal.as.error);
 
@@ -833,6 +833,8 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
 
         append(funcCallArgs, argValue.as.success);
     }
+
+    funcVal = getFunction(c, funcCall.ident, true);
 
     CometOperand returnValue;
     if (funcVal.as.success.funcType == FUNC_FUNC) {
@@ -1100,21 +1102,9 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     CometEnvironment* funcEnv = newEnvironment(funcName, c->env, true);
     c->env = funcEnv;
 
-    CometOperand selfVal = createOperand(CO_IMMEDIATE);
-    selfVal.imm.typeKind = COMET_SMALL;
-    selfVal.imm.smallVal = 0;
-
-    defineVar(
-        c->env,
-        "self",
-        RECORD_ARG,
-        selfVal,
-        structType,
-        false
-    );
-
     // define each argument in the functions scope
-    for (size_t argIdx = 0; argIdx < funcDef.args.count; argIdx++) {
+    size_t argIdx;
+    for (argIdx = 0; argIdx < funcDef.args.count; argIdx++) {
         CometASTNode* argNode = *get(funcDef.args, argIdx);
         struct AST_ARG_DEF argument = argNode->data.AST_ARG_DEF;
 
@@ -1135,6 +1125,19 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
             false
         );
     }
+
+    CometOperand selfVal = createOperand(CO_IMMEDIATE);
+    selfVal.imm.typeKind = COMET_SMALL;
+    selfVal.imm.smallVal = argIdx;
+
+    defineVar(
+        c->env,
+        "self",
+        RECORD_ARG,
+        selfVal,
+        structType,
+        false
+    );
 
     // build the functions body
     ResultType(CometOperand, charptr) bodyResult = compile(c, funcDef.program);
