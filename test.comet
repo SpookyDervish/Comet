@@ -21,7 +21,6 @@ func sub(int a, int b) -> int {
 }
 
 func main() -> int {
-    breakpoint
     OtherStruct test = new OtherStruct(123)
-    return sub(5, 2)
+    return test.foo(5)
 }
