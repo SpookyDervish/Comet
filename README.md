@@ -1,6 +1,6 @@
 # Comet <img src="icon/icon.svg" width=25 alt="comet logo">
 
-Comet is a fast, compiled programming built on top of C and LLVM. It has an enormous feature list, including:
+Comet is a fast, compiled programming built on top of C and runs on a custom made stack-based VM. It has an enormous feature list, including:
 - Classes (called structs)
 - Templates
 - Runtime exceptions
@@ -35,15 +35,15 @@ Comet is a fast, compiled programming built on top of C and LLVM. It has an enor
 - [ ] Structs
   - [ ] Struct definition
     - [x] Fields
-      - [x] Private/protected/readonly
-      - [x] Default values
+      - [ ] Private/protected/readonly
+      - [ ] Default values
       - [x] Accessing / setting fields
     - [x] Methods
     - [x] Constructor
     - [ ] Destructor
   - [x] "new" keyword
   - [x] Calling methods
-  - [x] Inheritance
+  - [ ] Inheritance
   - [ ] Templates
     - [ ] Template attributes
 - [x] Command line args
@@ -52,4 +52,4 @@ Comet is a fast, compiled programming built on top of C and LLVM. It has an enor
   - [ ] Catch exceptions
 
 ## Compiling
-Just run `make` in the root of the repo. This will create the `cometc` executable. If you want a debug build, run `make debug`. Debug builds include the address sanitizer for tracking down segfaults. 
+Just run `make` in the root of the repo. This will create the `cometc` and `comet` executables. If you want a debug build, run `make debug`. Debug builds include the address sanitizer for tracking down segfaults. 

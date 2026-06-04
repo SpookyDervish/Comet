@@ -14,13 +14,14 @@ struct OtherStruct : Foo {
     init(int abc) {
         super(self, abc)
     }
-}
 
-func sub(int a, int b) -> int {
-    return a - b
+    func testFunc() -> int {
+        return 24
+    }
 }
 
 func main() -> int {
+    breakpoint
     OtherStruct test = new OtherStruct(123)
-    return test.foo(5)
+    return test.testFunc()
 }
