@@ -40,6 +40,7 @@ typedef struct {
 typedef struct {
     CometFunctionType funcType;
     CometOperand value;
+    CometOperand methodIdx;
 } CometFunctionTypeInfo;
 
 #endif

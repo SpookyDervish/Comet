@@ -205,7 +205,10 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
 
             CometFunctionTypeInfo functionInfo = {
                 .funcType = FUNC_FUNC,
-                .value = varRecord->value
+                .value = varRecord->value,
+                .methodIdx = (CometOperand){
+                    .type = CO_NONE
+                }
             };
 
             return Success(CometFunctionTypeInfo, charptr, functionInfo);
@@ -228,12 +231,18 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
 
             int32_t methodIdx = getMethodIndex(structType.as.success.structType, fieldName);
 
-            CometOperand methodIdxValue = createOperand(CO_SYMBOL);
-            methodIdxValue.symbolIdx = structType.as.success.structType->vtable[methodIdx]->symbolIdx;
+            CometOperand funcValue = createOperand(CO_SYMBOL);
+            funcValue.symbolIdx = structType.as.success.structType->vtable[methodIdx]->symbolIdx;
+
+            CometOperand methodIdxValue = createOperand(CO_IMMEDIATE);
+            methodIdxValue.imm.typeKind = COMET_SMALL;
+            methodIdxValue.imm.smallVal = methodIdx;
+
 
             CometFunctionTypeInfo methodInfo = {
                 .funcType = FUNC_METHOD,
-                .value = methodIdxValue
+                .value = funcValue,
+                .methodIdx = methodIdxValue
             };
 
             return Success(CometFunctionTypeInfo, charptr, methodInfo);
@@ -807,7 +816,15 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     if (funcVal.error)
         return Error(CometOperand, charptr, funcVal.as.error);
 
+    printNode(funcCall.ident);
+    printf("\n");
+    printf("symbolVal = %d\n", funcVal.as.success.value.symbolIdx);
+
     CometFunction* func = c->functions[funcVal.as.success.value.symbolIdx];
+
+    printf("name = %s, arg count = %d\n", func->name, func->argCount);
+
+
     uint32_t neededArgCount = func->isMethod ? func->argCount - 1 : func->argCount;
 
     if (funcCall.args.count < neededArgCount) {
@@ -839,7 +856,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     if (funcVal.as.success.funcType == FUNC_FUNC) {
         returnValue = buildCall(c, func->name, funcCallArgs);
     } else { // FUNC_METHOD
-        returnValue = buildCallMethod(c, funcVal.as.success.value.imm.smallVal, funcCallArgs);
+        returnValue = buildCallMethod(c, funcVal.as.success.methodIdx.imm.smallVal, funcCallArgs);
     }
 
     return Success(CometOperand, charptr, returnValue);

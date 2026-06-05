@@ -21,7 +21,6 @@ struct OtherStruct : Foo {
 }
 
 func main() -> int {
-    breakpoint
-    OtherStruct test = new OtherStruct(123)
-    return test.testFunc()
+    OtherStruct test = new OtherStruct(3)
+    return test.testFunc() + test.foo(3)
 }
