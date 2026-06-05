@@ -21,6 +21,7 @@ struct OtherStruct : Foo {
 }
 
 func main() -> int {
-    OtherStruct test = new OtherStruct(3)
-    return test.testFunc()
+    Foo test = new Foo(3)
+    OtherStruct test2 = new OtherStruct(3)
+    return test.testFunc() + test2.testFunc()
 }

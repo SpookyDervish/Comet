@@ -1,3 +1,5 @@
+import io
+
 struct Vector {
     int x = 0
     int y = 0
@@ -18,25 +20,25 @@ struct Vector {
 
 struct Child : Vector {
     init(int x, int y, int z) {
-        
+        super(self, x, y, z)
     }
 
     override func add(Vector other) -> void {
-        print("overwritten!\n")
+        io.print("overwritten!\n")
     }
 }
 
 func main() -> int {
     Vector myVector = new Vector(1, 2, 3)
-    print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+    io.print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
 
     myVector.add(new Vector(1, 2, 3))
 
-    print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+    io.print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
 
-    print("test\n")
+    io.print("test\n")
     Child myChildVector = new Child(1, 2, 3)
-    print("test 2\n")
+    io.print("test 2\n")
     
     myChildVector.add(new Vector(1, 2, 3))
 
