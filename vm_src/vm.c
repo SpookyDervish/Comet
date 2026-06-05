@@ -58,10 +58,6 @@ CometFile* getFileContents(const char* filename) {
     return file;
 }
 
-static inline int max(int a, int b) {
-    return (a > b) ? a : b;
-}
-
 void createBreakpoint(CometVM* vm) {
     vm->breakpoints[vm->currentFrame->ip - 1] = 1;
 }
