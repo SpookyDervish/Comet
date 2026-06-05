@@ -5,8 +5,8 @@ struct Foo {
         self.abc = abc
     }   
 
-    func foo(int a) -> int {
-        return self.abc + a
+    func testFunc() -> int {
+        return 24
     }
 }
 
@@ -15,12 +15,12 @@ struct OtherStruct : Foo {
         super(self, abc)
     }
 
-    func testFunc() -> int {
-        return 24
+    override func testFunc() -> int {
+        return 22
     }
 }
 
 func main() -> int {
     OtherStruct test = new OtherStruct(3)
-    return test.testFunc() + test.foo(3)
+    return test.testFunc()
 }

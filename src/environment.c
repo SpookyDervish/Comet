@@ -31,7 +31,6 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
 
     // avoid duplication of keys
     if (record != NULL) {
-        printf("Redeclaration of %s!\n", name);
         return 0;
     }
 

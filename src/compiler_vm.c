@@ -1214,6 +1214,9 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
                 myMethodCount++;
                 break;
 
+            case AST_OVERRIDE_STATEMENT:
+                break;
+
             default: {
                 Estr errMsg = CREATE_ESTR("Cannot define \"");
                 APPEND_ESTR(errMsg, ASTNodeTypeToCStr(fieldDef->nodeType));
@@ -1248,6 +1251,16 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     append(c->typeMap, typeMapEntry);
     append(c->structs, structType);
 
+    // if we inherit from another struct then pull in its methods and fields
+    for (size_t i = 0; i < parentFieldCount; i++) {
+        structType->fieldNames[i] = parentStruct->fieldNames[i];
+        structType->fieldTypes[i] = parentStruct->fieldTypes[i];
+    }
+    for (size_t i = 0; i < parentMethodCount; i++) {
+        
+        structType->vtable[i] = parentStruct->vtable[i];
+    }
+
     uint32_t vtableIdx = parentMethodCount;
     uint32_t fieldIdx = parentFieldCount;
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
@@ -1259,7 +1272,49 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
                 structType->fieldTypes[fieldIdx++] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
                 break;
 
+            case AST_OVERRIDE_STATEMENT: {
+                // we're not inheriting from any struct so we cant override functions
+                if (parentStruct == NULL) {
+                    Estr errMsg = CREATE_ESTR("Cannot use an override statement in struct \"");
+                    APPEND_ESTR(errMsg, structName);
+                    APPEND_ESTR(errMsg, "\" because it has no parent.");
+                    return Error(CometOperand, charptr, errMsg.str);
+                }
+
+                ResultType(CometOperand, charptr) result = visitMethodDefStatement(c, fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef, generalStructType);
+                if (result.error)
+                    return result;
+
+                CometFunction* function = c->functions[result.as.success.symbolIdx];
+                int32_t parentMethodIdx = getMethodIndex(parentStruct, function->name);
+            
+                // overriding a function that doesn't exist in the parent
+                if (parentMethodIdx == -1) {
+                    Estr errMsg = CREATE_ESTR("Cannot override method \"");
+                    APPEND_ESTR(errMsg, function->name);
+                    APPEND_ESTR(errMsg, "\" because parent struct doesn't have it.");
+                    return Error(CometOperand, charptr, errMsg.str);
+                }
+
+                Estr newFuncName = CREATE_ESTR(structName);
+                APPEND_ESTR(newFuncName, "_");
+                APPEND_ESTR(newFuncName, function->name);
+
+                CometMethod* newMethod = malloc(sizeof(CometMethod));
+                memcpy(newMethod->name, function->name, strlen(function->name) + 1);
+                memcpy(function->name, newFuncName.str, newFuncName.size + 1);
+                newMethod->argCount = function->argCount;
+                newMethod->startIdx = function->startIdx,
+                newMethod->symbolIdx = result.as.success.symbolIdx;
+
+                DESTROY_ESTR(newFuncName);
+
+                structType->vtable[parentMethodIdx] = newMethod;
+                break;
+            }
+
             case AST_FUNC_DEF_STATEMENT: {
+
                 ResultType(CometOperand, charptr) result = visitMethodDefStatement(c, fieldDef, generalStructType);
                 if (result.error)
                     return result;
@@ -1285,16 +1340,6 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
 
             default: break;
         }
-    }
-
-    // if we inherit from another struct then pull in its methods and fields
-    for (size_t i = 0; i < parentFieldCount; i++) {
-        structType->fieldNames[i] = parentStruct->fieldNames[i];
-        structType->fieldTypes[i] = parentStruct->fieldTypes[i];
-    }
-    for (size_t i = 0; i < parentMethodCount; i++) {
-        
-        structType->vtable[i] = parentStruct->vtable[i];
     }
 
     // build constructor

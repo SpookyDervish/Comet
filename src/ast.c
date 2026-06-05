@@ -74,6 +74,10 @@ void freeNode(CometASTNode* node) {
             freeNode(node->data.AST_STRUCT_DEF_STATEMENT.parentName);
             break;
         }
+        case AST_OVERRIDE_STATEMENT: {
+            freeNode(node->data.AST_OVERRIDE_STATEMENT.funcDef);
+            break;
+        }
         case AST_ARG_DEF: {
             freeNode(node->data.AST_ARG_DEF.type);
             freeNode(node->data.AST_ARG_DEF.ident);
