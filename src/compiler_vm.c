@@ -816,15 +816,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
     if (funcVal.error)
         return Error(CometOperand, charptr, funcVal.as.error);
 
-    printNode(funcCall.ident);
-    printf("\n");
-    printf("symbolVal = %d\n", funcVal.as.success.value.symbolIdx);
-
     CometFunction* func = c->functions[funcVal.as.success.value.symbolIdx];
-
-    printf("name = %s, arg count = %d\n", func->name, func->argCount);
-
-
     uint32_t neededArgCount = func->isMethod ? func->argCount - 1 : func->argCount;
 
     if (funcCall.args.count < neededArgCount) {
