@@ -226,12 +226,6 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
             if (structType.error)
                 return Error(CometFunctionTypeInfo, charptr, structType.as.error);
 
-            if (buildValues) {
-                ResultType(CometOperand, charptr) structValue = visitValue(c, expr.left);
-                if (structValue.error)
-                    return Error(CometFunctionTypeInfo, charptr, structValue.as.error);
-            }
-
             // get function from module
             if (structType.as.success.typeKind == COMET_MODULE) {
                 ResultType(CometOperand, charptr) value = getModuleValue(c, node);
@@ -247,6 +241,14 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
                 };
                 return Success(CometFunctionTypeInfo, charptr, functionInfo);
             }
+
+            if (buildValues) {
+                ResultType(CometOperand, charptr) structValue = visitValue(c, expr.left);
+                if (structValue.error)
+                    return Error(CometFunctionTypeInfo, charptr, structValue.as.error);
+            }
+
+            
 
             int32_t methodIdx = getMethodIndex(structType.as.success.structType, fieldName);
 
@@ -1633,32 +1635,32 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
         return Error(CometOperand, charptr, errMsg.str);
     }
 
-    // compile
-    ResultType(cometCompilerPtr, charptr) importedCompiler = newCompiler();
-    if (importedCompiler.error) {
-        APPEND_ESTR(errMsg, importedCompiler.as.error);
-        return Error(CometOperand, charptr, errMsg.str);
-    }
-    ResultType(CometOperand, charptr) importedCompileResult = compile(importedCompiler.as.success, ast.as.success);
-    if (importedCompileResult.error) {
-        APPEND_ESTR(errMsg, importedCompileResult.as.error);
-        return Error(CometOperand, charptr, errMsg.str);
-    }
+
+    CometEnvironment* prevEnv = c->env;
+    c->env = newEnvironment(libName, c->env, false);
 
     // load imported symbols
     char* lastModuleIdent = (*get(importChain, importChain.count-1))->data.AST_IDENTIFIER.ident;
     CometOperand module = createOperand(CO_IMMEDIATE);
     module.imm.typeKind = COMET_MODULE;
-    module.imm.moduleVal = importedCompiler.as.success->env;
+    module.imm.moduleVal = c->env;
 
     CometType moduleType = {
         .typeKind = COMET_MODULE
     };
 
-    defineVar(c->env, lastModuleIdent, RECORD_LOCAL, module, moduleType, false);
+    ResultType(CometOperand, charptr) importedCompileResult = compile(c, ast.as.success);
+    if (importedCompileResult.error) {
+        APPEND_ESTR(errMsg, importedCompileResult.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    defineVar(prevEnv, lastModuleIdent, RECORD_LOCAL, module, moduleType, false);
 
     freeNode(ast.as.success);
     free(parser.as.success);
+
+    c->env = prevEnv;
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
