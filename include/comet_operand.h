@@ -14,6 +14,7 @@ typedef enum {
     CO_LABEL
 } CometOperandKind;
 
+typedef struct CometEnvironment CometEnvironment;
 typedef struct {
     CometValueTypeKind typeKind;
     union {
@@ -24,6 +25,7 @@ typedef struct {
         double doubleVal;
         bool boolVal;
         CometObject* objectVal;
+        CometEnvironment* moduleVal;
     };
 } CometImmediate;
 

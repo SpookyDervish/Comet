@@ -1,5 +1,5 @@
-import io
+import module
 
 func main() -> int {
-    return 0
+    return module.add(2, 4)
 }

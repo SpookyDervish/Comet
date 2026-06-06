@@ -6,6 +6,7 @@
 #include "../include/comet_operand.h"
 #include "serialize.h"
 #include "token.h"
+#include "parser.h"
 #include "util.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -1423,20 +1424,20 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     char path[filePathMaxLen] = {};
     snprintf(path, sizeof(path), "%s.comet", libName);    
 
-    bool found = access(path, F_OK);
+    bool found = access(path, F_OK) == 0;
 
     char* cometLibsPath = getenv("COMET_LIBS");
 
     // no local file was found, look for it in the system wide libs
     if (!found) { 
         snprintf(path, sizeof(path), "%s/%s.comet", cometLibsPath, libName);
-        found = access(path, F_OK);
+        found = access(path, F_OK) == 0;
     }
 
     // comet file was found in system wide libs, try a .cometlib file
     if (!found) { 
         snprintf(path, sizeof(path), "%s/%s.cometlib", cometLibsPath, libName);
-        found = access(path, F_OK);
+        found = access(path, F_OK) == 0;
     }
 
     // lib doesnt exist, KILL THEM!!!!
@@ -1446,7 +1447,65 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
         APPEND_ESTR(errMsg, "\"");
         return Error(CometOperand, charptr, errMsg.str);
     }
-    
+
+    // lex
+    Estr errMsg = CREATE_ESTR("Error in imported file \"");
+    APPEND_ESTR(errMsg, path);
+    APPEND_ESTR(errMsg, "\":\n");
+
+    char* fileContents = getFileContents(path);
+    ResultType(CometLexer, charptr) lexer = newLexer(fileContents);
+    if (lexer.error) {
+        APPEND_ESTR(errMsg, lexer.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+    ResultType(tokenList, charptr) tokens = lex(&lexer.as.success);
+    if (tokens.error) {
+        APPEND_ESTR(errMsg, tokens.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+    free(fileContents);
+
+    // parse
+    ResultType(parserPtr, charptr) parser = newParser(tokens.as.success);
+    if (parser.error) {
+        APPEND_ESTR(errMsg, parser.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+    ResultType(astNodePtr, charptr) ast = buildAST(parser.as.success);
+    if (ast.error) {
+        APPEND_ESTR(errMsg, ast.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    // compile
+    ResultType(cometCompilerPtr, charptr) importedCompiler = newCompiler();
+    if (importedCompiler.error) {
+        APPEND_ESTR(errMsg, importedCompiler.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+    ResultType(CometOperand, charptr) importedCompileResult = compile(importedCompiler.as.success, ast.as.success);
+    if (importedCompileResult.error) {
+        APPEND_ESTR(errMsg, importedCompileResult.as.error);
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    // load imported symbols
+    char* lastModuleIdent = (*get(importChain, importChain.count-1))->data.AST_IDENTIFIER.ident;
+    CometOperand module = createOperand(CO_IMMEDIATE);
+    module.imm.typeKind = COMET_MODULE;
+    module.imm.moduleVal = importedCompiler.as.success->env;
+
+    CometType moduleType = {
+        .typeKind = COMET_MODULE
+    };
+
+    defineVar(c->env, lastModuleIdent, RECORD_LOCAL, module, moduleType, false);
+
+    freeNode(ast.as.success);
+    free(parser.as.success);
+    free(importedCompiler.as.success);
+
     return Success(CometOperand, charptr, NO_OPERAND);
 }
 
