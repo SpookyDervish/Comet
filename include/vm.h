@@ -6,8 +6,8 @@
 #define MAX_VARIABLES 1024
 
 #include "comet_operand.h"
-#include "../lib/list.h"
-#include "../lib/error.h"
+#include "list.h"
+#include "error.h"
 #include "serialized.h"
 #include <stdint.h>
 

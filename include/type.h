@@ -2,7 +2,7 @@
 #define TYPE_H
 
 #include <stdint.h>
-#include "../lib/list.h"
+#include "list.h"
 
 typedef enum {
     COMET_VOID,

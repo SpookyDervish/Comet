@@ -1,4 +1,4 @@
-#include "../../include/cometlib.h"
+#include <comet/cometlib.h>
 
 CometOperand fooFunc(List(CometOperand) args, CometVM* vm) {
     return cometValue(COMET_INT, 123);

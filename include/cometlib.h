@@ -5,7 +5,7 @@
 #include "serialized.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "../lib/list.h"
+#include "list.h"
 #include "vm.h"
 
 #define cometTypeSmall (CometType){.typeKind = COMET_SMALL}
