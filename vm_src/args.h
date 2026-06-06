@@ -4,7 +4,7 @@
 #include <argp.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include "../lib/error.h"
+#include "../include/error.h"
 
 typedef struct {
     char* filePath;

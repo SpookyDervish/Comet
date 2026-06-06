@@ -8,9 +8,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include "../lib/error.h"
+#include "../include/error.h"
 #include "../include/serialized.h"
 #include "../include/comet_operand.h"
+#include "../include/environment.h"
+#include "util.h"
 
 typedef void* voidPtr;
 

@@ -1,12 +1,9 @@
 #include "compiler_vm.h"
 #include "ast.h"
-#include "../include/environment.h"
 #include "inst.h"
 #include "lexer.h"
-#include "../include/comet_operand.h"
 #include "token.h"
 #include "parser.h"
-#include "util.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -71,6 +68,10 @@ int32_t getMethodIndex(CometStruct* structType, char* methodName) {
     }
 
     return -1;
+}
+
+ResultType(CometOperand, charptr) loadExternalLib() {
+
 }
 
 ResultType(CometOperand, charptr) visitProgram(CometCompiler* c, CometASTNode* p) {
@@ -1580,6 +1581,7 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     snprintf(path, sizeof(path), "%s.comet", libName);    
 
     bool found = access(path, F_OK) == 0;
+    bool isExternal = false;
 
     char* cometLibsPath = getenv("COMET_LIBS");
 
@@ -1593,6 +1595,7 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     if (!found) { 
         snprintf(path, sizeof(path), "%s/%s.cometlib", cometLibsPath, libName);
         found = access(path, F_OK) == 0;
+        isExternal = found;
     }
 
     // lib doesnt exist, KILL THEM!!!!
@@ -1601,6 +1604,10 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
         APPEND_ESTR(errMsg, libName);
         APPEND_ESTR(errMsg, "\"");
         return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    if (isExternal) {
+        return loadExternalLib(path);
     }
 
     // lex

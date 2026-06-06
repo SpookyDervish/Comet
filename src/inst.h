@@ -1,8 +1,8 @@
 #ifndef INST_H
 #define INST_H
 
-#include "../lib/error.h"
-#include "../lib/list.h"
+#include "../include/error.h"
+#include "../include/list.h"
 #include "../include/comet_operand.h"
 #include "../include/struct.h"
 #include "../include/serialized.h"

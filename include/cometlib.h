@@ -8,6 +8,16 @@
 #include "list.h"
 #include "vm.h"
 
+#if defined(_WIN32) || defined(__CYGWIN__)
+    #define API_EXPORT __declspec(dllexport)
+#else
+    #ifdef __GNUC__
+        #define API_EXPORT __attribute__((visibility("default")))
+    #else
+        #define API_EXPORT
+    #endif
+#endif
+
 #define cometTypeSmall (CometType){.typeKind = COMET_SMALL}
 #define cometTypeInt (CometType){.typeKind = COMET_INT}
 #define cometTypeBig (CometType){.typeKind = COMET_BIG}
@@ -21,7 +31,7 @@
 UseList(CometSerializedFunc);
 UseList(CometOperand);
 
-void cometDefineFunc(
+API_EXPORT void cometDefineFunc(
     CometEnvironment* env,
     char* name,
     CometOperand (*funcPtr)(List(CometOperand) args, CometVM* vm),
@@ -29,7 +39,7 @@ void cometDefineFunc(
     uint32_t numArgs,
     ...
 );
-CometSerializedFunc* cometDefineMethod(
+API_EXPORT CometSerializedFunc* cometDefineMethod(
     CometEnvironment* env,
     char* name,
     CometOperand (*funcPtr)(List(CometOperand) args, CometVM* vm),
@@ -38,9 +48,9 @@ CometSerializedFunc* cometDefineMethod(
     ...
 );
 
-CometSerializedStruct* cometCreateStruct(List(CometSerializedFunc) methods, uint32_t numFields);
-CometOperand cometCreateObject(CometSerializedStruct* structType);
+API_EXPORT CometSerializedStruct* cometCreateStruct(List(CometSerializedFunc) methods, uint32_t numFields);
+API_EXPORT CometOperand cometCreateObject(CometSerializedStruct* structType);
 
-CometOperand cometValue(CometValueTypeKind valueType, ...);
+API_EXPORT CometOperand cometValue(CometValueTypeKind valueType, ...);
 
 #endif
