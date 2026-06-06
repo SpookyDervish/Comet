@@ -1,27 +1,5 @@
-struct Foo {
-    int abc
-
-    init(int abc) {
-        self.abc = abc
-    }   
-
-    func testFunc() -> int {
-        return 24
-    }
-}
-
-struct OtherStruct : Foo {
-    init(int abc) {
-        super(self, abc)
-    }
-
-    override func testFunc() -> int {
-        return 22
-    }
-}
+import io
 
 func main() -> int {
-    Foo test = new Foo(3)
-    OtherStruct test2 = new OtherStruct(3)
-    return test.testFunc() + test2.testFunc()
+    return 0
 }

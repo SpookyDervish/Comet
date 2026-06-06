@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include "vm.h"
 #include "args.h"
-#include "../include/operand.h"
+#include "../include/comet_operand.h"
 #include "../lib/estr.h"
 #include "debugger.h"
 

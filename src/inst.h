@@ -4,7 +4,7 @@
 #include "../lib/error.h"
 #include "../lib/list.h"
 #include "environment.h"
-#include "../include/operand.h"
+#include "../include/comet_operand.h"
 #include "../include/struct.h"
 #include <stdint.h>
 #include <stdio.h>

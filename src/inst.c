@@ -1,7 +1,7 @@
 #include "inst.h"
 #include "ast.h"
 #include "environment.h"
-#include "../include/operand.h"
+#include "../include/comet_operand.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>

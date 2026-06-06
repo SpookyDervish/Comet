@@ -3,10 +3,10 @@
 #include "environment.h"
 #include "inst.h"
 #include "lexer.h"
-#include "../include/operand.h"
-#include "parser.h"
+#include "../include/comet_operand.h"
 #include "serialize.h"
 #include "token.h"
+#include "util.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
 
 // -- HELPER METHODS -- //
@@ -1404,6 +1405,50 @@ ResultType(CometOperand, charptr) visitBreakpointStatement(CometCompiler* c) {
     buildBreakpoint(c);
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometASTNode* node) {
+    size_t filePathMaxLen = 1024;
+    char libName[filePathMaxLen] = {};
+
+    List(astNodePtr) importChain = node->data.AST_IMPORT_STATEMENT.importChain;
+
+    for (size_t i = 0; i < importChain.count; i++) {
+        CometASTNode* ident = *get(importChain, i);
+        char* name = ident->data.AST_IDENTIFIER.ident;
+
+        char* formatString = i < importChain.count-1 ? "%s/" : "%s";
+
+        snprintf(libName + strlen(libName), sizeof(libName), formatString, name);
+    }
+
+    char path[filePathMaxLen] = {};
+    snprintf(path, sizeof(path), "%s.comet", libName);    
+
+    bool found = access(path, F_OK);
+
+    char* cometLibsPath = getenv("COMET_LIBS");
+
+    // no local file was found, look for it in the system wide libs
+    if (!found) { 
+        snprintf(path, sizeof(path), "%s/%s.comet", cometLibsPath, libName);
+        found = access(path, F_OK);
+    }
+
+    // comet file was found in system wide libs, try a .cometlib file
+    if (!found) { 
+        snprintf(path, sizeof(path), "%s/%s.cometlib", cometLibsPath, libName);
+        found = access(path, F_OK);
+    }
+
+    // lib doesnt exist, KILL THEM!!!!
+    if (!found) {
+        Estr errMsg = CREATE_ESTR("Could not find library \"");
+        APPEND_ESTR(errMsg, libName);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+    
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 
 // -- MAIN -- //
 ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath) {
@@ -1493,6 +1538,8 @@ ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node) 
             return visitNewStatement(c, node);
         case AST_BREAKPOINT_STATEMENT:
             return visitBreakpointStatement(c);
+        case AST_IMPORT_STATEMENT:
+            return visitImportStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

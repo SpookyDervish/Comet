@@ -5,7 +5,7 @@
 #define MAX_DATA_STACK 65536
 #define MAX_VARIABLES 1024
 
-#include "../include/operand.h"
+#include "../include/comet_operand.h"
 #include "../lib/list.h"
 #include "args.h"
 #include "serialized.h"

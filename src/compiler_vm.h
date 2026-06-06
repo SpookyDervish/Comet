@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include "../lib/error.h"
-#include "../include/operand.h"
+#include "../include/comet_operand.h"
 
 typedef void* voidPtr;
 

@@ -1,6 +1,6 @@
 #include "serialize.h"
 #include "inst.h"
-#include "../include/operand.h"
+#include "../include/comet_operand.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
