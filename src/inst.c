@@ -1,6 +1,5 @@
 #include "inst.h"
 #include "ast.h"
-#include "environment.h"
 #include "../include/comet_operand.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -74,34 +73,6 @@ void buildInst(
         .pos = compiler->programIdx
     };
     compiler->programIdx++;
-}
-
-ResultType(cometCompilerPtr, charptr) newCompiler() {
-    CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
-
-    newCompiler->outputProgram = calloc(2048, sizeof(CometInst));
-    newCompiler->programIdx = 0;
-    newCompiler->stackIdx = 0;
-    newCompiler->env = newEnvironment("root", NULL, false);
-    newCompiler->structs = newList(cometStructPtr);
-    newCompiler->typeMap = newList(CometTypeMapEntry);
-    newCompiler->currentFunction = NULL;
- 
-    // fill in type map
-    CometTypeMapEntry smallType =  { .name = "small",  .type = (CometType){.typeKind = COMET_SMALL}  };
-    CometTypeMapEntry intType =    { .name = "int",    .type = (CometType){.typeKind = COMET_INT}    };
-    CometTypeMapEntry bigType =    { .name = "big",    .type = (CometType){.typeKind = COMET_BIG}    };
-    CometTypeMapEntry boolType =   { .name = "bool",   .type = (CometType){.typeKind = COMET_BOOL}   };
-    CometTypeMapEntry floatType =  { .name = "float",  .type = (CometType){.typeKind = COMET_FLOAT}  };
-    CometTypeMapEntry doubleType = { .name = "double", .type = (CometType){.typeKind = COMET_DOUBLE} };
-    append(newCompiler->typeMap, smallType);
-    append(newCompiler->typeMap, intType);
-    append(newCompiler->typeMap, bigType);
-    append(newCompiler->typeMap, boolType);
-    append(newCompiler->typeMap, floatType);
-    append(newCompiler->typeMap, doubleType);
-    
-    return Success(cometCompilerPtr, charptr, newCompiler);
 }
 
 CometOperand pushVal(CometCompiler* c) {

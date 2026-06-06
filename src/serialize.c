@@ -1,9 +1,10 @@
-#include "serialize.h"
+#include "../include/serialized.h"
 #include "inst.h"
 #include "../include/comet_operand.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 uint32_t serializeOperand(CometOperand operand) {
     switch (operand.type) {
@@ -36,7 +37,17 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
     };
 
     for (size_t i = 0; i < structType->numMethods; i++) {
-        serialized->vtable[i] = structType->vtable[i]->symbolIdx;
+        CometMethod* method = structType->vtable[i];
+
+        CometSerializedFunc func = {};
+        memcpy(func.name, method->name, sizeof(func.name));
+        func.numArgs = method->argCount;
+        func.startIdx = method->startIdx;
+        func.symbolIdx = method->symbolIdx;
+        func.isExternal = false;
+        func.externalPtr = NULL;
+
+        serialized->vtable[i] = func;
     }
 
     return serialized;

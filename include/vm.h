@@ -5,9 +5,9 @@
 #define MAX_DATA_STACK 65536
 #define MAX_VARIABLES 1024
 
-#include "../include/comet_operand.h"
+#include "comet_operand.h"
 #include "../lib/list.h"
-#include "args.h"
+#include "../lib/error.h"
 #include "serialized.h"
 #include <stdint.h>
 
@@ -61,5 +61,17 @@ Result(voidPtr, charptr);
 
 ResultType(vmPtr, charptr) newCometVM(char* filePath);
 ResultType(int, charptr) startVM(CometVM* vm);
+
+// Functions exposed so external libs can use them. //
+/*
+Call a function. The callee must return the VM's state to how it was before
+or suffer the consequences.
+*/
+void callFunction(CometVM* vm, CometSerializedFunc* function);
+
+/*
+Return from the function the VM is currently in.
+*/
+void returnFromFunc(CometVM* vm);
 
 #endif

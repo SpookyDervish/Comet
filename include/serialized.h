@@ -2,6 +2,7 @@
 #define SERIALIZED_H
 
 #include <stdint.h>
+#include "comet_operand.h"
 
 typedef enum {
     INST_PUSH_CONST,
@@ -44,11 +45,15 @@ typedef enum {
     INST_MAX
 } CometInstType;
 
-typedef struct {
+typedef struct CometSerializedFunc CometSerializedFunc;
+struct CometSerializedFunc {
     char name[32];
     uint64_t startIdx;
     uint32_t numArgs;
-} CometSerializedFunc;
+    uint32_t symbolIdx;
+    bool isExternal;
+    CometOperand (*externalPtr)(void* vm);
+};
 
 typedef struct {
     CometInstType opcode;
@@ -60,7 +65,7 @@ typedef struct {
 typedef struct {
     uint32_t numFields;
     uint32_t numMethods;
-    uint32_t* vtable;
+    CometSerializedFunc* vtable;
 } CometSerializedStruct;
 
 typedef struct {
@@ -76,5 +81,17 @@ typedef struct {
     uint32_t numFunctions;
     uint32_t numStructs;
 } CometFile;
+
+typedef struct {
+    CometInstType opcode;
+    CometOperand a;
+    CometOperand b;
+    CometOperand c;
+    uint32_t pos;
+} CometInst;
+
+CometSerializedInst* serializeInst(CometInst inst);
+CometSerializedStruct* serializeStruct(CometStruct* structType);
+uint32_t serializeOperand(CometOperand operand);
 
 #endif

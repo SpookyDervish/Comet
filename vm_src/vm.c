@@ -1,4 +1,3 @@
-#include "serialized.h"
 #include <assert.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -7,8 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "vm.h"
-#include "args.h"
+#include "../include/vm.h"
 #include "../include/comet_operand.h"
 #include "../lib/estr.h"
 #include "debugger.h"
@@ -535,10 +533,16 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         CometObject* obj = (CometObject*)getTop(vm);
 
         uint32_t methodIdx = inst.a;
-        uint32_t symbolIdx = obj->vtable[methodIdx];
-        CometSerializedFunc* func = &vm->functions[symbolIdx];
+        CometSerializedFunc func = obj->vtable[methodIdx];
 
-        callFunction(vm, func);
+        if (!func.isExternal) {
+            callFunction(vm, &vm->functions[func.symbolIdx]);
+        } else {
+            CometOperand result = func.externalPtr((void*)vm);
+            pushValue(vm, result.imm.bigVal);
+        }
+
+        
         DISPATCH();
     }
     BREAKPOINT: {

@@ -1,5 +1,5 @@
-#include "vm.h"
 #include "args.h"
+#include "../include/vm.h"
 #include "../lib/ansi.h"
 #include <stddef.h>
 #include <stdio.h>

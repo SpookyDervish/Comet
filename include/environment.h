@@ -1,8 +1,5 @@
 #pragma once
-#include "ast.h"
-#include "lexer.h"
-#include "../include/comet_operand.h"
-#include "token.h"
+#include "comet_operand.h"
 #include <uthash.h>
 #include <stdlib.h>
 #include <stdio.h>

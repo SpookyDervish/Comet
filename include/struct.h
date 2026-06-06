@@ -13,9 +13,10 @@ typedef enum {
 } FieldAttribute;
 
 // an instance of a struct
+typedef struct CometSerializedFunc CometSerializedFunc;
 typedef struct {
     int64_t* fields;
-    uint32_t* vtable;
+    CometSerializedFunc* vtable;
 } CometObject;
 
 FieldAttribute attribStringToFieldAttrib(char* str);

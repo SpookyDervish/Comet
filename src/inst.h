@@ -3,63 +3,12 @@
 
 #include "../lib/error.h"
 #include "../lib/list.h"
-#include "environment.h"
 #include "../include/comet_operand.h"
 #include "../include/struct.h"
+#include "../include/serialized.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-
-
-
-typedef enum {
-    INST_PUSH_CONST,
-    INST_STORE,
-    INST_LOAD,
-    INST_ADDI,
-    INST_ADDF,
-    INST_SUBI,
-    INST_SUBF,
-    INST_MULI,
-    INST_MULF,
-    INST_DIVI,
-    INST_DIVF,
-    INST_EQI,
-    INST_EQF,
-    INST_NEQI,
-    INST_NEQF,
-    INST_GTI,
-    INST_GTF,
-    INST_LTI,
-    INST_LTF,
-    INST_GTEI,
-    INST_GTEF,
-    INST_LTEI,
-    INST_LTEF,
-    INST_LOAD_ARG,
-    INST_RET,
-    INST_CALL,
-    INST_JMP,
-    INST_JMP_IF_FALSE,
-    INST_JMP_IF_TRUE,
-    INST_NOT,
-    INST_I2F,
-    INST_DUP,
-    INST_NEW,
-    INST_GET_FIELD,
-    INST_SET_FIELD,
-    INST_CALL_METHOD,
-    INST_BREAKPOINT,
-    INST_MAX
-} CometInstType;
-
-typedef struct {
-    CometInstType opcode;
-    CometOperand a;
-    CometOperand b;
-    CometOperand c;
-    uint32_t pos;
-} CometInst;
 
 #define NO_OPERAND ((CometOperand){0})
 

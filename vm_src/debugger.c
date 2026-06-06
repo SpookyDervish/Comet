@@ -2,8 +2,7 @@
 #include "args.h"
 #include "../lib/estr.h"
 #include "../lib/ansi.h"
-#include "serialized.h"
-#include "vm.h"
+#include "../include/vm.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -314,7 +313,7 @@ void printStructInfo(CometDebugger* dbgr, uint32_t structIdx, CometSerializedStr
         printf(ESC_BOLD "        Methods:\n" ESC_RESET);
 
     for (uint32_t methodIdx = 0; methodIdx < structType.numMethods; methodIdx++) {
-        uint32_t symbolIdx = structType.vtable[methodIdx];
+        uint32_t symbolIdx = structType.vtable[methodIdx].symbolIdx;
         CometSerializedFunc func = dbgr->vm->functions[symbolIdx];
 
         printf(ESC_BRIGHT_BLUE_FG "            %s:\n" ESC_RESET, func.name);

@@ -1,0 +1,7 @@
+{
+    "name": "io",
+    "description": "Input / Output",
+    "dependencies": {
+        "test": "1.0.0"
+    }
+}

@@ -2,6 +2,7 @@
 #define TYPE_H
 
 #include <stdint.h>
+#include "../lib/list.h"
 
 typedef enum {
     COMET_VOID,
@@ -29,12 +30,15 @@ struct CometType {
     };
 };
 
+typedef struct CometOperand CometOperand;
 struct CometFunction {
     char name[32];
     uint32_t startIdx;
     uint32_t argCount;
     CometType returnType;
     bool isMethod;
+    bool isExternal;
+    CometOperand (*externalPtr)();
 };
 
 typedef struct {

@@ -1,7 +1,6 @@
 #pragma once
 #include "ast.h"
 #include "lexer.h"
-#include "environment.h"
 #include "token.h"
 #include <stdio.h>
 #include <stdlib.h>

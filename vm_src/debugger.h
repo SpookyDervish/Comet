@@ -2,13 +2,12 @@
 #define DEBUGGER_H
 
 #include "args.h"
-#include "serialized.h"
-#include "vm.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../include/vm.h"
 #include "../lib/error.h"
 #include "../lib/list.h"
 

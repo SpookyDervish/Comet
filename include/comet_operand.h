@@ -29,7 +29,8 @@ typedef struct {
     };
 } CometImmediate;
 
-typedef struct {
+typedef struct CometOperand CometOperand;
+struct CometOperand {
     CometOperandKind type;
     union {
         uint32_t stackIdx;
@@ -37,7 +38,7 @@ typedef struct {
         uint32_t symbolIdx;
         CometLabel* label;
     };
-} CometOperand;
+};
 
 typedef struct {
     CometFunctionType funcType;

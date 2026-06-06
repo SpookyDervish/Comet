@@ -1,6 +1,16 @@
-import module
+struct Test {
+    int abc
+
+    init(int abc) {
+        self.abc = abc
+    }
+
+    func foo(int a) -> int {
+        return self.abc - a
+    }
+}
 
 func main() -> int {
-    breakpoint
-    return module.add(2, 4)
+    Test test = new Test(12)
+    return test.foo(2)
 }
