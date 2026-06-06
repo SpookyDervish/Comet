@@ -1,4 +1,5 @@
 #include "ast.h"
+#include <stddef.h>
 
 CometASTNode* allocateNode(CometASTNode node) {
     CometASTNode* ptr = malloc(sizeof(CometASTNode));
@@ -129,6 +130,12 @@ void freeNode(CometASTNode* node) {
             break;
         }
         case AST_BREAKPOINT_STATEMENT: break;
+        case AST_IMPORT_STATEMENT: {
+            for (size_t i = 0; i < node->data.AST_IMPORT_STATEMENT.importChain.count; i++) {
+                freeNode(*get(node->data.AST_IMPORT_STATEMENT.importChain, i));
+            }
+            break;
+        }   
 
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));

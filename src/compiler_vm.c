@@ -641,7 +641,6 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 
     uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success, exprType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);
-    printf("%d\n", idx);
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
