@@ -1,3 +1,1 @@
-func add(imt a, int b) -> int {
-    return a + b
-}
+int x = 123

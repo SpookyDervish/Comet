@@ -187,6 +187,7 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
     }
 }
 
+ResultType(CometOperand, charptr) getModuleValue(CometCompiler* c, CometASTNode* infixExpr);
 ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node);
 ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometASTNode* node, bool buildValues) {
     switch (node->nodeType) {
@@ -229,6 +230,22 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
                 ResultType(CometOperand, charptr) structValue = visitValue(c, expr.left);
                 if (structValue.error)
                     return Error(CometFunctionTypeInfo, charptr, structValue.as.error);
+            }
+
+            // get function from module
+            if (structType.as.success.typeKind == COMET_MODULE) {
+                ResultType(CometOperand, charptr) value = getModuleValue(c, node);
+                if (value.error)
+                    return Error(CometFunctionTypeInfo, charptr, value.as.error);
+
+                CometFunctionTypeInfo functionInfo = {
+                    .funcType = FUNC_FUNC,
+                    .value = value.as.success,
+                    .methodIdx = (CometOperand){
+                        .type = CO_NONE
+                    }
+                };
+                return Success(CometFunctionTypeInfo, charptr, functionInfo);
             }
 
             int32_t methodIdx = getMethodIndex(structType.as.success.structType, fieldName);
@@ -329,6 +346,71 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
     });
 }
 
+ResultType(CometOperand, charptr) getModuleValue(CometCompiler* c, CometASTNode* infixExpr) {
+    struct AST_INFIX_EXPRESSION expr = infixExpr->data.AST_INFIX_EXPRESSION;
+
+    switch (expr.left->nodeType) {
+        case AST_IDENTIFIER: {
+            char* moduleName = expr.left->data.AST_IDENTIFIER.ident;
+            Record* moduleRecord = lookup(c->env, moduleName);
+            if (!moduleRecord) {
+                Estr errMsg = CREATE_ESTR("Undefined module \"");
+                APPEND_ESTR(errMsg, moduleName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometOperand, charptr, errMsg.str);
+            }
+            CometOperand module = moduleRecord->value;
+
+            if (module.imm.typeKind != COMET_MODULE)
+                return Error(CometOperand, charptr, "Attempted to get an attribute from something that isn't a module!");
+
+            char* attribName = expr.right->data.AST_IDENTIFIER.ident;
+
+            Record* attribRecord = lookup(module.imm.moduleVal, attribName);
+            if (!attribRecord) {
+                Estr errMsg = CREATE_ESTR("Can't find attribute \"");
+                APPEND_ESTR(errMsg, attribName);
+                APPEND_ESTR(errMsg, "\" in module \"");
+                APPEND_ESTR(errMsg, expr.left->data.AST_IDENTIFIER.ident);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometOperand, charptr, errMsg.str);
+            }
+
+            return Success(CometOperand, charptr, attribRecord->value);
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            char* moduleName = expr.left->data.AST_IDENTIFIER.ident;
+            Record* moduleRecord = lookup(c->env, moduleName);
+            if (!moduleRecord) {
+                Estr errMsg = CREATE_ESTR("Undefined module \"");
+                APPEND_ESTR(errMsg, moduleName);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometOperand, charptr, errMsg.str);
+            }
+            CometOperand module = moduleRecord->value;
+
+            char* attribName = expr.right->data.AST_IDENTIFIER.ident;
+
+            Record* attribRecord = lookup(module.imm.moduleVal, attribName);
+            if (!attribRecord) {
+                Estr errMsg = CREATE_ESTR("Can't find attribute \"");
+                APPEND_ESTR(errMsg, attribName);
+                APPEND_ESTR(errMsg, "\" in module \"");
+                APPEND_ESTR(errMsg, expr.left->data.AST_IDENTIFIER.ident);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometOperand, charptr, errMsg.str);
+            }
+
+            return Success(CometOperand, charptr, attribRecord->value);
+        }
+
+        default: {
+            return Error(CometOperand, charptr, "getModuleValue: this error should never happen, please make a bug report.");
+        }
+    }
+}
+
 ResultType(CometType, charptr) getModuleAttribType(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
@@ -341,25 +423,23 @@ ResultType(CometType, charptr) getModuleAttribType(CometCompiler* c, CometASTNod
 
     switch (expr.left->nodeType) {
         case AST_IDENTIFIER: {
-            printNode(node);
-            printf("\n");
             char* moduleName = expr.left->data.AST_IDENTIFIER.ident;
             Record* moduleRecord = lookup(c->env, moduleName);
-
             if (!moduleRecord) {
                 Estr errMsg = CREATE_ESTR("Undefined module \"");
                 APPEND_ESTR(errMsg, moduleName);
                 APPEND_ESTR(errMsg, "\"");
                 return Error(CometType, charptr, errMsg.str);
             }
+            CometOperand module = moduleRecord->value;
 
-            if (moduleRecord->type.typeKind != COMET_MODULE)
+            if (module.imm.typeKind != COMET_MODULE)
                 return Error(CometType, charptr, "Attempted to get an attribute from something that isn't a module!");
 
             char* attribName = expr.right->data.AST_IDENTIFIER.ident;
 
-            Record* attribRecord = lookup(moduleRecord->value.imm.moduleVal, attribName);
-            {
+            Record* attribRecord = lookup(module.imm.moduleVal, attribName);
+            if (!attribRecord) {
                 Estr errMsg = CREATE_ESTR("Can't find attribute \"");
                 APPEND_ESTR(errMsg, attribName);
                 APPEND_ESTR(errMsg, "\" in module \"");
@@ -370,6 +450,27 @@ ResultType(CometType, charptr) getModuleAttribType(CometCompiler* c, CometASTNod
 
             return Success(CometType, charptr, attribRecord->type);
         }
+
+        case AST_INFIX_EXPRESSION: {
+            ResultType(CometOperand, charptr) left = getModuleValue(c, expr.left);
+            if (left.error)
+                return Error(CometType, charptr, left.as.error);
+            
+            char* attribName = expr.right->data.AST_IDENTIFIER.ident;
+
+            Record* attribRecord = lookup(left.as.success.imm.moduleVal, attribName);
+            if (!attribRecord) {
+                Estr errMsg = CREATE_ESTR("Can't find attribute \"");
+                APPEND_ESTR(errMsg, attribName);
+                APPEND_ESTR(errMsg, "\" in module \"");
+                APPEND_ESTR(errMsg, expr.left->data.AST_IDENTIFIER.ident);
+                APPEND_ESTR(errMsg, "\"");
+                return Error(CometType, charptr, errMsg.str);
+            }
+
+            return Success(CometType, charptr, attribRecord->type);
+        }
+
         
         default: break;
     }
@@ -538,6 +639,7 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 
     uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success, exprType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);
+    printf("%d\n", idx);
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
@@ -709,13 +811,16 @@ ResultType(CometOperand, charptr) getField(CometCompiler* c, CometASTNode* struc
 ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
-    if (expr.op.type == CT_DOT) { // getting a field
-        return getField(c, expr.left, expr.right);
-    }
-
     ResultType(CometType, charptr) leftType = resolveType(c, expr.left);
     if (leftType.error)
         return Error(CometOperand, charptr, leftType.as.error);
+
+    if (expr.op.type == CT_DOT) { // getting a field
+        if (leftType.as.success.typeKind == COMET_MODULE)
+            return getModuleValue(c, node);
+
+        return getField(c, expr.left, expr.right);
+    }
 
     ResultType(CometType, charptr) rightType = resolveType(c, expr.right);
     if (rightType.error)
@@ -1145,6 +1250,8 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
 ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType) {
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+
+    
 
     // get return type
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
