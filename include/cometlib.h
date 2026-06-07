@@ -26,7 +26,7 @@
 #define cometTypeBool (CometType){.typeKind = COMET_BOOL}
 #define cometTypeVoid (CometType){.typeKind = COMET_VOID}
 
-#define on_import void onImport(CometVM* vm, CometEnvironment* env)
+#define on_import void onImport(CometEnvironment* env)
 
 UseList(CometSerializedFunc);
 UseList(CometOperand);

@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <dlfcn.h>
 
 
 // -- HELPER METHODS -- //
@@ -70,8 +71,54 @@ int32_t getMethodIndex(CometStruct* structType, char* methodName) {
     return -1;
 }
 
-ResultType(CometOperand, charptr) loadExternalLib() {
+ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* path, char* libName) {
+    void* handle = dlopen(path, RTLD_LAZY);
+    if (!handle) {
+        Estr errMsg = CREATE_ESTR("Failed to load module: ");
+        APPEND_ESTR(errMsg,  dlerror());
 
+        dlclose(handle);
+
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    void (*onLibImport)(CometEnvironment* env) = dlsym(handle, "onImport");
+    if (!onLibImport) {
+        Estr errMsg = CREATE_ESTR("Could not get the \"onImport\" function from the library \"");
+        APPEND_ESTR(errMsg, libName);
+        APPEND_ESTR(errMsg, "\". (");
+        APPEND_ESTR(errMsg, dlerror());
+        APPEND_ESTR(errMsg, ")");
+
+        dlclose(handle);
+
+        return Error(CometOperand, charptr, errMsg.str);
+    }
+
+    CometEnvironment* oldEnv = c->env;
+    CometEnvironment* libEnv = newEnvironment("externalLib", c->env, false); 
+    onLibImport(libEnv);
+
+    for (size_t methodIdx = 0; methodIdx < libEnv->recordIdx; methodIdx++) {
+        if (libEnv->records[methodIdx].type.typeKind != COMET_FUNCTION) continue;
+
+        CometOperand libFunc = libEnv->records[methodIdx].value.;
+
+        CometOperand func = buildFunction(c, , 2, CometType returnType, bool isMethod)
+    }
+
+    CometOperand libValue = createOperand(CO_IMMEDIATE);
+    libValue.imm.typeKind = COMET_MODULE;
+    libValue.imm.moduleVal = libEnv;
+
+    CometType libType = {
+        .typeKind = COMET_MODULE
+    };
+
+    defineVar(oldEnv, libName, RECORD_LOCAL, libValue, libType, false);
+
+    dlclose(handle);
+    return Success(CometOperand, charptr, NO_OPERAND);
 }
 
 ResultType(CometOperand, charptr) visitProgram(CometCompiler* c, CometASTNode* p) {
@@ -1584,6 +1631,7 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     bool isExternal = false;
 
     char* cometLibsPath = getenv("COMET_LIBS");
+    printf("%s\n", cometLibsPath);
 
     // no local file was found, look for it in the system wide libs
     if (!found) { 
@@ -1606,8 +1654,10 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
         return Error(CometOperand, charptr, errMsg.str);
     }
 
+    char* lastModuleIdent = (*get(importChain, importChain.count-1))->data.AST_IDENTIFIER.ident;
+
     if (isExternal) {
-        return loadExternalLib(path);
+        return loadExternalLib(c, path, lastModuleIdent);
     }
 
     // lex
@@ -1645,7 +1695,6 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     c->env = newEnvironment(libName, c->env, false);
 
     // load imported symbols
-    char* lastModuleIdent = (*get(importChain, importChain.count-1))->data.AST_IDENTIFIER.ident;
     CometOperand module = createOperand(CO_IMMEDIATE);
     module.imm.typeKind = COMET_MODULE;
     module.imm.moduleVal = c->env;

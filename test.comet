@@ -1,16 +1,5 @@
-struct Test {
-    int abc
-
-    init(int abc) {
-        self.abc = abc
-    }
-
-    func foo(int a) -> int {
-        return self.abc - a
-    }
-}
+import io
 
 func main() -> int {
-    Test test = new Test(12)
-    return test.foo(2)
+    return io.foo()
 }
