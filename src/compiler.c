@@ -393,6 +393,7 @@ ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode)
             printf("\n");
 
             // TODO: i was gonna finish this but the parser can't even parse it yet so ill finish it later
+            break;
         }
 
         default: {
