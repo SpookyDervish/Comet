@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <comet/vm.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -108,6 +109,9 @@ void pushImm(CometVM* vm, CometImmediate imm) {
         case COMET_STRUCT: pushValue(vm, (int64_t)imm.objectVal); break;
         case COMET_FUNCTION: pushValue(vm, (int64_t)imm.smallVal); break;
         case COMET_VOID: break;
+        default:
+            assert(imm.typeKind != COMET_VOID);
+            break;
     }
 }
 
@@ -120,6 +124,8 @@ void pushOperand(CometVM* vm, CometOperand operand) {
 
         default: break;
     }
+
+    assert(false);
 }
 
 CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
@@ -576,7 +582,11 @@ ResultType(int, charptr) startVM(CometVM* vm) {
         return Error(int, charptr, errMsg.str);
     }
 
-    return Success(int, charptr, vm->stack[vm->sp-1]);//(*vm->currentStack)[(*vm->currentSp)-1]);
+    if (vm->sp <= 0) {
+        return Success(int, charptr, 0);
+    }
+
+    return Success(int, charptr, getTop(vm));
 }
 
 

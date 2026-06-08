@@ -9,7 +9,7 @@ CXX=g++
 CFLAGS=-Wall -Wextra -Wno-trigraphs -O3 -rdynamic
 LDFLAGS=
 LDLIBS=
-DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -fsanitize=address -rdynamic
+DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -rdynamic -fsanitize=address 
 
 COMPILER_TARGET=cometc
 VM_TARGET=comet
