@@ -78,8 +78,6 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
         Estr errMsg = CREATE_ESTR("Failed to load module: ");
         APPEND_ESTR(errMsg,  dlerror());
 
-        dlclose(handle);
-
         return Error(CometOperand, charptr, errMsg.str);
     }
 

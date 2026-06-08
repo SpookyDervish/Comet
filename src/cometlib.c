@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 void cometDefineFunc(
     CometEnvironment* env,
@@ -62,28 +63,28 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
             newVal = (CometOperand){
                 .type = CO_IMMEDIATE,
                 .imm.typeKind = COMET_SMALL,
-                .imm.smallVal = (int8_t)va_arg(args, int8_t)
+                .imm.smallVal = (int8_t)va_arg(args, int)
             };
             break;
         case COMET_INT: 
             newVal = (CometOperand){
                 .type = CO_IMMEDIATE,
                 .imm.typeKind = COMET_INT,
-                .imm.intVal = (int32_t)va_arg(args, int32_t)
+                .imm.intVal = (int32_t)va_arg(args, int)
             };
             break;
         case COMET_BIG: 
             newVal = (CometOperand){
                 .type = CO_IMMEDIATE,
                 .imm.typeKind = COMET_BIG,
-                .imm.bigVal = (int64_t)va_arg(args, int64_t)
+                .imm.bigVal = (int64_t)va_arg(args, int)
             };
             break;
         case COMET_FLOAT: 
             newVal = (CometOperand){
                 .type = CO_IMMEDIATE,
                 .imm.typeKind = COMET_FLOAT,
-                .imm.floatVal = (float)va_arg(args, float)
+                .imm.floatVal = (float)va_arg(args, double)
             };
             break;
         case COMET_DOUBLE: 
@@ -97,7 +98,7 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
             newVal = (CometOperand){
                 .type = CO_IMMEDIATE,
                 .imm.typeKind = COMET_BOOL,
-                .imm.boolVal = (bool)va_arg(args, bool)
+                .imm.boolVal = (bool)va_arg(args, int)
             };
             break;
         case COMET_STRUCT:
@@ -110,8 +111,7 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
         case COMET_FUNCTION:
             newVal = (CometOperand){
                 .type = CO_SYMBOL,
-                .imm.typeKind = COMET_FUNCTION,
-                .symbolIdx = va_arg(args, uint32_t)
+                .symbolIdx = (uint32_t)va_arg(args, int)
             };
             break;
         case COMET_VOID: 
