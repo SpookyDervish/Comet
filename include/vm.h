@@ -11,6 +11,8 @@
 #include "serialized.h"
 #include <stdint.h>
 
+Result(int, charptr);
+
 typedef struct DebuggerBreakpoint DebuggerBreakpoint;
 UseList(DebuggerBreakpoint);
 
@@ -55,11 +57,8 @@ typedef struct {
 } CometVM;
 
 typedef CometVM* vmPtr;
-typedef void* voidPtr;
 
 Result(vmPtr, charptr);
-Result(int, charptr);
-Result(voidPtr, charptr);
 
 ResultType(vmPtr, charptr) newCometVM(char* filePath);
 ResultType(int, charptr) startVM(CometVM* vm);

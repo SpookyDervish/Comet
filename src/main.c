@@ -1,4 +1,4 @@
-#include "compiler_vm.h"
+#include "compiler.h"
 #include "inst.h"
 #include "lexer.h"
 #include "parser.h"

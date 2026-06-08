@@ -1,9 +1,10 @@
-#include "compiler_vm.h"
+#include "compiler.h"
 #include "ast.h"
 #include "inst.h"
 #include "lexer.h"
 #include "token.h"
 #include "parser.h"
+#include "../include/cometlib.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -99,13 +100,23 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
     CometEnvironment* libEnv = newEnvironment("externalLib", c->env, false); 
     onLibImport(libEnv);
 
+    // whenever an external lib creates a function we need to create a symbol for it in the compiler
     for (size_t methodIdx = 0; methodIdx < libEnv->recordIdx; methodIdx++) {
         if (libEnv->records[methodIdx].type.typeKind != COMET_FUNCTION) continue;
 
-        /*Record libFuncRecord = libEnv->records[methodIdx];
-        libFuncRecord.value.
+        Record libFuncRecord = libEnv->records[methodIdx];
+        CometFunction* funcVal = (CometFunction*)libFuncRecord.value.imm.bigVal; // i sure do love casting pointers to ints lmao
 
-        CometOperand func = buildFunction(c, libFuncRecord.name, 2, libFuncRecord.type, false);*/
+        CometOperand funcOperand = buildFunction(
+            c,
+            funcVal->name,
+            funcVal->argCount,
+            funcVal->returnType,
+            funcVal->isMethod,
+            true
+        );
+
+        
     }
 
     CometOperand libValue = createOperand(CO_IMMEDIATE);
@@ -954,7 +965,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType, false);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType, false, false);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1214,7 +1225,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct) {
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
-    buildFunction(c, constructorName, constDef.args.count + 1, structType, true); // add 1 arg for self
+    buildFunction(c, constructorName, constDef.args.count + 1, structType, true, false); // add 1 arg for self
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
@@ -1306,7 +1317,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType, true);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType, true, false);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1632,7 +1643,10 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     bool isExternal = false;
 
     char* cometLibsPath = getenv("COMET_LIBS");
-    printf("%s\n", cometLibsPath);
+    if (!cometLibsPath) {
+        cometLibsPath = "";
+    }
+    printf("libs path = %s\n", cometLibsPath);
 
     // no local file was found, look for it in the system wide libs
     if (!found) { 

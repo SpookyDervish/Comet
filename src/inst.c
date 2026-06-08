@@ -361,11 +361,12 @@ CometOperand buildGte(CometCompiler* c, CometType resultType) {
 
     return dest;
 }
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod) {
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod, bool isExternal) {
     CometFunction* newFunction = malloc(sizeof(CometFunction));
     newFunction->argCount = argCount;
     newFunction->returnType = returnType;
     newFunction->isMethod = isMethod;
+    newFunction->isExternal = isExternal;
 
     strncpy(newFunction->name, name, 31);
     newFunction->startIdx = c->programIdx;

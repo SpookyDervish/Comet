@@ -8,8 +8,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include "../include/vm.h"
-#include "../include/error.h"
-#include "../include/list.h"
 
 #define IS_OBJECT(x) _Generic((x), \
     CometObject*: 1,        \

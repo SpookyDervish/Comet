@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "type.h"
 
+typedef struct CometFunction CometFunction;
 struct CometFunction {
     char name[32];
     uint32_t startIdx;

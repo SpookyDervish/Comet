@@ -1,5 +1,5 @@
-#ifndef VM_H
-#define VM_H
+#ifndef COMPILER_H
+#define COMPILER_H
 
 #include "ast.h"
 #include "lexer.h"

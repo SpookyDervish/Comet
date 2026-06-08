@@ -6,10 +6,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "../include/vm.h"
 #include "../include/comet_operand.h"
 #include "../lib/estr.h"
+#include "args.h"
 #include "debugger.h"
+
+typedef void* voidPtr;
+Result(voidPtr, charptr);
 
 // For Clang and GCC on macOS
 #define FORCE_INLINE __attribute__((always_inline)) static inline

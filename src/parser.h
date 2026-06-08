@@ -27,7 +27,6 @@ typedef ResultType(astNodePtr, charptr) (*prefixFuncType)(CometParser*);
 typedef ResultType(astNodePtr, charptr) (*infixFuncType)(CometParser*, CometASTNode* left);
 
 Result(parserPtr, charptr);
-Result(int, charptr);
 Result(prefixFuncType, charptr);
 Result(infixFuncType, charptr);
 Result(argList, charptr);

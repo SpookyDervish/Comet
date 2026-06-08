@@ -98,7 +98,7 @@ CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOpe
 void buildBreakpoint(CometCompiler* c);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod);
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod, bool isExternal);
 
 CometLabel* buildLabel(CometCompiler* c);
 void resolveLabel(CometCompiler* c, CometLabel* label);

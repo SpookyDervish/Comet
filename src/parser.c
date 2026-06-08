@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+Result(int, charptr);
 
 ResultType(astNodePtr, charptr) parseStatement(CometParser* parser, bool isMutable, FieldAttribute attrib);
 

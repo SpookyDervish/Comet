@@ -1,11 +1,8 @@
 #ifndef COMETLIB_H
 #define COMETLIB_H
 
-#include "comet_operand.h"
-#include "serialized.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "list.h"
 #include "vm.h"
 #include "function.h"
 

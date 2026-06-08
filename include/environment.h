@@ -1,4 +1,6 @@
-#pragma once
+#ifndef ENVIRONMENT_H
+#define ENVIRONMENT_H
+
 #include "comet_operand.h"
 #include <uthash.h>
 #include <stdlib.h>
@@ -34,3 +36,5 @@ CometEnvironment* newEnvironment(char* name, CometEnvironment* parent, bool isFu
 uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, CometOperand value, CometType type, bool isMutable);
 Record* lookup(CometEnvironment* env, char* name);
 CometEnvironment* destroyEnv(CometEnvironment* env);
+
+#endif // ENVIRONMENT_H
