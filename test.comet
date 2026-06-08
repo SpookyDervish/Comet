@@ -1,5 +1,6 @@
 import example
 
-func main() -> void {    
+func main() -> int {    
+    breakpoint
     return example.foo(1, 2)
 }

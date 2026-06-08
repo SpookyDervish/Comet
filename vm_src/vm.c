@@ -120,8 +120,6 @@ void pushOperand(CometVM* vm, CometOperand operand) {
 
         default: break;
     }
-
-    assert(false);
 }
 
 CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
