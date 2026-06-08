@@ -16,6 +16,8 @@ typedef enum {
     COMET_FUNCTION,
     COMET_MODULE,   // not actually represented in assembly but this is used so
                     // we can resolve imported values
+
+    COMET_TYPE,     // this is also not actually represented in the asm
 } CometValueTypeKind;
 
 typedef struct CometStruct CometStruct;

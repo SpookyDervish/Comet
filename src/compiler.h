@@ -16,9 +16,15 @@
 
 typedef void* voidPtr;
 
+
+typedef List(astNodePtr) astNodeList;
+
 Result(voidPtr, charptr);
 Result(CometType, charptr);
+Result(astNodeList, charptr);
 Result(CometFunctionTypeInfo, charptr);
+
+
 
 ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node);
 ResultType(cometCompilerPtr, charptr) newCompiler();

@@ -711,7 +711,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         char libName[128];
         snprintf(libName, 128, "%s.cometlib", cursor);
 
-        char* cometLibsPath = "/usr/lib/comet";//getenv("COMET_LIBS");
+        char* cometLibsPath = getenv("COMET_LIBS");
         if (!cometLibsPath) {
             cometLibsPath = "";
         }

@@ -16,21 +16,6 @@
 
 
 // -- HELPER METHODS -- //
-ResultType(CometType, charptr) getType(CometCompiler* c, char* typeName) {
-    for (size_t i = 0; i < c->typeMap.count; i++) {
-        CometTypeMapEntry type = *get(c->typeMap, i);
-
-        if (strcmp(type.name, typeName) == 0) {
-            return Success(CometType, charptr, type.type);
-        }
-    }
-
-    Estr errMsg = CREATE_ESTR("Unkown type \"");
-    APPEND_ESTR(errMsg, typeName);
-    APPEND_ESTR(errMsg, "\"");
-    return Error(CometType, charptr, errMsg.str);
-}
-
 bool isAssignmentOperator(CometASTNode* expr) {
     CometTokenType assignmentOps[] = {
         CT_PLUS_EQ,
@@ -342,6 +327,80 @@ ResultType(CometFunctionTypeInfo, charptr) getFunction(CometCompiler* c, CometAS
     return Error(CometFunctionTypeInfo, charptr, "Attempted to call something which isn't a function!");
 }
 
+ResultType(astNodeList, charptr) flattenPath(CometCompiler* c, CometASTNode* typeNode) {
+    List(astNodePtr) flattenedTypes = newList(astNodePtr);
+
+    switch (typeNode->nodeType) {
+        case AST_IDENTIFIER:
+            append(flattenedTypes, typeNode);
+            break;
+        
+
+        case AST_INFIX_EXPRESSION: {
+            ResultType(astNodeList, charptr) leftTypes = flattenPath(c, typeNode->data.AST_INFIX_EXPRESSION.left);
+            if (leftTypes.error)
+                return leftTypes;
+
+            for (size_t i = 0; i < leftTypes.as.success.count; i++) {
+                append(flattenedTypes, *get(leftTypes.as.success, i))
+            }
+
+            append(flattenedTypes, typeNode->data.AST_INFIX_EXPRESSION.right);
+
+            break;
+        }
+
+        default: {
+            Estr errMsg = CREATE_ESTR("Expected identifier or module access but got \"");
+            APPEND_ESTR(errMsg, ASTNodeTypeToCStr(typeNode->nodeType));
+            APPEND_ESTR(errMsg, "\"");
+            return Error(astNodeList, charptr, errMsg.str);
+        }
+    }
+
+    return Success(astNodeList, charptr, flattenedTypes);
+}
+
+ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode) {
+    switch (typeNode->nodeType) {
+        case AST_IDENTIFIER: {
+
+            List(CometTypeMapEntry) typeMap = c->typeMap;
+            char* typeName = typeNode->data.AST_IDENTIFIER.ident;
+
+            for (size_t i = 0; i < typeMap.count; i++) {
+                CometTypeMapEntry type = *get(typeMap, i);
+
+                if (strcmp(type.name, typeName) == 0) {
+                    return Success(CometType, charptr, type.type);
+                }
+            }
+
+            Estr errMsg = CREATE_ESTR("Unkown type \"");
+            APPEND_ESTR(errMsg, typeName);
+            APPEND_ESTR(errMsg, "\"");
+            return Error(CometType, charptr, errMsg.str);
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            ResultType(astNodeList, charptr) path = flattenPath(c, typeNode);
+            if (path.error)
+                return Error(CometType, charptr, path.as.error);
+
+            for (size_t i = 0; i < path.as.success.count; i++) {
+                printf("%s.", (*get(path.as.success, i))->data.AST_IDENTIFIER.ident);
+            }
+            printf("\n");
+
+            // TODO: i was gonna finish this but the parser can't even parse it yet so ill finish it later
+        }
+
+        default: {
+            return Error(CometType, charptr, "Expected type name or module access.");
+        }
+    }
+}
+
 ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_IDENTIFIER: {
@@ -568,7 +627,7 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
             return Success(CometType, charptr, varRecord->type);
         }
         case AST_NEW_STATEMENT: {
-            ResultType(CometType, charptr) type = getType(c, node->data.AST_NEW_STATEMENT.structName->data.AST_IDENTIFIER.ident);
+            ResultType(CometType, charptr) type = getType(c, node->data.AST_NEW_STATEMENT.structName);
             if (type.error)
                 return type;
 
@@ -650,7 +709,7 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
             return Success(CometType, charptr, unifyType(left.as.success, right.as.success));
         }
         case AST_ARG_DEF: {
-            return getType(c, node->data.AST_ARG_DEF.type->data.AST_IDENTIFIER.ident);
+            return getType(c, node->data.AST_ARG_DEF.type);
         }
         case AST_FUNC_CALL: {
             ResultType(CometFunctionTypeInfo, charptr) funcResult = getFunction(c, node->data.AST_FUNC_CALL.ident, false);
@@ -985,7 +1044,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     for (size_t argTypeIdx = 0; argTypeIdx < funcDef.args.count; argTypeIdx++) {
         CometASTNode* argNode = *get(funcDef.args, argTypeIdx);
 
-        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_IDENTIFIER.ident);
+        ResultType(CometType, charptr) argType = getType(c, argNode);
         if (argType.error)
             return Error(CometOperand, charptr, argType.as.error);
 
@@ -993,7 +1052,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     } 
 
     // get return type
-    ResultType(CometType, charptr) returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
+    ResultType(CometType, charptr) returnType = getType(c, funcDef.returnType);
     if (returnType.error)
         return Error(CometOperand, charptr, returnType.as.error);
 
@@ -1263,7 +1322,7 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
     for (size_t argTypeIdx = 0; argTypeIdx < constDef.args.count; argTypeIdx++) {
         CometASTNode* argNode = *get(constDef.args, argTypeIdx);
 
-        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_IDENTIFIER.ident);
+        ResultType(CometType, charptr) argType = getType(c, argNode);
         if (argType.error)
             return Error(CometOperand, charptr, argType.as.error);
 
@@ -1361,7 +1420,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     for (size_t argTypeIdx = 0; argTypeIdx < funcDef.args.count; argTypeIdx++) {
         CometASTNode* argNode = *get(funcDef.args, argTypeIdx);
 
-        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_IDENTIFIER.ident);
+        ResultType(CometType, charptr) argType = getType(c, argNode);
         if (argType.error)
             return Error(CometOperand, charptr, argType.as.error);
 
@@ -1369,7 +1428,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     } 
 
     // get return type
-    ResultType(CometType, charptr) returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
+    ResultType(CometType, charptr) returnType = getType(c, funcDef.returnType);
     if (returnType.error)
         return Error(CometOperand, charptr, returnType.as.error);
 
@@ -1453,7 +1512,7 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     // handle inheritance
     CometStruct* parentStruct = NULL;
     if (structDef.parentName) {
-        ResultType(CometType, charptr) parentStructType = getType(c, structDef.parentName->data.AST_IDENTIFIER.ident);
+        ResultType(CometType, charptr) parentStructType = getType(c, structDef.parentName);
         if (parentStructType.error)
             return Error(CometOperand, charptr, parentStructType.as.error);
 
@@ -1538,7 +1597,7 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
 
         switch (fieldDef->nodeType) {
             case AST_ASSIGN_STATEMENT: {
-                ResultType(CometType, charptr) fieldType = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
+                ResultType(CometType, charptr) fieldType = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type);
                 if (fieldType.error)
                     return Error(CometOperand, charptr, fieldType.as.error);
 

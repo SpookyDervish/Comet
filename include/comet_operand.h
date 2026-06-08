@@ -28,6 +28,7 @@ typedef struct {
         bool boolVal;
         CometObject* objectVal;
         CometEnvironment* moduleVal;
+        CometType typeVal;
     };
 } CometImmediate;
 
