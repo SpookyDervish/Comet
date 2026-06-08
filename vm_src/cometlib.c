@@ -35,6 +35,18 @@ void cometDefineFunc(
         }
     };
 
+    va_list args;
+    va_start(args, numArgs);
+
+    CometType* argTypes = numArgs > 0 ? calloc(numArgs, sizeof(CometType)) : NULL;
+    for (size_t i = 0; i < numArgs; i++) {
+        argTypes[i] = va_arg(args, CometType);
+    }
+
+    func->argTypes = argTypes;
+
+    va_end(args);
+
     defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
 }
 

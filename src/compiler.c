@@ -16,18 +16,19 @@
 
 
 // -- HELPER METHODS -- //
-CometType getType(CometCompiler* c, char* typeName) {
+ResultType(CometType, charptr) getType(CometCompiler* c, char* typeName) {
     for (size_t i = 0; i < c->typeMap.count; i++) {
         CometTypeMapEntry type = *get(c->typeMap, i);
 
         if (strcmp(type.name, typeName) == 0) {
-            return type.type;
+            return Success(CometType, charptr, type.type);
         }
     }
 
-    return (CometType){
-        .typeKind = COMET_VOID
-    };
+    Estr errMsg = CREATE_ESTR("Unkown type \"");
+    APPEND_ESTR(errMsg, typeName);
+    APPEND_ESTR(errMsg, "\"");
+    return Error(CometType, charptr, errMsg.str);
 }
 
 bool isAssignmentOperator(CometASTNode* expr) {
@@ -117,6 +118,7 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
             funcVal->name,
             funcVal->argCount,
             funcVal->returnType,
+            funcVal->argTypes,
             funcVal->isMethod,
             true,
             libIdx
@@ -541,6 +543,8 @@ ResultType(CometType, charptr) getModuleAttribType(CometCompiler* c, CometASTNod
         
         default: break;
     }
+
+    return Error(CometType, charptr, "Expected identifier or attribute access.");
 }
 
 ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node) {
@@ -564,9 +568,13 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
             return Success(CometType, charptr, varRecord->type);
         }
         case AST_NEW_STATEMENT: {
+            ResultType(CometType, charptr) type = getType(c, node->data.AST_NEW_STATEMENT.structName->data.AST_IDENTIFIER.ident);
+            if (type.error)
+                return type;
+
             CometType structType = (CometType){
                 .typeKind = COMET_STRUCT,
-                .structType = getType(c, node->data.AST_NEW_STATEMENT.structName->data.AST_IDENTIFIER.ident).structType
+                .structType = type.as.success.structType
             };
 
             return Success(CometType, charptr, structType);
@@ -642,8 +650,7 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
             return Success(CometType, charptr, unifyType(left.as.success, right.as.success));
         }
         case AST_ARG_DEF: {
-            CometType argType = getType(c, node->data.AST_ARG_DEF.type->data.AST_IDENTIFIER.ident);
-            return Success(CometType, charptr, argType);
+            return getType(c, node->data.AST_ARG_DEF.type->data.AST_IDENTIFIER.ident);
         }
         case AST_FUNC_CALL: {
             ResultType(CometFunctionTypeInfo, charptr) funcResult = getFunction(c, node->data.AST_FUNC_CALL.ident, false);
@@ -967,11 +974,31 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
+    if (node->data.AST_FUNC_DEF_STATEMENT.args.count > MAX_ARGS) {
+        char* buffer = malloc(64);
+        snprintf(buffer, 64, "Functions can't have more than %d args.", MAX_ARGS);
+        return Error(CometOperand, charptr, buffer);
+    }
+
+    // get arg types
+    CometType* argTypes = calloc(funcDef.args.count, sizeof(CometType));
+    for (size_t argTypeIdx = 0; argTypeIdx < funcDef.args.count; argTypeIdx++) {
+        CometASTNode* argNode = *get(funcDef.args, argTypeIdx);
+
+        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_IDENTIFIER.ident);
+        if (argType.error)
+            return Error(CometOperand, charptr, argType.as.error);
+
+        argTypes[argTypeIdx] = argType.as.success;
+    } 
+
     // get return type
-    CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
-    
+    ResultType(CometType, charptr) returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
+    if (returnType.error)
+        return Error(CometOperand, charptr, returnType.as.error);
+
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType, false, false, -1);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, -1);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1231,7 +1258,19 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct) {
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
-    buildFunction(c, constructorName, constDef.args.count + 1, structType, true, false, -1); // add 1 arg for self
+    // get arg types
+    CometType* argTypes = calloc(constDef.args.count + 1, sizeof(CometType));
+    for (size_t argTypeIdx = 0; argTypeIdx < constDef.args.count; argTypeIdx++) {
+        CometASTNode* argNode = *get(constDef.args, argTypeIdx);
+
+        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_IDENTIFIER.ident);
+        if (argType.error)
+            return Error(CometOperand, charptr, argType.as.error);
+
+        argTypes[argTypeIdx+1] = argType.as.success;
+    }
+
+    buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, true, false, -1); // add 1 arg for self
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
@@ -1317,13 +1356,25 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
-    
+    // get arg types
+    CometType* argTypes = calloc(funcDef.args.count+1, sizeof(CometType));
+    for (size_t argTypeIdx = 0; argTypeIdx < funcDef.args.count; argTypeIdx++) {
+        CometASTNode* argNode = *get(funcDef.args, argTypeIdx);
+
+        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_IDENTIFIER.ident);
+        if (argType.error)
+            return Error(CometOperand, charptr, argType.as.error);
+
+        argTypes[argTypeIdx+1] = argType.as.success;
+    } 
 
     // get return type
-    CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
-    
+    ResultType(CometType, charptr) returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
+    if (returnType.error)
+        return Error(CometOperand, charptr, returnType.as.error);
+
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType, true, false, -1);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType.as.success, argTypes, true, false, -1);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1402,22 +1453,18 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
     // handle inheritance
     CometStruct* parentStruct = NULL;
     if (structDef.parentName) {
-        CometType parentStructType = getType(c, structDef.parentName->data.AST_IDENTIFIER.ident);
-        if (parentStructType.typeKind == COMET_VOID) {
-            Estr errMsg = CREATE_ESTR("Cannot inherit from undefined type \"");
-            APPEND_ESTR(errMsg, structDef.parentName->data.AST_IDENTIFIER.ident);
-            APPEND_ESTR(errMsg, "\"");
-            return Error(CometOperand, charptr, errMsg.str);
-        }
+        ResultType(CometType, charptr) parentStructType = getType(c, structDef.parentName->data.AST_IDENTIFIER.ident);
+        if (parentStructType.error)
+            return Error(CometOperand, charptr, parentStructType.as.error);
 
-        if (parentStructType.typeKind != COMET_STRUCT) {
+        if (parentStructType.as.success.typeKind != COMET_STRUCT) {
             Estr errMsg = CREATE_ESTR("Cannot inherit from non-struct type \"");
             APPEND_ESTR(errMsg, structDef.parentName->data.AST_IDENTIFIER.ident);
             APPEND_ESTR(errMsg, "\"");
             return Error(CometOperand, charptr, errMsg.str);
         }
 
-        parentStruct = parentStructType.structType;
+        parentStruct = parentStructType.as.success.structType;
 
         // add parent field count
         parentFieldCount = parentStruct->fieldCount;
@@ -1490,10 +1537,15 @@ ResultType(CometOperand, charptr) visitStructDefStatement(CometCompiler* c, Come
         CometASTNode* fieldDef = *get(structDef.fieldDefs, i);
 
         switch (fieldDef->nodeType) {
-            case AST_ASSIGN_STATEMENT:
+            case AST_ASSIGN_STATEMENT: {
+                ResultType(CometType, charptr) fieldType = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
+                if (fieldType.error)
+                    return Error(CometOperand, charptr, fieldType.as.error);
+
                 structType->fieldNames[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-                structType->fieldTypes[fieldIdx++] = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type->data.AST_IDENTIFIER.ident);
+                structType->fieldTypes[fieldIdx++] = fieldType.as.success;
                 break;
+            }
 
             case AST_OVERRIDE_STATEMENT: {
                 // we're not inheriting from any struct so we cant override functions
@@ -1761,6 +1813,8 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
 
 
     for (size_t i = 0; i < c->functionCount; i++) {
+        
+
         CometSerializedFunc serializedFunc = {
             .startIdx = c->functions[i]->startIdx,
             .numArgs = c->functions[i]->argCount,
@@ -1768,9 +1822,9 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
             .libIdx = c->functions[i]->libIdx,
         };
         strcpy(serializedFunc.name, c->functions[i]->name);
+        memcpy(serializedFunc.argTypes, c->functions[i]->argTypes, sizeof(CometType) * c->functions[i]->argCount);
 
         fwrite(&serializedFunc, sizeof(CometSerializedFunc), 1, file);
-        
     }
 
     for (size_t structIdx = 0; structIdx < c->structs.count; structIdx++) {

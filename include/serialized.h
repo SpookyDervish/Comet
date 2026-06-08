@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "comet_operand.h"
 
+#define MAX_ARGS 16
+
 typedef enum {
     INST_PUSH_CONST,
     INST_STORE,
@@ -53,6 +55,7 @@ struct CometSerializedFunc {
     bool isExternal;
     int8_t libIdx;
     uint32_t externFuncIndex;
+    CometType argTypes[MAX_ARGS];
 };
 
 typedef struct {

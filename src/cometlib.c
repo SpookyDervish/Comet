@@ -21,7 +21,6 @@ void cometDefineFunc(
     func->returnType = returnType;
     func->startIdx = 0;
     func->isExternal = true;
-    func->libIdx = 0;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,
@@ -35,6 +34,18 @@ void cometDefineFunc(
             .bigVal = (int64_t)func
         }
     };
+
+    va_list args;
+    va_start(args, numArgs);
+
+    CometType* argTypes = numArgs > 0 ? calloc(numArgs, sizeof(CometType)) : NULL;
+    for (size_t i = 0; i < numArgs; i++) {
+        argTypes[i] = va_arg(args, CometType);
+    }
+
+    func->argTypes = argTypes;
+
+    va_end(args);
 
     defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
 }

@@ -88,6 +88,45 @@ CometOperand getConst(CometVM* vm, uint32_t idx) {
     return vm->constants[idx];
 }
 
+int64_t serializeValue(CometOperand value) {
+    if (value.type == CO_SYMBOL) {
+        return value.symbolIdx;
+    }
+
+    switch (value.imm.typeKind) {
+        case COMET_SMALL   : return value.imm.smallVal;
+        case COMET_INT     : return value.imm.intVal;
+        case COMET_BIG     : return value.imm.bigVal;
+        case COMET_BOOL    : return value.imm.boolVal;
+        case COMET_STRUCT  : return (int64_t)value.imm.objectVal;
+        case COMET_FLOAT   : {
+            int64_t serialized;
+            memcpy(&serialized, &value.imm.floatVal, sizeof(int64_t));
+            return serialized;
+        }
+        case COMET_DOUBLE  : {
+            int64_t serialized;
+            memcpy(&serialized, &value.imm.doubleVal, sizeof(int64_t));
+            return serialized;
+        }
+        default: return 0;
+    }
+}
+
+CometOperand deserializeValue(int64_t value, CometType type) {
+    switch (type.typeKind) {
+        case COMET_SMALL   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.smallVal = value };
+        case COMET_INT     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.intVal = value };
+        case COMET_BIG     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.bigVal = value };
+        case COMET_FLOAT   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.floatVal = value };
+        case COMET_DOUBLE  : return (CometOperand){ .type = CO_IMMEDIATE, .imm.doubleVal = value };
+        case COMET_BOOL    : return (CometOperand){ .type = CO_IMMEDIATE, .imm.boolVal = value };
+        case COMET_FUNCTION: return (CometOperand){ .type = CO_SYMBOL, .symbolIdx = value };
+        case COMET_STRUCT  : return (CometOperand){ .type = CO_SYMBOL, .imm.objectVal = (CometObject*)value };
+        default: return  (CometOperand){ .type = CO_NONE };
+    }
+}
+
 void pushImm(CometVM* vm, CometImmediate imm) {
     switch (imm.typeKind) {
         case COMET_SMALL: pushValue(vm, (int64_t)imm.smallVal); break;
@@ -138,10 +177,16 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
     if (function->isExternal) {
-        List(CometOperand) args = newList(CometOperand);
-        CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+        CometOperand args[function->numArgs];
 
-        // TODO: serialize return value given to us by C
+        for (size_t argIdx = 0; argIdx < function->numArgs; argIdx++) {
+            args[argIdx] = deserializeValue(popValue(vm), function->argTypes[argIdx]);
+        }
+
+        CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+        printf("hi\n");
+
+        pushValue(vm, serializeValue(returnValue));
 
         return;
     }
@@ -149,7 +194,6 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     Frame* newFrame = &vm->callStack[vm->callIdx++];
 
     newFrame->ip = function->startIdx;
-    //newFrame.stackStart = vm->sp;
     newFrame->funcName = function->name;
 
     for (size_t i = function->numArgs; i > 0; i--) {
@@ -663,20 +707,18 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->loadedLibs = calloc(loadedFile->numLibs, sizeof(void*));
     newVM->externalFuncs = calloc(loadedFile->numFunctions, sizeof(void*));
 
-    dlerror(); // call derror beforehand to ensure we dont get any null err messages or something
     size_t externalFuncIndex = 0;
     for (size_t i = 0; i < loadedFile->numLibs; i++) {
         char libName[128];
         snprintf(libName, 128, "%s.cometlib", cursor);
 
-        char* cometLibsPath = getenv("COMET_LIBS");
+        char* cometLibsPath = "/usr/lib/comet";//getenv("COMET_LIBS");
         if (!cometLibsPath) {
             cometLibsPath = "";
         }
 
         char libPath[1024];
         snprintf(libPath, 1024, "%s/%s", cometLibsPath, libName);
-        printf("lib path = %s\n", libPath);
 
         void* handle = dlopen(libPath, RTLD_NOW);
         if (!handle) {    

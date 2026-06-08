@@ -24,7 +24,7 @@ typedef struct {
 } Frame;
 
 typedef struct CometVM CometVM;
-typedef CometOperand (*externalLibFunc)(List(CometOperand) args, CometVM* vm);
+typedef CometOperand (*externalLibFunc)(CometOperand args[], CometVM* vm);
 
 struct CometVM {
     uint32_t numConstants;

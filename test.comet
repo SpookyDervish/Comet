@@ -1,6 +1,5 @@
 import io
 
 func main() -> int {    
-    breakpoint
-    return io.foo()
+    return io.foo(123)
 }
