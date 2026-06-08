@@ -32,7 +32,7 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
     
     *serialized = (CometSerializedStruct){
         .numFields = structType->fieldCount,
-        .vtable = calloc(structType->numMethods, sizeof(uint32_t)),
+        .vtable = calloc(structType->numMethods, sizeof(CometSerializedFunc)),
         .numMethods = structType->numMethods
     };
 
@@ -45,7 +45,6 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
         func.startIdx = method->startIdx;
         func.symbolIdx = method->symbolIdx;
         func.isExternal = false;
-        func.externalPtr = NULL;
 
         serialized->vtable[i] = func;
     }

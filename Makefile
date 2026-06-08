@@ -6,10 +6,10 @@ VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 
 CC=gcc
 CXX=g++
-CFLAGS=-Wall -Wextra -Wno-trigraphs -O3
+CFLAGS=-Wall -Wextra -Wno-trigraphs -O3 -rdynamic
 LDFLAGS=
 LDLIBS=
-DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -fsanitize=address
+DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -fsanitize=address -rdynamic
 
 COMPILER_TARGET=cometc
 VM_TARGET=comet

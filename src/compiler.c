@@ -96,7 +96,9 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
 
     CometEnvironment* oldEnv = c->env;
     CometEnvironment* libEnv = newEnvironment("externalLib", c->env, false); 
+    printf("loading...\n");
     onLibImport(libEnv);
+    printf("done loading.\n");
 
     // whenever an external lib creates a function we need to create a symbol for it in the compiler
     for (size_t methodIdx = 0; methodIdx < libEnv->recordIdx; methodIdx++) {
