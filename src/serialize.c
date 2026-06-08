@@ -45,6 +45,7 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
         func.startIdx = method->startIdx;
         func.symbolIdx = method->symbolIdx;
         func.isExternal = false;
+        func.externalPtr = NULL; // TO FUTURE ME: DONT REMOVE THIS YOU MORON. IT BREAKS EVERYTHING AND I HAVE NO CLUE WHY!!!!!! 
 
         serialized->vtable[i] = func;
     }
