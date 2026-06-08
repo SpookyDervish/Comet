@@ -18,28 +18,16 @@ typedef enum {
                     // we can resolve imported values
 } CometValueTypeKind;
 
-typedef struct CometType CometType;
 typedef struct CometStruct CometStruct;
-typedef struct CometFunction CometFunction;
 
-struct CometType {
+typedef struct CometFunction CometFunction;
+typedef struct {
     CometValueTypeKind typeKind;
     union {
         CometStruct* structType;
         CometFunction* functionType;
     };
-};
-
-typedef struct CometOperand CometOperand;
-struct CometFunction {
-    char name[32];
-    uint32_t startIdx;
-    uint32_t argCount;
-    CometType returnType;
-    bool isMethod;
-    bool isExternal;
-    CometOperand (*externalPtr)();
-};
+} CometType;
 
 typedef struct {
     char name[32];
@@ -53,16 +41,6 @@ typedef enum {
     FUNC_FUNC,
     FUNC_METHOD
 } CometFunctionType;
-
-// the actual struct type
-struct CometStruct {
-    CometMethod** vtable;
-    uint32_t numMethods;
-    uint32_t fieldCount;
-    char** fieldNames;
-    CometType* fieldTypes;
-    char* name;
-};
 
 typedef struct {
     uint32_t pos;

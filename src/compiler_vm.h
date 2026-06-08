@@ -17,7 +17,6 @@
 typedef void* voidPtr;
 
 Result(voidPtr, charptr);
-
 Result(CometType, charptr);
 Result(CometFunctionTypeInfo, charptr);
 

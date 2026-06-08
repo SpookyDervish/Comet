@@ -9,7 +9,7 @@
 void cometDefineFunc(
     CometEnvironment* env,
     char* name,
-    CometOperand (*funcPtr)(List(CometOperand) args, CometVM* vm),
+    externalLibFunc funcPtr,
     CometType returnType,
     uint32_t numArgs,
     ...
@@ -21,7 +21,6 @@ void cometDefineFunc(
     func->returnType = returnType;
     func->startIdx = 0;
     func->isExternal = true;
-    func->externalPtr = funcPtr;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,

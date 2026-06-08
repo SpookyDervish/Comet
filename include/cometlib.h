@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include "list.h"
 #include "vm.h"
+#include "function.h"
 
 #if defined(_WIN32) || defined(__CYGWIN__)
     #define API_EXPORT __declspec(dllexport)
@@ -29,12 +30,13 @@
 #define on_import void onImport(CometEnvironment* env)
 
 UseList(CometSerializedFunc);
-UseList(CometOperand);
+
+typedef CometOperand (*externalLibFunc)(List(CometOperand) args, CometVM* vm);
 
 API_EXPORT void cometDefineFunc(
     CometEnvironment* env,
     char* name,
-    CometOperand (*funcPtr)(List(CometOperand) args, CometVM* vm),
+    externalLibFunc funcPtr,
     CometType returnType,
     uint32_t numArgs,
     ...
@@ -42,7 +44,7 @@ API_EXPORT void cometDefineFunc(
 API_EXPORT CometSerializedFunc* cometDefineMethod(
     CometEnvironment* env,
     char* name,
-    CometOperand (*funcPtr)(List(CometOperand) args, CometVM* vm),
+    externalLibFunc funcPtr,
     CometType returnType,
     uint32_t numArgs,
     ...

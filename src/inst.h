@@ -6,6 +6,7 @@
 #include "../include/comet_operand.h"
 #include "../include/struct.h"
 #include "../include/serialized.h"
+#include "../include/function.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,8 +54,6 @@ CometType getValueType(CometCompiler* c, CometOperand value);
 CometOperand pushVal(CometCompiler* c);
 void popVal(CometCompiler* c);
 
-UseList(CometOperand);
-
 CometFunction* getSymbol(CometCompiler* c, CometOperand symbolValue);
 
 int32_t getSymbolIndex(CometCompiler* c, const char* symbolName);
@@ -83,7 +82,6 @@ CometOperand buildLt(CometCompiler* c, CometType resultType);
 CometOperand buildGt(CometCompiler* c, CometType resultType);
 CometOperand buildLte(CometCompiler* c, CometType resultType);
 CometOperand buildGte(CometCompiler* c, CometType resultType);
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod);
 void buildReturn(CometCompiler* c);
 CometOperand buildLoadArg(CometCompiler* c, uint32_t idx);
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args);
@@ -99,6 +97,8 @@ void buildSetField(CometCompiler* c, uint32_t idx);
 CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args);
 void buildBreakpoint(CometCompiler* c);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
+
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod);
 
 CometLabel* buildLabel(CometCompiler* c);
 void resolveLabel(CometCompiler* c, CometLabel* label);

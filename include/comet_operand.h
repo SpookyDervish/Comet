@@ -14,6 +14,8 @@ typedef enum {
     CO_LABEL
 } CometOperandKind;
 
+
+
 typedef struct CometEnvironment CometEnvironment;
 typedef struct {
     CometValueTypeKind typeKind;
@@ -39,6 +41,8 @@ struct CometOperand {
         CometLabel* label;
     };
 };
+
+UseList(CometOperand);
 
 typedef struct {
     CometFunctionType funcType;

@@ -12,6 +12,16 @@ typedef enum {
     FIELD_PUBLIC,
 } FieldAttribute;
 
+// the actual struct type
+struct CometStruct {
+    CometMethod** vtable;
+    uint32_t numMethods;
+    uint32_t fieldCount;
+    char** fieldNames;
+    CometType* fieldTypes;
+    char* name;
+};
+
 // an instance of a struct
 typedef struct CometSerializedFunc CometSerializedFunc;
 typedef struct {

@@ -102,9 +102,10 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
     for (size_t methodIdx = 0; methodIdx < libEnv->recordIdx; methodIdx++) {
         if (libEnv->records[methodIdx].type.typeKind != COMET_FUNCTION) continue;
 
-        CometOperand libFunc = libEnv->records[methodIdx].value.;
+        /*Record libFuncRecord = libEnv->records[methodIdx];
+        libFuncRecord.value.
 
-        CometOperand func = buildFunction(c, , 2, CometType returnType, bool isMethod)
+        CometOperand func = buildFunction(c, libFuncRecord.name, 2, libFuncRecord.type, false);*/
     }
 
     CometOperand libValue = createOperand(CO_IMMEDIATE);
