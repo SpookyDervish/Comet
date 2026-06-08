@@ -1,5 +1,5 @@
 import io
 
 func main() -> int {    
-    return io.foo(123)
+    return io.subtract(5, 2)
 }

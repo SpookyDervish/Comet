@@ -179,12 +179,11 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     if (function->isExternal) {
         CometOperand args[function->numArgs];
 
-        for (size_t argIdx = 0; argIdx < function->numArgs; argIdx++) {
-            args[argIdx] = deserializeValue(popValue(vm), function->argTypes[argIdx]);
+        for (size_t argIdx = function->numArgs; argIdx > 0; argIdx--) {
+            args[argIdx - 1] = deserializeValue(popValue(vm), function->argTypes[argIdx-1]);
         }
 
         CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
-        printf("hi\n");
 
         pushValue(vm, serializeValue(returnValue));
 
