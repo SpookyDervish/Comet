@@ -130,6 +130,13 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
                 .type = CO_NONE
             };
             break;
+        case COMET_TYPE: 
+            newVal = (CometOperand){
+                .type = CO_IMMEDIATE,
+                .imm.typeKind = COMET_TYPE,
+                .imm.typeVal = va_arg(args, CometType)
+            };
+            break;
         case COMET_MODULE:
             newVal = (CometOperand){
                 .type = CO_IMMEDIATE,

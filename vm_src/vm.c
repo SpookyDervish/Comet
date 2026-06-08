@@ -101,12 +101,12 @@ int64_t serializeValue(CometOperand value) {
         case COMET_STRUCT  : return (int64_t)value.imm.objectVal;
         case COMET_FLOAT   : {
             int64_t serialized;
-            memcpy(&serialized, &value.imm.floatVal, sizeof(int64_t));
+            memcpy(&serialized, &value.imm.floatVal, sizeof(float));
             return serialized;
         }
         case COMET_DOUBLE  : {
             int64_t serialized;
-            memcpy(&serialized, &value.imm.doubleVal, sizeof(int64_t));
+            memcpy(&serialized, &value.imm.doubleVal, sizeof(double));
             return serialized;
         }
         default: return 0;
@@ -115,14 +115,14 @@ int64_t serializeValue(CometOperand value) {
 
 CometOperand deserializeValue(int64_t value, CometType type) {
     switch (type.typeKind) {
-        case COMET_SMALL   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.smallVal = value };
-        case COMET_INT     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.intVal = value };
-        case COMET_BIG     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.bigVal = value };
-        case COMET_FLOAT   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.floatVal = value };
-        case COMET_DOUBLE  : return (CometOperand){ .type = CO_IMMEDIATE, .imm.doubleVal = value };
-        case COMET_BOOL    : return (CometOperand){ .type = CO_IMMEDIATE, .imm.boolVal = value };
+        case COMET_SMALL   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_SMALL,  .imm.smallVal = value };
+        case COMET_INT     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_INT,    .imm.intVal = value };
+        case COMET_BIG     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_BIG,    .imm.bigVal = value };
+        case COMET_FLOAT   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_FLOAT,  .imm.floatVal = value };
+        case COMET_DOUBLE  : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_DOUBLE, .imm.doubleVal = value };
+        case COMET_BOOL    : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_BOOL,   .imm.boolVal = value };
         case COMET_FUNCTION: return (CometOperand){ .type = CO_SYMBOL, .symbolIdx = value };
-        case COMET_STRUCT  : return (CometOperand){ .type = CO_SYMBOL, .imm.objectVal = (CometObject*)value };
+        case COMET_STRUCT  : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_STRUCT, .imm.objectVal = (CometObject*)value };
         default: return  (CometOperand){ .type = CO_NONE };
     }
 }
