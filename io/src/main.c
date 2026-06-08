@@ -3,7 +3,7 @@
 
 CometOperand impl_foo(CometOperand* args, CometVM* vm) {
     printf("we loaded a function and called it!\n");
-    return cometValue(COMET_INT, args[0]);
+    return cometValue(COMET_INT, args[0].imm.intVal);
 }
 
 on_import {
