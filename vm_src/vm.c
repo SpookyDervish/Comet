@@ -137,13 +137,16 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 }
 
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
-    Frame* newFrame = &vm->callStack[vm->callIdx++];
-
     if (function->isExternal) {
         List(CometOperand) args = newList(CometOperand);
         CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+
+        // TODO: serialize return value given to us by C
+
         return;
     }
+
+    Frame* newFrame = &vm->callStack[vm->callIdx++];
 
     newFrame->ip = function->startIdx;
     //newFrame.stackStart = vm->sp;
