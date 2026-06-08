@@ -21,7 +21,6 @@ void cometDefineFunc(
     func->returnType = returnType;
     func->startIdx = 0;
     func->isExternal = true;
-    func->libIdx = 0;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,

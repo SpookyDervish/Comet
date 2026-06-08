@@ -1,6 +1,5 @@
-import example
+import io
 
 func main() -> int {    
-    breakpoint
-    return example.foo(1, 2)
+    return io.foo()
 }

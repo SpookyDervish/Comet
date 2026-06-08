@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <comet/vm.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -7,9 +6,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <dlfcn.h>
 #include "../include/comet_operand.h"
 #include "../lib/estr.h"
+#include "args.h"
 #include "debugger.h"
+
+typedef void* voidPtr;
+Result(voidPtr, charptr);
 
 // For Clang and GCC on macOS
 #define FORCE_INLINE __attribute__((always_inline)) static inline
@@ -134,6 +138,12 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
 
 void callFunction(CometVM* vm, CometSerializedFunc* function) {
     Frame* newFrame = &vm->callStack[vm->callIdx++];
+
+    if (function->isExternal) {
+        List(CometOperand) args = newList(CometOperand);
+        CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+        return;
+    }
 
     newFrame->ip = function->startIdx;
     //newFrame.stackStart = vm->sp;
@@ -538,12 +548,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         uint32_t methodIdx = inst.a;
         CometSerializedFunc func = obj->vtable[methodIdx];
 
-        if (!func.isExternal) {
-            callFunction(vm, &vm->functions[func.symbolIdx]);
-        } else {
-            CometOperand result = func.externalPtr((void*)vm);
-            pushValue(vm, result.imm.bigVal);
-        }
+        callFunction(vm, &func);
 
         
         DISPATCH();
@@ -601,6 +606,11 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     }
 
     // allocate arrays
+    newVM->numConstants = loadedFile->numConsts;
+    newVM->numFunctions = loadedFile->numFunctions;
+    newVM->numStructs = loadedFile->numStructs;
+    newVM->numInstructions = loadedFile->numInstructions;
+
     newVM->instructions = calloc(loadedFile->numInstructions, sizeof(CometSerializedInst));
     newVM->constants = calloc(loadedFile->numConsts, sizeof(CometOperand));
     newVM->structs = calloc(loadedFile->numStructs, sizeof(CometSerializedStruct));
@@ -647,15 +657,86 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         cursor += sizeof(uint32_t) * numMethods;
     }
 
+    newVM->loadedLibs = calloc(loadedFile->numLibs, sizeof(void*));
+    newVM->externalFuncs = calloc(loadedFile->numFunctions, sizeof(void*));
+
+    dlerror(); // call derror beforehand to ensure we dont get any null err messages or something
+    size_t externalFuncIndex = 0;
+    for (size_t i = 0; i < loadedFile->numLibs; i++) {
+        char libName[128];
+        snprintf(libName, 128, "%s.cometlib", cursor);
+
+        char* cometLibsPath = getenv("COMET_LIBS");
+        if (!cometLibsPath) {
+            cometLibsPath = "";
+        }
+
+        char libPath[1024];
+        snprintf(libPath, 1024, "%s/%s", cometLibsPath, libName);
+        printf("lib path = %s\n", libPath);
+
+        void* handle = dlopen(libPath, RTLD_NOW);
+        if (!handle) {    
+            free(newVM->instructions);
+            free(newVM->constants);
+            free(newVM->structs);
+            free(newVM->functions);
+            free(newVM);
+
+            const char* err = dlerror();
+
+            Estr errMsg = CREATE_ESTR("failed to load external lib \"");
+            APPEND_ESTR(errMsg, libPath);
+            APPEND_ESTR(errMsg, "\": ");
+            APPEND_ESTR(errMsg, err);
+            return Error(vmPtr, charptr, errMsg.str);
+        }
+
+        newVM->loadedLibs[i] = handle;
+
+        // load each function
+        for (size_t symbolIdx = 0; symbolIdx < newVM->numFunctions; symbolIdx++) {
+            CometSerializedFunc* externalFunc = &newVM->functions[symbolIdx];
+
+            if (!(externalFunc->libIdx == i && externalFunc->isExternal))
+                continue;
+            
+
+            Estr funcSymbolName = CREATE_ESTR("impl_");
+            APPEND_ESTR(funcSymbolName, externalFunc->name);
+
+            void* loadedFunc = dlsym(handle, funcSymbolName.str);
+            if (!loadedFunc) {
+                const char* err = dlerror();
+
+                DESTROY_ESTR(funcSymbolName);
+
+                Estr errMsg = CREATE_ESTR("failed to load func \"");
+                APPEND_ESTR(errMsg, externalFunc->name);
+                APPEND_ESTR(errMsg, "\" from external library \"");
+                APPEND_ESTR(errMsg, libPath);
+                APPEND_ESTR(errMsg, "\": ");
+                APPEND_ESTR(errMsg, err);
+                return Error(vmPtr, charptr, errMsg.str);
+            }
+
+            DESTROY_ESTR(funcSymbolName);
+
+            externalFunc->externFuncIndex = externalFuncIndex;
+            newVM->externalFuncs[externalFuncIndex] = loadedFunc;
+            externalFuncIndex++;
+            
+
+            
+        } 
+
+        cursor += 64;
+    }
+
     // instructions
     memcpy(newVM->instructions,
        cursor,
-       sizeof(CometSerializedInst) * loadedFile->numInstructions);
-
-    newVM->numConstants = loadedFile->numConsts;
-    newVM->numFunctions = loadedFile->numFunctions;
-    newVM->numStructs = loadedFile->numStructs;
-    newVM->numInstructions = loadedFile->numInstructions;
+       sizeof(CometSerializedInst) * loadedFile->numInstructions);    
 
     newVM->currentFrame = NULL,
     newVM->callIdx = 0;

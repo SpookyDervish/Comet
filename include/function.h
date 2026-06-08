@@ -12,6 +12,7 @@ struct CometFunction {
     CometType returnType;
     bool isMethod;
     bool isExternal;
+    int8_t libIdx;
 };
 
 #endif

@@ -4,7 +4,6 @@
 #include "lexer.h"
 #include "token.h"
 #include "parser.h"
-#include "../include/cometlib.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -94,18 +93,24 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
         return Error(CometOperand, charptr, errMsg.str);
     }
 
+    uint8_t libIdx = c->libs.count;
+    char* storedLibName = calloc(1, 64);
+
+    // make sure we dont overrun the buffer
+    size_t srcSize = strlen(libName) + 1;
+    memcpy(storedLibName, libName, srcSize < 64 ? srcSize : 64);
+    append(c->libs, storedLibName);
+
     CometEnvironment* oldEnv = c->env;
     CometEnvironment* libEnv = newEnvironment("externalLib", c->env, false); 
-    printf("loading...\n");
     onLibImport(libEnv);
-    printf("done loading.\n");
 
     // whenever an external lib creates a function we need to create a symbol for it in the compiler
     for (size_t methodIdx = 0; methodIdx < libEnv->recordIdx; methodIdx++) {
         if (libEnv->records[methodIdx].type.typeKind != COMET_FUNCTION) continue;
 
-        Record libFuncRecord = libEnv->records[methodIdx];
-        CometFunction* funcVal = (CometFunction*)libFuncRecord.value.imm.bigVal; // i sure do love casting pointers to ints lmao
+        Record* libFuncRecord = &libEnv->records[methodIdx];
+        CometFunction* funcVal = (CometFunction*)libFuncRecord->value.imm.bigVal; // i sure do love casting pointers to ints lmao
 
         CometOperand funcOperand = buildFunction(
             c,
@@ -113,10 +118,11 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
             funcVal->argCount,
             funcVal->returnType,
             funcVal->isMethod,
-            true
+            true,
+            libIdx
         );
 
-        
+        libEnv->records[methodIdx].value = funcOperand;
     }
 
     CometOperand libValue = createOperand(CO_IMMEDIATE);
@@ -965,7 +971,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType, false, false);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType, false, false, -1);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1225,7 +1231,7 @@ ResultType(CometOperand, charptr) visitForStatement(CometCompiler* c, CometASTNo
 ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct) {
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
-    buildFunction(c, constructorName, constDef.args.count + 1, structType, true, false); // add 1 arg for self
+    buildFunction(c, constructorName, constDef.args.count + 1, structType, true, false, -1); // add 1 arg for self
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
@@ -1317,7 +1323,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
     CometType returnType = getType(c, funcDef.returnType->data.AST_IDENTIFIER.ident);
     
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType, true, false);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType, true, false, -1);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1646,7 +1652,6 @@ ResultType(CometOperand, charptr) visitImportStatement(CometCompiler* c, CometAS
     if (!cometLibsPath) {
         cometLibsPath = "";
     }
-    printf("libs path = %s\n", cometLibsPath);
 
     // no local file was found, look for it in the system wide libs
     if (!found) { 
@@ -1747,7 +1752,8 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
         .numConsts = c->constIdx,
         .numInstructions = c->programIdx,
         .numFunctions = c->functionCount,
-        .numStructs = c->structs.count
+        .numStructs = c->structs.count,
+        .numLibs = c->libs.count
     };
 
     fwrite(&cometFile, sizeof(CometFile), 1, file);
@@ -1757,7 +1763,9 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
     for (size_t i = 0; i < c->functionCount; i++) {
         CometSerializedFunc serializedFunc = {
             .startIdx = c->functions[i]->startIdx,
-            .numArgs = c->functions[i]->argCount
+            .numArgs = c->functions[i]->argCount,
+            .isExternal = c->functions[i]->isExternal,
+            .libIdx = c->functions[i]->libIdx,
         };
         strcpy(serializedFunc.name, c->functions[i]->name);
 
@@ -1778,6 +1786,10 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
         fwrite(serializedStruct->vtable, sizeof(uint32_t), serializedStruct->numMethods, file);
     }
 
+    for (size_t libIdx = 0; libIdx < c->libs.count; libIdx++) {
+        char* libName = *get(c->libs, libIdx);
+        fwrite(libName, 64, 1, file);
+    }
 
     for (size_t instIdx = 0; instIdx < c->programIdx; instIdx++) {
         CometInst inst = c->outputProgram[instIdx];
@@ -1786,8 +1798,6 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
         fwrite(serializedInst, sizeof(CometSerializedInst), 1, file);
         
     }
-
-    
 
     fclose(file);
 
@@ -1803,6 +1813,7 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     newCompiler->env = newEnvironment("root", NULL, false);
     newCompiler->structs = newList(cometStructPtr);
     newCompiler->typeMap = newList(CometTypeMapEntry);
+    newCompiler->libs = newList(charptr);
     newCompiler->currentFunction = NULL;
  
     // fill in type map

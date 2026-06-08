@@ -313,8 +313,8 @@ void printStructInfo(CometDebugger* dbgr, uint32_t structIdx, CometSerializedStr
         printf(ESC_BOLD "        Methods:\n" ESC_RESET);
 
     for (uint32_t methodIdx = 0; methodIdx < structType.numMethods; methodIdx++) {
-        uint32_t symbolIdx = structType.vtable[methodIdx].symbolIdx;
-        CometSerializedFunc func = dbgr->vm->functions[symbolIdx];
+        //uint32_t symbolIdx = structType.vtable[methodIdx].symbolIdx;
+        CometSerializedFunc func = structType.vtable[methodIdx];//dbgr->vm->functions[symbolIdx];
 
         printf(ESC_BRIGHT_BLUE_FG "            %s:\n" ESC_RESET, func.name);
         printf(ESC_BOLD "                Number of arguments:" ESC_RESET " %d\n", func.numArgs);

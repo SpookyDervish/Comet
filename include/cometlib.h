@@ -28,12 +28,9 @@
 
 UseList(CometSerializedFunc);
 
-typedef CometOperand (*externalLibFunc)(List(CometOperand) args, CometVM* vm);
-
 API_EXPORT void cometDefineFunc(
     CometEnvironment* env,
     char* name,
-    externalLibFunc funcPtr,
     CometType returnType,
     uint32_t numArgs,
     ...
@@ -41,7 +38,6 @@ API_EXPORT void cometDefineFunc(
 API_EXPORT CometSerializedFunc* cometDefineMethod(
     CometEnvironment* env,
     char* name,
-    externalLibFunc funcPtr,
     CometType returnType,
     uint32_t numArgs,
     ...

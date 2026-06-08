@@ -1,5 +1,4 @@
 #include "../include/serialized.h"
-#include "inst.h"
 #include "../include/comet_operand.h"
 #include <stddef.h>
 #include <stdint.h>
@@ -43,9 +42,8 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
         memcpy(func.name, method->name, sizeof(func.name));
         func.numArgs = method->argCount;
         func.startIdx = method->startIdx;
-        func.symbolIdx = method->symbolIdx;
         func.isExternal = false;
-        func.externalPtr = NULL; // TO FUTURE ME: DONT REMOVE THIS YOU MORON. IT BREAKS EVERYTHING AND I HAVE NO CLUE WHY!!!!!! 
+        func.libIdx = 0;
 
         serialized->vtable[i] = func;
     }

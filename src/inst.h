@@ -22,6 +22,7 @@ typedef CometStruct* cometStructPtr;
 
 UseList(CometTypeMapEntry);
 UseList(cometStructPtr);
+UseList(charptr);
 
 typedef struct {
     uint32_t programIdx;
@@ -29,6 +30,7 @@ typedef struct {
     uint32_t constIdx;
     uint32_t functionCount;
     uint32_t labelCount;
+
     CometOperand consts[512];
     CometLabel* labels[512];
     CometInst* outputProgram;
@@ -37,6 +39,7 @@ typedef struct {
     CometEnvironment* env;
     List(CometTypeMapEntry) typeMap;
     List(cometStructPtr) structs;
+    List(charptr) libs;
 } CometCompiler;
 
 typedef CometCompiler* cometCompilerPtr;
@@ -98,7 +101,7 @@ CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOpe
 void buildBreakpoint(CometCompiler* c);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod, bool isExternal);
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, bool isMethod, bool isExternal, int8_t libIdx);
 
 CometLabel* buildLabel(CometCompiler* c);
 void resolveLabel(CometCompiler* c, CometLabel* label);

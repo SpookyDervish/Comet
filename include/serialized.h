@@ -50,9 +50,9 @@ struct CometSerializedFunc {
     char name[32];
     uint64_t startIdx;
     uint32_t numArgs;
-    uint32_t symbolIdx;
     bool isExternal;
-    CometOperand (*externalPtr)(void* vm);
+    int8_t libIdx;
+    uint32_t externFuncIndex;
 };
 
 typedef struct {
@@ -80,6 +80,7 @@ typedef struct {
     uint32_t numInstructions;
     uint32_t numFunctions;
     uint32_t numStructs;
+    uint32_t numLibs;
 } CometFile;
 
 typedef struct {

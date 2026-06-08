@@ -31,4 +31,5 @@ clean:
 	rm $(COMPILER_TARGET)
 	
 install: both
-	sudo cp -r include /usr/local/include/comet
+	sudo mkdir -p /usr/local/include/comet/
+	sudo cp -r include/* /usr/local/include/comet/

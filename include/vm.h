@@ -23,13 +23,17 @@ typedef struct {
     char* funcName;
 } Frame;
 
+typedef struct CometVM CometVM;
+typedef CometOperand (*externalLibFunc)(List(CometOperand) args, CometVM* vm);
 
-
-typedef struct {
+struct CometVM {
     uint32_t numConstants;
     CometOperand* constants;
 
     int64_t stack[MAX_DATA_STACK];
+
+    void** loadedLibs;
+    externalLibFunc* externalFuncs;
 
     uint32_t numFunctions;
 
@@ -54,7 +58,7 @@ typedef struct {
     uint64_t instructionsLeftToExec;
 
     bool running;
-} CometVM;
+};
 
 typedef CometVM* vmPtr;
 
