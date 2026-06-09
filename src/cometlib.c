@@ -12,6 +12,7 @@ void cometDefineFunc(
     char* name,
     CometType returnType,
     uint32_t numArgs,
+    bool isVarArgs,
     ...
 ) {
     CometFunction* func = malloc(sizeof(CometFunction));
@@ -21,6 +22,7 @@ void cometDefineFunc(
     func->returnType = returnType;
     func->startIdx = 0;
     func->isExternal = true;
+    func->isVarArgs = isVarArgs;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,

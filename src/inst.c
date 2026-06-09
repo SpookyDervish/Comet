@@ -361,7 +361,7 @@ CometOperand buildGte(CometCompiler* c, CometType resultType) {
 
     return dest;
 }
-CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, CometType* argTypes, bool isMethod, bool isExternal, int8_t libIdx) {
+CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, CometType* argTypes, bool isVarArgs, bool isMethod, bool isExternal, int8_t libIdx) {
     CometFunction* newFunction = malloc(sizeof(CometFunction));
     newFunction->argCount = argCount;
     newFunction->returnType = returnType;
@@ -369,6 +369,7 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, Come
     newFunction->isExternal = isExternal;
     newFunction->libIdx = libIdx;
     newFunction->argTypes = argTypes;
+    newFunction->isVarArgs = isVarArgs;
 
     strncpy(newFunction->name, name, 31);
     newFunction->startIdx = c->programIdx;
@@ -408,7 +409,11 @@ CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
         pushVal(c);
     }
 
-    buildInst(c, INST_CALL, funcValue, NO_OPERAND, NO_OPERAND);
+    CometOperand numArgs = createOperand(CO_IMMEDIATE);
+    numArgs.imm.typeKind = COMET_SMALL;
+    numArgs.imm.smallVal = args.count;
+
+    buildInst(c, INST_CALL, funcValue, numArgs, NO_OPERAND);
     return returnValue;
 }
 void buildJump(CometCompiler* c, CometLabel* label) {
@@ -494,7 +499,11 @@ CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOpe
         pushVal(c);
     }
 
-    buildInst(c, INST_CALL_METHOD, funcValue, NO_OPERAND, NO_OPERAND);
+    CometOperand numArgs = createOperand(CO_IMMEDIATE);
+    numArgs.imm.typeKind = COMET_SMALL;
+    numArgs.imm.smallVal = args.count;
+
+    buildInst(c, INST_CALL_METHOD, funcValue, numArgs, NO_OPERAND);
     return returnValue;
 }
 void buildBreakpoint(CometCompiler* c) {

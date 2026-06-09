@@ -5,5 +5,5 @@ CometOperand impl_subtract(CometOperand* args, CometVM* vm) {
 }
 
 on_import {
-    cometDefineFunc(env, "subtract", cometTypeInt, 2, cometTypeInt, cometTypeInt);
+    cometDefineFunc(env, "print", cometTypeVoid, 1, true, cometTypeBig);
 }

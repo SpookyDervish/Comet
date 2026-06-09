@@ -105,6 +105,7 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
             funcVal->returnType,
             funcVal->argTypes,
             funcVal->isMethod,
+            funcVal->isVarArgs,
             true,
             libIdx
         );
@@ -1058,7 +1059,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
         return Error(CometOperand, charptr, returnType.as.error);
 
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, -1);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, false, -1);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -1132,7 +1133,7 @@ ResultType(CometOperand, charptr) visitFuncCall(CometCompiler* c, CometASTNode* 
         APPEND_ESTR(errMsg, func->name);
         APPEND_ESTR(errMsg, "\"");
         return Error(CometOperand, charptr, errMsg.str);
-    } else if (funcCall.args.count > neededArgCount) {
+    } else if (funcCall.args.count > neededArgCount && !func->isVarArgs) {
         Estr errMsg = CREATE_ESTR("Too many args passed to function \"");
         APPEND_ESTR(errMsg, func->name);
         APPEND_ESTR(errMsg, "\"");
@@ -1330,7 +1331,7 @@ ResultType(CometOperand, charptr) visitConstructorDefStatement(CometCompiler* c,
         argTypes[argTypeIdx+1] = argType.as.success;
     }
 
-    buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, true, false, -1); // add 1 arg for self
+    buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, false, true, false, -1); // add 1 arg for self
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
@@ -1434,7 +1435,7 @@ ResultType(CometOperand, charptr) visitMethodDefStatement(CometCompiler* c, Come
         return Error(CometOperand, charptr, returnType.as.error);
 
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType.as.success, argTypes, true, false, -1);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType.as.success, argTypes, false, true, false, -1);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType

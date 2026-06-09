@@ -12,6 +12,7 @@ void cometDefineFunc(
     char* name,
     CometType returnType,
     uint32_t numArgs,
+    bool isVarArgs,
     ...
 ) {
     CometFunction* func = malloc(sizeof(CometFunction));
@@ -21,6 +22,7 @@ void cometDefineFunc(
     func->returnType = returnType;
     func->startIdx = 0;
     func->isExternal = true;
+    func->isVarArgs = isVarArgs;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,
@@ -128,6 +130,13 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
         case COMET_VOID: 
             newVal = (CometOperand){
                 .type = CO_NONE
+            };
+            break;
+        case COMET_TYPE: 
+            newVal = (CometOperand){
+                .type = CO_IMMEDIATE,
+                .imm.typeKind = COMET_TYPE,
+                .imm.typeVal = va_arg(args, CometType)
             };
             break;
         case COMET_MODULE:

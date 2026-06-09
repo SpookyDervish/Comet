@@ -11,6 +11,7 @@ struct CometFunction {
     uint32_t argCount;
     CometType returnType;
     CometType* argTypes;
+    bool isVarArgs;
     bool isMethod;
     bool isExternal;
     int8_t libIdx;

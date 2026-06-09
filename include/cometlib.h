@@ -33,6 +33,7 @@ API_EXPORT void cometDefineFunc(
     char* name,
     CometType returnType,
     uint32_t numArgs,
+    bool isVarArgs,
     ...
 );
 API_EXPORT CometSerializedFunc* cometDefineMethod(
@@ -40,6 +41,7 @@ API_EXPORT CometSerializedFunc* cometDefineMethod(
     char* name,
     CometType returnType,
     uint32_t numArgs,
+    bool isVarArgs,
     ...
 );
 
