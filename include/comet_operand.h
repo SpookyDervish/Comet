@@ -14,7 +14,11 @@ typedef enum {
     CO_LABEL
 } CometOperandKind;
 
-
+typedef struct {
+    uint32_t length;
+    uint32_t capacity;
+    int64_t* data;
+} CometArray;
 
 typedef struct CometEnvironment CometEnvironment;
 typedef struct {
@@ -27,6 +31,7 @@ typedef struct {
         double doubleVal;
         bool boolVal;
         CometObject* objectVal;
+        CometArray* arrayVal;
         CometEnvironment* moduleVal;
         CometType typeVal;
     };

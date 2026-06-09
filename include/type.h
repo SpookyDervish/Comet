@@ -14,6 +14,7 @@ typedef enum {
     COMET_BOOL,
     COMET_STRUCT,
     COMET_FUNCTION,
+    COMET_ARRAY,
     COMET_MODULE,   // not actually represented in assembly but this is used so
                     // we can resolve imported values
 

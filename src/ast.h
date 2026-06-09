@@ -22,6 +22,7 @@ typedef enum {
     AST_STRING,
     AST_IDENTIFIER,
     AST_BOOL,
+    AST_ARRAY,
     AST_FUNC_CALL,
 
     AST_ARG_DEF,
@@ -68,9 +69,16 @@ struct CometASTNode {
         struct AST_STRING { char* value; } AST_STRING;
         struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
         struct AST_BOOL { bool value; } AST_BOOL;
+        struct AST_ARRAY { List(astNodePtr) elements; } AST_ARRAY;
         struct AST_FUNC_CALL { CometASTNode* ident; List(astNodePtr) args; } AST_FUNC_CALL;
 
         struct AST_ARG_DEF { CometASTNode* type; CometASTNode* ident; } AST_ARG_DEF;
+
+        struct AST_TYPE {
+            CometASTNode* baseType;
+            List(astNodePtr) shape;
+            int dimensions;
+        } AST_TYPE;
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
 
@@ -132,11 +140,6 @@ struct CometASTNode {
             List(astNodePtr) importChain; // import chain. first item is the top level import
         } AST_IMPORT_STATEMENT;
         struct AST_BREAKPOINT_STATEMENT {} AST_BREAKPOINT_STATEMENT;
-        struct AST_TYPE {
-            CometASTNode* baseType;
-            List(astNodePtr) shape;
-            int dimensions;
-        } AST_TYPE;
 
     } data;  
 };

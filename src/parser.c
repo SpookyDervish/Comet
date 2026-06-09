@@ -41,6 +41,7 @@ ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser);
 ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseBoolLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser);
+ResultType(astNodePtr, charptr) parseArrayLiteral(CometParser* parser);
 ResultType(astNodePtr, charptr) parseType(CometParser* parser);
 ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser);
 ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser);
@@ -52,6 +53,7 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_BOOL_LITERAL, parseBoolLiteral},
     {CT_IDENT, parseIdentifier},
     {CT_OPEN_PAREN, parseGroupedExpression},
+    {CT_OPEN_SQUARE, parseArrayLiteral},
     {CT_KEYWORD, parseStructCreateStatement},
 
     {CT_NOT, parsePrefixExpression}
@@ -293,6 +295,19 @@ void printNode(CometASTNode* node) {
         case AST_DOUBLE: printf("%f", node->data.AST_DOUBLE.number); break;
         case AST_STRING: printf("\"%s\"", node->data.AST_STRING.value); break;
         case AST_IDENTIFIER: printf("%s", node->data.AST_IDENTIFIER.ident); break;
+        case AST_ARRAY:
+            printf("[");
+
+            for (size_t i = 0; i < node->data.AST_ARRAY.elements.count; i++) {
+                printNode(*get(node->data.AST_ARRAY.elements, i));
+
+                if (i < node->data.AST_ARRAY.elements.count-1) {
+                    printf(", ");
+                }
+            }
+
+            printf("]");
+            break;
             
         case AST_TYPE: {
             printNode(node->data.AST_TYPE.baseType);
@@ -620,8 +635,6 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
         if (type.error)
             return Error(argList, charptr, type.as.error);
 
-        printf("hi %s\n", tokenToCStr(*parser->peekToken));
-
         ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
         if (expectArgName.error) {
             return Error(argList, charptr, expectArgName.as.error);
@@ -682,6 +695,37 @@ ResultType(astNodePtr, charptr) parseBoolLiteral(CometParser* parser) {
 
 ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_STRING, parser->currentToken->value.literal));
+}
+
+ResultType(astNodePtr, charptr) parseArrayLiteral(CometParser* parser) {
+    CometASTNode* literal = AST_NODE(AST_ARRAY, newList(astNodePtr));
+
+    
+
+    while (true) {
+        parserNextToken(parser);
+        ResultType(astNodePtr, charptr) value = parseExpression(parser, PRECEDENCE_LOWEST);
+        if (value.error)
+            return value;
+
+        append(literal->data.AST_ARRAY.elements, value.as.success);
+
+        if (peekTokenIs(parser, CT_CLOSE_SQUARE)) {
+            break;
+        } else if (peekTokenIs(parser, CT_COMMA)) {
+            parserNextToken(parser);
+            continue;
+        } else {
+            Estr errMsg = CREATE_ESTR("Expected ',' or ']', got \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(parser->peekToken->type));
+            APPEND_ESTR(errMsg, "\" instead.");
+            return Error(astNodePtr, charptr, errMsg.str);
+        }
+    }
+
+    parserNextToken(parser); // skip ']'
+
+    return Success(astNodePtr, charptr, literal);
 }
 
 ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
