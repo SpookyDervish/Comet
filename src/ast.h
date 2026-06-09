@@ -26,6 +26,8 @@ typedef enum {
 
     AST_ARG_DEF,
 
+    AST_TYPE,
+
     AST_PROGRAM,
 
     // statements
@@ -130,6 +132,11 @@ struct CometASTNode {
             List(astNodePtr) importChain; // import chain. first item is the top level import
         } AST_IMPORT_STATEMENT;
         struct AST_BREAKPOINT_STATEMENT {} AST_BREAKPOINT_STATEMENT;
+        struct AST_TYPE {
+            CometASTNode* baseType;
+            List(astNodePtr) shape;
+            int dimensions;
+        } AST_TYPE;
 
     } data;  
 };

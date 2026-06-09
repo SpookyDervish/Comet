@@ -9,7 +9,7 @@
 #include "../lib/ansi.h"
 
 
-#define VERSION_NUMBER "0.1.0"
+#define VERSION_NUMBER "0.5.0"
 
 
 int main(int argc, char** argv) {
@@ -50,8 +50,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    /*printNode(ast.as.success);
-    printf("\n");*/
+    printNode(ast.as.success);
+    printf("\n");
+    return 0;
 
     ResultType(cometCompilerPtr, charptr) compiler = newCompiler();
     if (compiler.error) {

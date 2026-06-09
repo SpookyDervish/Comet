@@ -274,6 +274,8 @@ ResultType(infixFuncType, charptr) getInfixFunc(CometTokenType tokenType) {
 }
 
 void printNode(CometASTNode* node) {
+    printf("type = %d\n", node->nodeType);
+
     switch (node->nodeType) {
         case AST_PROGRAM:
             printf("Program:\n");
@@ -662,10 +664,6 @@ ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser) {
     return Success(astNodePtr, charptr, AST_NODE(AST_STRING, parser->currentToken->value.literal));
 }
 
-ResultType(astNodePtr, charptr) parseType(CometParser* parser) {
-
-}
-
 ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     return Success(astNodePtr, charptr, ident);
@@ -682,6 +680,73 @@ ResultType(astNodePtr, charptr) parsePrefixExpression(CometParser* parser) {
 
     expr->data.AST_PREFIX_EXPRESSION.right = rightSide.as.success;
     return Success(astNodePtr, charptr, expr);
+}
+
+// -- TYPE PARSING -- //
+ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
+    
+    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    parserNextToken(parser); // consume base type
+
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, newList(astNodePtr), 0);
+
+    parserNextToken(parser); // consume '<'
+
+    while (true) {
+        CometToken* currentTok = parser->currentToken;
+
+        if (currentTok->type == CT_TIMES) {
+            append(
+                typeNode->data.AST_TYPE.shape,
+                AST_NODE(AST_IDENTIFIER, "*")
+            );
+        } else if (currentTok->type == CT_INT_LITERAL) {
+            append(
+                typeNode->data.AST_TYPE.shape,
+                AST_NODE(AST_INT, currentTok->value.intVal)
+            );
+        } else {
+            Estr errMsg = CREATE_ESTR("Expected int or '*' when declaring array type, got \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(currentTok->type));
+            APPEND_ESTR(errMsg, "\" instead.");
+            return Error(astNodePtr, charptr, errMsg.str);
+        }
+
+        typeNode->data.AST_TYPE.dimensions++;
+
+        parserNextToken(parser);
+
+        if (currentTokenIs(parser, CT_COMMA)) {
+            parserNextToken(parser);
+        } else if (currentTokenIs(parser, CT_GT)) {
+            parserNextToken(parser);
+            break;
+        } else {
+            Estr errMsg = CREATE_ESTR("Expected ',' or '>' when continuing array type, got \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(currentTok->type));
+            APPEND_ESTR(errMsg, "\" instead.");
+            return Error(astNodePtr, charptr, errMsg.str);
+        }
+    }
+
+    return Success(astNodePtr, charptr, typeNode);
+}
+
+ResultType(astNodePtr, charptr) parseScalarType(CometParser* parser) {
+    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    parserNextToken(parser); // consume base type
+
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, NULL, 0);
+
+    return Success(astNodePtr, charptr, typeNode);
+}
+
+ResultType(astNodePtr, charptr) parseType(CometParser* parser) {
+    if (peekTokenIs(parser, CT_LT)) {
+        return parseArrayType(parser);
+    } else {
+        return parseScalarType(parser);
+    }
 }
 
 // -- STATEMENT METHODS -- //
@@ -723,6 +788,8 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
             return parseAssignmentStatement(parser, isMutable, attribStringToFieldAttrib(keyword));
         }
     }
+
+    printf("current: %s\n", tokenToCStr(*parser->currentToken));
 
     ResultType(astNodePtr, charptr) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     if (type.error)
