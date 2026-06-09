@@ -1,5 +1,5 @@
-func main() -> int[1, 2] {
-    int array
+func main() -> int {
+    int[2] array
 
 
 }

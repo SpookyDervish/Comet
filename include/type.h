@@ -29,6 +29,7 @@ typedef struct {
         CometStruct* structType;
         CometFunction* functionType;
     };
+    bool isArray;
 } CometType;
 
 typedef struct {
