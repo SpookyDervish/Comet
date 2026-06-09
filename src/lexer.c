@@ -342,6 +342,8 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '}': append(tokens, TOKEN_LITERAL(CT_CLOSE_CURLY, "}")); break;
             case '(': append(tokens, TOKEN_LITERAL(CT_OPEN_PAREN, "(")); break;
             case ')': append(tokens, TOKEN_LITERAL(CT_CLOSE_PAREN, ")")); break;
+            case '[': append(tokens, TOKEN_LITERAL(CT_OPEN_SQUARE, "[")); break;
+            case ']': append(tokens, TOKEN_LITERAL(CT_CLOSE_SQUARE, "]")); break;
             case ':': {
 
                 ResultType(char, charptr) labelStart = lexerPeek(lexer);
@@ -430,11 +432,11 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_TIMES_EQ, "+="));
+                    append(tokens, TOKEN_LITERAL(CT_TIMES_EQ, "*="));
                     break;
                 }
 
-                append(tokens, TOKEN_LITERAL(CT_TIMES, "+"));
+                append(tokens, TOKEN_LITERAL(CT_TIMES, "*"));
                 break;
             }
             case '/': {

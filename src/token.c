@@ -24,6 +24,10 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_OPEN_PAREN";
         case CT_CLOSE_PAREN:
             return "CT_CLOSE_PAREN";
+        case CT_OPEN_SQUARE:
+            return "CT_OPEN_SQUARE";
+        case CT_CLOSE_SQUARE:
+            return "CT_CLOSE_SQUARE";
         case CT_LT:
             return "CT_LT";
         case CT_GT:

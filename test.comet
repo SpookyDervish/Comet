@@ -1,1 +1,5 @@
-small<*, *> arr = 123
+func main() -> int[1, 2] {
+    int array
+
+
+}

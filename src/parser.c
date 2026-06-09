@@ -274,8 +274,6 @@ ResultType(infixFuncType, charptr) getInfixFunc(CometTokenType tokenType) {
 }
 
 void printNode(CometASTNode* node) {
-    printf("type = %d\n", node->nodeType);
-
     switch (node->nodeType) {
         case AST_PROGRAM:
             printf("Program:\n");
@@ -296,6 +294,26 @@ void printNode(CometASTNode* node) {
         case AST_STRING: printf("\"%s\"", node->data.AST_STRING.value); break;
         case AST_IDENTIFIER: printf("%s", node->data.AST_IDENTIFIER.ident); break;
             
+        case AST_TYPE: {
+            printNode(node->data.AST_TYPE.baseType);
+
+            if (node->data.AST_TYPE.dimensions > 0) {
+                printf("[");
+                for (size_t i = 0; i < node->data.AST_TYPE.shape.count; i++) {
+                    CometASTNode* size = *get(node->data.AST_TYPE.shape, i);
+                    printNode(size);
+
+                    if (i < node->data.AST_TYPE.shape.count - 1) {
+                        printf(", ");
+                    } else {
+                        printf("]");
+                    }
+                }
+            }
+
+            break;
+        }
+
         case AST_INFIX_EXPRESSION:
             printf("(");
             printNode(node->data.AST_INFIX_EXPRESSION.left);
@@ -602,6 +620,8 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
         if (type.error)
             return Error(argList, charptr, type.as.error);
 
+        printf("hi %s\n", tokenToCStr(*parser->peekToken));
+
         ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
         if (expectArgName.error) {
             return Error(argList, charptr, expectArgName.as.error);
@@ -693,56 +713,59 @@ ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
     parserNextToken(parser); // consume '<'
 
     while (true) {
-        CometToken* currentTok = parser->currentToken;
 
-        if (currentTok->type == CT_TIMES) {
+        if (parser->currentToken->type == CT_TIMES) {
             append(
                 typeNode->data.AST_TYPE.shape,
                 AST_NODE(AST_IDENTIFIER, "*")
             );
-        } else if (currentTok->type == CT_INT_LITERAL) {
-            append(
-                typeNode->data.AST_TYPE.shape,
-                AST_NODE(AST_INT, currentTok->value.intVal)
-            );
+
         } else {
-            Estr errMsg = CREATE_ESTR("Expected int or '*' when declaring array type, got \"");
-            APPEND_ESTR(errMsg, tokenTypeToCStr(currentTok->type));
-            APPEND_ESTR(errMsg, "\" instead.");
-            return Error(astNodePtr, charptr, errMsg.str);
+            ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+            if (expr.error)
+                return expr;
+
+            append(typeNode->data.AST_TYPE.shape, expr.as.success);
+
+            
         }
+
+        
+        parserNextToken(parser);
 
         typeNode->data.AST_TYPE.dimensions++;
 
-        parserNextToken(parser);
-
         if (currentTokenIs(parser, CT_COMMA)) {
             parserNextToken(parser);
-        } else if (currentTokenIs(parser, CT_GT)) {
-            parserNextToken(parser);
+            continue;
+        } else if (currentTokenIs(parser, CT_CLOSE_SQUARE)) {
             break;
         } else {
-            Estr errMsg = CREATE_ESTR("Expected ',' or '>' when continuing array type, got \"");
-            APPEND_ESTR(errMsg, tokenTypeToCStr(currentTok->type));
+            Estr errMsg = CREATE_ESTR("Expected ',' or ']' when continuing array type, got \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(parser->currentToken->type));
             APPEND_ESTR(errMsg, "\" instead.");
             return Error(astNodePtr, charptr, errMsg.str);
         }
     }
+
+    printf("current tok in array type = %s\n", tokenToCStr(*parser->currentToken));
+
 
     return Success(astNodePtr, charptr, typeNode);
 }
 
 ResultType(astNodePtr, charptr) parseScalarType(CometParser* parser) {
     CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-    parserNextToken(parser); // consume base type
-
     CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, NULL, 0);
+
+    printf("current tok in scalar type = %s\n", tokenToCStr(*parser->currentToken));
+
 
     return Success(astNodePtr, charptr, typeNode);
 }
 
 ResultType(astNodePtr, charptr) parseType(CometParser* parser) {
-    if (peekTokenIs(parser, CT_LT)) {
+    if (peekTokenIs(parser, CT_OPEN_SQUARE)) {
         return parseArrayType(parser);
     } else {
         return parseScalarType(parser);
@@ -789,8 +812,6 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
         }
     }
 
-    printf("current: %s\n", tokenToCStr(*parser->currentToken));
-
     ResultType(astNodePtr, charptr) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     if (type.error)
         return type;
@@ -803,7 +824,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type.as.success, isMutable, fieldAttrib);
-    
+
     bool hasValue = peekTokenIs(parser, CT_EQ);
     
 
@@ -813,6 +834,8 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
 
     parserNextToken(parser);
     parserNextToken(parser);
+
+    
     
 
     ResultType(astNodePtr, charptr) value = parseExpression(parser, PRECEDENCE_LOWEST);
@@ -821,6 +844,8 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
     }
 
     stmt->data.AST_ASSIGN_STATEMENT.expression = value.as.success;
+
+    
     
     return Success(astNodePtr, charptr, stmt);
 }
@@ -1075,15 +1100,27 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, F
         return Error(astNodePtr, charptr, expectArrow.as.error);
     }
 
+    printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
+
+    parserNextToken(parser);
+
     ResultType(astNodePtr, charptr) returnType = parseType(parser);
     if (returnType.error)
         return returnType;
 
+    printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
+
     isInline = peekTokenIs(parser, CT_INLINE_FUNC_ARROW);
 
     if (!(isInline || peekTokenIs(parser, CT_OPEN_CURLY))) {
-        return Error(astNodePtr, charptr, "Expected next token to be '{' '=>'.");
+        Estr errMsg = CREATE_ESTR("Expected next token to be '{' '=>', got \"");
+        APPEND_ESTR(errMsg, tokenTypeToCStr(parser->peekToken->type));
+        APPEND_ESTR(errMsg, "\" instead.");
+        return Error(astNodePtr, charptr, errMsg.str);
     }
+
+    printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
+
 
     CometASTNode* block = NULL;    
     CometASTNode* inlineExpr = NULL;    
