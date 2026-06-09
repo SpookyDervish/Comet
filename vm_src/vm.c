@@ -180,9 +180,14 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
 
     if (function->isExternal) {
         CometOperand args[numArgs];
+        CometType* argTypes = function->argTypes;
 
-        for (size_t argIdx = numArgs; argIdx > 0; argIdx--) {
-            args[argIdx - 1] = deserializeValue(popValue(vm), function->argTypes[argIdx-1]);
+        for (int8_t argIdx = numArgs; argIdx > 0; argIdx--) {
+            CometType argType = (argIdx - numArgs) > 0 ?
+                                    argTypes[argIdx-1] :
+                                    (CometType){ .typeKind = COMET_BIG };
+
+            args[argIdx - 1] = deserializeValue(popValue(vm), argType);
         }
 
         CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);

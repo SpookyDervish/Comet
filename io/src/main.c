@@ -1,6 +1,6 @@
 #include "../../include/cometlib.h"
 
-CometOperand impl_subtract(CometOperand* args, CometVM* vm) {
+CometOperand impl_print(CometOperand* args, CometVM* vm) {
     return cometValue(COMET_INT, args[0].imm.intVal - args[1].imm.intVal);
 }
 

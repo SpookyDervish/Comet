@@ -3,6 +3,6 @@ import io
 func main() -> int {    
     int value = 16
 
-    int result = io.print(value, 123, 123234234)
+    int result = io.print(value, 13)
     return result
 }
