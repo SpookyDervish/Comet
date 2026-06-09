@@ -104,8 +104,8 @@ ResultType(CometOperand, charptr) loadExternalLib(CometCompiler* c, const char* 
             funcVal->argCount,
             funcVal->returnType,
             funcVal->argTypes,
-            funcVal->isMethod,
             funcVal->isVarArgs,
+            funcVal->isMethod,
             true,
             libIdx
         );
@@ -1881,6 +1881,7 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
             .numArgs = c->functions[i]->argCount,
             .isExternal = c->functions[i]->isExternal,
             .libIdx = c->functions[i]->libIdx,
+            .isVarArgs = c->functions[i]->isVarArgs
         };
         strcpy(serializedFunc.name, c->functions[i]->name);
         memcpy(serializedFunc.argTypes, c->functions[i]->argTypes, sizeof(CometType) * c->functions[i]->argCount);

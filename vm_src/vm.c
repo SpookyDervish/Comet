@@ -175,11 +175,13 @@ CometSerializedFunc* findFunctionByName(CometVM* vm, char* name) {
     return NULL;
 }
 
-void callFunction(CometVM* vm, CometSerializedFunc* function) {
-    if (function->isExternal) {
-        CometOperand args[function->numArgs];
+void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) {
+    uint8_t numArgs = function->isVarArgs ? callArgs : function->numArgs;
 
-        for (size_t argIdx = function->numArgs; argIdx > 0; argIdx--) {
+    if (function->isExternal) {
+        CometOperand args[numArgs];
+
+        for (size_t argIdx = numArgs; argIdx > 0; argIdx--) {
             args[argIdx - 1] = deserializeValue(popValue(vm), function->argTypes[argIdx-1]);
         }
 
@@ -195,7 +197,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function) {
     newFrame->ip = function->startIdx;
     newFrame->funcName = function->name;
 
-    for (size_t i = function->numArgs; i > 0; i--) {
+    for (size_t i = numArgs; i > 0; i--) {
         newFrame->args[i - 1] = popValue(vm);
     }
 
@@ -548,7 +550,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     CALL: {
-        callFunction(vm, &vm->functions[inst.a]);
+        callFunction(vm, &vm->functions[inst.a], inst.b);
         DISPATCH();
     }
     NOT: {
@@ -594,7 +596,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         uint32_t methodIdx = inst.a;
         CometSerializedFunc func = obj->vtable[methodIdx];
 
-        callFunction(vm, &func);
+        callFunction(vm, &func, inst.b);
 
         
         DISPATCH();
@@ -617,7 +619,7 @@ ResultType(int, charptr) startVM(CometVM* vm) {
     if (!mainFunc) {
         return Error(int, charptr, "Could not find main function!");
     }
-    callFunction(vm, mainFunc);
+    callFunction(vm, mainFunc, 0);
 
     ResultType(voidPtr, charptr) loopResult = vmMainLoop(vm);
     if (loopResult.error) {

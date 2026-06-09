@@ -72,7 +72,7 @@ ResultType(int, charptr) startVM(CometVM* vm);
 Call a function. The callee must return the VM's state to how it was before
 or suffer the consequences.
 */
-void callFunction(CometVM* vm, CometSerializedFunc* function);
+void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs);
 
 /*
 Return from the function the VM is currently in.
