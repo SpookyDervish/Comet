@@ -1,8 +1,3 @@
-import io
+small<> stringType
+int number
 
-func main() -> int {    
-    int value = 16
-
-    int result = io.print(value, 13)
-    return result
-}
