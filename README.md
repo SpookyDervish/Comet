@@ -1,6 +1,6 @@
 # Comet <img src="icon/icon.svg" width=25 alt="comet logo">
 
-Comet is a fast, compiled programming built on top of C and runs on a custom made stack-based VM. It has an enormous feature list, including:
+Comet is a fast, compiled programming language built on top of C and runs on a custom made stack-based VM. It has an enormous feature list, including:
 - Classes (called structs)
 - Templates
 - Runtime exceptions
@@ -10,6 +10,7 @@ Comet is a fast, compiled programming built on top of C and runs on a custom mad
 - Inheritance
 - Imports and a package system (no more C-style header files!)
 - An extensive standard library that handles memory management for you
+- Arrays
 
 ## Completed Features
 - [x] Variables
@@ -47,6 +48,9 @@ Comet is a fast, compiled programming built on top of C and runs on a custom mad
   - [ ] Templates
     - [ ] Template attributes
 - [x] Command line args
+- [x] Arrays
+  - [x] Creation
+  - [x] Access
 - [ ] Exceptions
   - [ ] Throw exceptions
   - [ ] Catch exceptions
