@@ -158,6 +158,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_IDENTIFIER";
         case AST_BOOL:
             return "AST_BOOL";
+        case AST_ARRAY:
+            return "AST_ARRAY";
 
         case AST_PROGRAM:
             return "AST_PROGRAM";

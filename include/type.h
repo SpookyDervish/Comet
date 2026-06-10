@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "list.h"
 
+#define MAX_ARRAY_DEPTH 8
+
 typedef enum {
     COMET_VOID,
     COMET_SMALL,
@@ -22,16 +24,26 @@ typedef enum {
 } CometValueTypeKind;
 
 typedef struct CometStruct CometStruct;
-
+typedef struct CometType CometType;
 typedef struct CometFunction CometFunction;
-typedef struct {
+typedef struct CometArrayType CometArrayType;
+
+struct CometArrayType {
+    CometType* elem; 
+    bool isFixedSize;
+    uint64_t fixedSize;
+};
+
+
+
+struct CometType {
     CometValueTypeKind typeKind;
     union {
         CometStruct* structType;
         CometFunction* functionType;
+        CometArrayType* arrayType;
     };
-    bool isArray;
-} CometType;
+};
 
 typedef struct {
     char name[32];

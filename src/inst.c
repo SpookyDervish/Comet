@@ -470,6 +470,17 @@ CometOperand buildNew(CometCompiler* c, uint32_t idx) {
 
     return dest;
 }
+
+CometOperand buildBuildList(CometCompiler* c) {
+    popVal(c); // pop size
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_BUILD_LIST, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+
 CometOperand buildGetField(CometCompiler* c, uint32_t idx) {
     CometOperand dest = pushVal(c);
 

@@ -631,7 +631,7 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
             return Error(argList, charptr, expectType.as.error);
         }
 
-        ResultType(astNodePtr, charptr) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+        ResultType(astNodePtr, charptr) type = parseType(parser);
         if (type.error)
             return Error(argList, charptr, type.as.error);
 

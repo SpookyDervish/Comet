@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "token.h"
 #include "parser.h"
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -168,7 +169,7 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
         case AST_INT: {
             CometOperand new = createOperand(CO_IMMEDIATE);
             new.imm.typeKind = COMET_BIG;
-            new.imm.intVal = node->data.AST_INT.number;
+            new.imm.bigVal = node->data.AST_INT.number;
 
             CometOperand idx = storeConst(c, new);
             buildPushConst(c, idx);
@@ -194,6 +195,26 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
 
             CometOperand idx = storeConst(c, new);
             buildPushConst(c, idx);
+
+            return Success(CometOperand, charptr, new);
+        }
+
+        case AST_ARRAY: {
+            for (size_t i = 0; i < node->data.AST_ARRAY.elements.count; i++) {
+                ResultType(CometOperand, charptr) elementValue = visitValue(c, *get(node->data.AST_ARRAY.elements, i));
+                if (elementValue.error)
+                    return elementValue;
+            }
+
+            // push size
+            CometOperand sizeVal = createOperand(CO_IMMEDIATE);
+            sizeVal.imm.typeKind = COMET_INT;
+            sizeVal.imm.intVal = (int32_t)node->data.AST_ARRAY.elements.count;
+
+            CometOperand idx = storeConst(c, sizeVal);
+            buildPushConst(c, idx);
+
+            CometOperand new = buildBuildList(c);
 
             return Success(CometOperand, charptr, new);
         }
@@ -363,44 +384,46 @@ ResultType(astNodeList, charptr) flattenPath(CometCompiler* c, CometASTNode* typ
 }
 
 ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode) {
-    switch (typeNode->nodeType) {
-        case AST_IDENTIFIER: {
+    struct AST_TYPE type = typeNode->data.AST_TYPE;
 
-            List(CometTypeMapEntry) typeMap = c->typeMap;
-            char* typeName = typeNode->data.AST_IDENTIFIER.ident;
+    // get base type
+    CometType* baseType = malloc(sizeof(CometType));
 
-            for (size_t i = 0; i < typeMap.count; i++) {
-                CometTypeMapEntry type = *get(typeMap, i);
+    List(CometTypeMapEntry) typeMap = c->typeMap;
+    char* baseTypeName = type.baseType->data.AST_IDENTIFIER.ident;
 
-                if (strcmp(type.name, typeName) == 0) {
-                    return Success(CometType, charptr, type.type);
-                }
-            }
+    bool found = false;
+    for (size_t i = 0; i < typeMap.count; i++) {
+        CometTypeMapEntry type = *get(typeMap, i);
 
-            Estr errMsg = CREATE_ESTR("Unkown type \"");
-            APPEND_ESTR(errMsg, typeName);
-            APPEND_ESTR(errMsg, "\"");
-            return Error(CometType, charptr, errMsg.str);
-        }
-
-        case AST_INFIX_EXPRESSION: {
-            ResultType(astNodeList, charptr) path = flattenPath(c, typeNode);
-            if (path.error)
-                return Error(CometType, charptr, path.as.error);
-
-            for (size_t i = 0; i < path.as.success.count; i++) {
-                printf("%s.", (*get(path.as.success, i))->data.AST_IDENTIFIER.ident);
-            }
-            printf("\n");
-
-            // TODO: i was gonna finish this but the parser can't even parse it yet so ill finish it later
-            break;
-        }
-
-        default: {
-            return Error(CometType, charptr, "Expected type name or module access.");
+        if (strcmp(type.name, baseTypeName) == 0) {
+            found = true;
+            *baseType = type.type;
         }
     }
+
+    if (!found) {
+        Estr errMsg = CREATE_ESTR("Unkown type \"");
+        APPEND_ESTR(errMsg, baseTypeName);
+        APPEND_ESTR(errMsg, "\"");
+        return Error(CometType, charptr, errMsg.str);
+    }
+
+    CometType finalType;    
+    if (type.dimensions > 0) {
+        finalType.typeKind = COMET_ARRAY;
+
+        CometArrayType* arrayType = malloc(sizeof(CometArrayType));
+        arrayType->elem = baseType;
+        arrayType->isFixedSize = false;
+
+        finalType.arrayType = arrayType;
+    } else {
+        finalType = *baseType;
+        free(baseType);
+    }
+
+    return Success(CometType, charptr, finalType);
 }
 
 ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
@@ -615,6 +638,33 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
         case AST_INT: outTypeKind = COMET_INT; break;
         case AST_BOOL: outTypeKind = COMET_BOOL; break;
         case AST_DOUBLE: outTypeKind = COMET_DOUBLE; break;
+
+        case AST_ARRAY: {
+            CometArrayType* arrayType = malloc(sizeof(CometArrayType));
+
+            if (node->data.AST_ARRAY.elements.count < 1) {
+                return Error(CometType, charptr, "Empty array initializer!");
+            }
+
+            CometType* elemType = malloc(sizeof(CometType));
+
+            ResultType(CometType, charptr) resolvedElemType = resolveType(c, *get(node->data.AST_ARRAY.elements, 0));
+            if (resolvedElemType.error)
+                return resolvedElemType;
+
+            *elemType = resolvedElemType.as.success;
+
+            arrayType->elem = elemType;
+            arrayType->isFixedSize = false;
+
+            CometType outType = {
+                .typeKind = COMET_ARRAY,
+                .arrayType = arrayType,
+            };
+
+            return Success(CometType, charptr, outType);
+        }
+
         case AST_IDENTIFIER: {
             char* varName = node->data.AST_IDENTIFIER.ident;
             Record* varRecord = lookup(c->env, varName);
@@ -1923,7 +1973,7 @@ ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath
 ResultType(cometCompilerPtr, charptr) newCompiler() {
     CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
 
-    newCompiler->outputProgram = calloc(2048, sizeof(CometInst));
+    newCompiler->outputProgram = calloc(pow(2, 14), sizeof(CometInst));
     newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
     newCompiler->env = newEnvironment("root", NULL, false);

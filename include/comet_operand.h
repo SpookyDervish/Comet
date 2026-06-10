@@ -6,6 +6,8 @@
 #include "struct.h"
 #include "type.h"
 
+typedef struct CometOperand CometOperand;
+
 typedef enum {
     CO_NONE,
     CO_IMMEDIATE,
@@ -17,7 +19,7 @@ typedef enum {
 typedef struct {
     uint32_t length;
     uint32_t capacity;
-    int64_t* data;
+    CometOperand* data;
 } CometArray;
 
 typedef struct CometEnvironment CometEnvironment;
@@ -37,7 +39,6 @@ typedef struct {
     };
 } CometImmediate;
 
-typedef struct CometOperand CometOperand;
 struct CometOperand {
     CometOperandKind type;
     union {

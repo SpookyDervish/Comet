@@ -84,10 +84,6 @@ FORCE_INLINE int64_t popValue(CometVM* vm) {
     return value;
 }
 
-CometOperand getConst(CometVM* vm, uint32_t idx) {
-    return vm->constants[idx];
-}
-
 int64_t serializeValue(CometOperand value) {
     if (value.type == CO_SYMBOL) {
         return value.symbolIdx;
@@ -220,6 +216,29 @@ void returnFromFunc(CometVM* vm) {
     vm->currentFrame = &vm->callStack[vm->callIdx-1];
 }
 
+void buildList(CometVM* vm) {
+    // get size
+    int64_t size = popValue(vm);
+
+    if (size < 0) {
+        char* trace = stackTrace(vm);
+
+        fprintf(stderr, "Attempted to create a list of negative size!\n%s", trace);
+        assert(size < 0);
+    }
+
+    // malloc list
+    int64_t* arrayData = calloc(size, sizeof(int64_t));
+
+    // put values into array
+    for (int64_t i = size; i > 0; i--) {
+        arrayData[i - 1] = popValue(vm);
+    }
+
+    // push array onto stack
+    pushValue(vm, (int64_t)arrayData);
+}
+
 FORCE_INLINE CometSerializedInst fetchNextInst(CometVM* vm) {
     return vm->instructions[vm->currentFrame->ip++];
 }
@@ -271,7 +290,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&GET_FIELD,
         &&SET_FIELD,
         &&CALL_METHOD,
-        &&BREAKPOINT
+        &&BREAKPOINT,
+        &&BUILD_LIST
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -296,7 +316,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     DISPATCH();
 
     PUSH_CONST: {
-        CometOperand value = getConst(vm, inst.a);
+        CometOperand value = vm->constants[inst.a];
         
         pushOperand(vm, value);
         DISPATCH();
@@ -604,6 +624,10 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         callFunction(vm, &func, inst.b);
 
         
+        DISPATCH();
+    }
+    BUILD_LIST: {
+        buildList(vm);
         DISPATCH();
     }
     BREAKPOINT: {
