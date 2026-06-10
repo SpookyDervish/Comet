@@ -45,6 +45,7 @@ typedef enum {
     INST_CALL_METHOD,
     INST_BREAKPOINT,
     INST_BUILD_LIST,
+    INST_LIST_AT,
     INST_MAX
 } CometInstType;
 

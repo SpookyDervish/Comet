@@ -568,7 +568,6 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
 
 
     ResultType(astNodePtr, charptr) leftExpr = prefixFunc.as.success(parser);
-    printf("%d < %d?\n", precedence, peekPrecedence(parser));
 
     while (precedence < peekPrecedence(parser)) {
         ResultType(infixFuncType, charptr) infixFunc = getInfixFunc(parser->peekToken->type);

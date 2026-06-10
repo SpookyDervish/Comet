@@ -96,6 +96,7 @@ CometOperand buildI2F(CometCompiler* c);
 void buildDup(CometCompiler* c);
 CometOperand buildNew(CometCompiler* c, uint32_t idx);
 CometOperand buildBuildList(CometCompiler* c);
+CometOperand buildListAt(CometCompiler* c);
 CometOperand buildGetField(CometCompiler* c, uint32_t idx);
 void buildSetField(CometCompiler* c, uint32_t idx);
 CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args);

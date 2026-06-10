@@ -481,6 +481,14 @@ CometOperand buildBuildList(CometCompiler* c) {
     return dest;
 }
 
+CometOperand buildListAt(CometCompiler* c) {
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_LIST_AT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+
 CometOperand buildGetField(CometCompiler* c, uint32_t idx) {
     CometOperand dest = pushVal(c);
 

@@ -250,6 +250,18 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
         case AST_NEW_STATEMENT: 
             return visitNewStatement(c, node);
         
+        case AST_ARRAY_ACCESS: {
+            ResultType(CometOperand, charptr) index = visitValue(c, node->data.AST_ARRAY_ACCESS.expr);
+            if (index.error)
+                return index;
+
+            ResultType(CometOperand, charptr) leftValue = visitValue(c, node->data.AST_ARRAY_ACCESS.left);
+            if (leftValue.error)
+                return leftValue;
+
+            CometOperand new = buildListAt(c);
+            return Success(CometOperand, charptr, new);
+        }
 
         default: {
             Estr errMsg = CREATE_ESTR("Could not build expression: \"");
@@ -773,6 +785,17 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
 
             return Success(CometType, charptr, funcSymbol->returnType);
         }
+        case AST_ARRAY_ACCESS: {
+            ResultType(CometType, charptr) leftType = resolveType(c, node->data.AST_ARRAY_ACCESS.left);
+            if (leftType.error)
+                return leftType;
+
+            if (leftType.as.success.typeKind != COMET_ARRAY) {
+                return Error(CometType, charptr, "Attempted to index something that wasn't an array!");
+            }
+
+            return Success(CometType, charptr, *leftType.as.success.arrayType->elem);
+        }
 
         default: {
             Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
@@ -1012,12 +1035,20 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
 
     CometType resultType = unifyType(leftType.as.success, rightType.as.success);
     
-    visitValue(c, expr.left);
+    // left
+    ResultType(CometOperand, charptr) leftValue = visitValue(c, expr.left);
+    if (leftValue.error)
+        return leftValue;
+
     if (typesAreEqual(leftType.as.success, resultType)) {
         leftType.as.success = buildCast(c, leftType.as.success, resultType);
     }
 
-    visitValue(c, expr.right);
+    // right
+    ResultType(CometOperand, charptr) rightValue = visitValue(c, expr.right);
+    if (rightValue.error)
+        return rightValue;
+
     if (typesAreEqual(rightType.as.success, resultType)) {
         rightType.as.success = buildCast(c, rightType.as.success, resultType);
     }

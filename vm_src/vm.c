@@ -291,7 +291,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&SET_FIELD,
         &&CALL_METHOD,
         &&BREAKPOINT,
-        &&BUILD_LIST
+        &&BUILD_LIST,
+        &&LIST_AT
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -628,6 +629,16 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     }
     BUILD_LIST: {
         buildList(vm);
+        DISPATCH();
+    }
+    LIST_AT: {
+        int64_t* array = (int64_t*)popValue(vm);
+        int64_t index = popValue(vm);
+
+        pushValue(
+            vm, 
+            array[index]
+        );
         DISPATCH();
     }
     BREAKPOINT: {
