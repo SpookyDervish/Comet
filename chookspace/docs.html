@@ -113,17 +113,11 @@ sudo make install</pre>
 
                     <div id="cometc">
                         <h1>cometc</h1>
-                        <p><b>cometc</b> is the Comet compiler. It can take several command line arguments: (the first
+                        <p><b>cometc</b> is the Comet compiler. It can take a few command line arguments: (the first
                             argument is the Comet file you want to compile)</p>
                         <ul>
                             <li><b>-o</b> or <b>--output</b>: the file to output to</li>
                             <li><b>-v</b> or <b>--version</b>: print version number and exit</li>
-                            <li><b>-l</b> or <b>--llvm</b>: output LLVM IR instead of an object file. this cant be used
-                                with the -a argument</li>
-                            <li><b>-a</b> or <b>--asm</b>: output native assembly instead of an object file. this cant
-                                be used with the -l argument</li>
-                            <li><b>-O</b>: specify the level of optimisation. this can be anywhere from 0 (no
-                                optimisation) to 3 (max optimisation)</li>
                         </ul>
                         <br />
                         <p>Example usage:</p>
@@ -133,17 +127,16 @@ sudo make install</pre>
                     <div id="hello-world">
                         <h1>"Hello, World!"</h1>
                         <p>This is a basic "Hello, World!" program in Comet:</p>
-                        <pre class="code"><code class="language-go">func main() -> int {
-    print("Hello, World!")
+                        <pre class="code"><code class="language-go">import io
+
+func main() -> int {
+    io.print("Hello, World!")
 }</code></pre>
                         <br />
-                        <p>Save this to a file called "helloWorld.comet". We can compile this program to an object file with the following command:</p>
-                        <pre class="command">cometc helloWorld.comet -o helloWorld.obj</pre>
-                        <p>And then we can compile this to a program with <b>gcc</b>:</p>
-                        <pre class="command">gcc helloWorld.obj -o helloWorld</pre>
-                        <p>We can then run our fully compiled program:</p>
-                        <pre class="command">$ ./helloWorld
-Hello, World!</pre>
+                        <p>Save this to a file called "helloWorld.comet". We can compile this program to an executable file with the following command:</p>
+                        <pre class="command">cometc helloWorld.comet -o helloWorld.cvm</pre>
+                        <p>And then we can run our program on the Comet VM:</p>
+                        <pre class="command">comet helloWorld.cvm</pre>
                     </div>
                 </div>
 
@@ -225,7 +218,7 @@ Hello, World!</pre>
                             the condition is <b>false</b>.</p>
                         <p>Example syntax:</p>
                         <pre class="code"><code class="language-go">while true {
-    print("To infinity and beyond!\n")
+    io.print("To infinity and beyond!\n")
 }</code></pre>
                         <br />
                         <p>The above code will print "To infinity and beyond!" forever.</p>
@@ -250,7 +243,7 @@ Hello, World!</pre>
                             down.</p>
                         <p>Example syntax:</p>
                         <pre class="code"><code class="language-go">for int i in 10 .. 0 step -1 {
-    print("%d\n", i)
+    io.print("%d\n", i)
 }</code></pre>
                         <br />
                         <p>The above code outputs the numbers 10 to 1.</p>
