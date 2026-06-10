@@ -52,7 +52,8 @@ typedef enum {
 
     // expressions
     AST_INFIX_EXPRESSION,
-    AST_PREFIX_EXPRESSION
+    AST_PREFIX_EXPRESSION,
+    AST_ARRAY_ACCESS
 } CometASTNodeType;
 
 // Main ASTNode struct, this can hold the different types of nodes.
@@ -140,6 +141,11 @@ struct CometASTNode {
             List(astNodePtr) importChain; // import chain. first item is the top level import
         } AST_IMPORT_STATEMENT;
         struct AST_BREAKPOINT_STATEMENT {} AST_BREAKPOINT_STATEMENT;
+
+        struct AST_ARRAY_ACCESS {
+            CometASTNode* left;
+            CometASTNode* expr;
+        } AST_ARRAY_ACCESS;
 
     } data;  
 };

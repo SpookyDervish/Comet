@@ -137,6 +137,28 @@ void freeNode(CometASTNode* node) {
             break;
         }   
 
+        case AST_TYPE: {
+            freeNode(node->data.AST_TYPE.baseType);
+            for (size_t i = 0; i < node->data.AST_TYPE.shape.count; i++) {
+                freeNode(*get(node->data.AST_TYPE.shape, i));
+            }
+            destroy(node->data.AST_TYPE.shape);
+            break;
+        }
+
+        case AST_ARRAY: {
+            for (size_t i = 0; i < node->data.AST_ARRAY.elements.count; i++) {
+                freeNode(*get(node->data.AST_ARRAY.elements, i));
+            }
+            break;
+        }
+
+        case AST_ARRAY_ACCESS: {
+            freeNode(node->data.AST_ARRAY_ACCESS.left);
+            freeNode(node->data.AST_ARRAY_ACCESS.expr);
+            break;
+        }
+
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));
             break;
@@ -160,6 +182,9 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_BOOL";
         case AST_ARRAY:
             return "AST_ARRAY";
+
+        case AST_TYPE:
+            return "AST_TYPE";
 
         case AST_PROGRAM:
             return "AST_PROGRAM";
@@ -201,6 +226,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_ARG_DEF";
         case AST_NEW_STATEMENT:
             return "AST_NEW_STATEMENT";
+        case AST_ARRAY_ACCESS:
+            return "AST_ARRAY_ACCESS";
 
         default:
             return "AST_UNKOWN (FIXME)";
