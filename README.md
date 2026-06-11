@@ -48,9 +48,10 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [ ] Templates
     - [ ] Template attributes
 - [x] Command line args
-- [x] Arrays
+- [ ] Arrays
   - [x] Creation
   - [x] Access
+  - [ ] Changing values
 - [ ] Exceptions
   - [ ] Throw exceptions
   - [ ] Catch exceptions

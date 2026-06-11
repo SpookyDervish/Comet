@@ -770,9 +770,13 @@ ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
     while (true) {
 
         if (parser->currentToken->type == CT_TIMES) {
+            char* buffer = malloc(2);
+            buffer[0] = '*';
+            buffer[1] = 0;
+
             append(
                 typeNode->data.AST_TYPE.shape,
-                AST_NODE(AST_IDENTIFIER, "*")
+                AST_NODE(AST_IDENTIFIER, buffer)
             );
 
         } else {
