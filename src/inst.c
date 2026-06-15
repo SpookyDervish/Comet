@@ -1,5 +1,4 @@
 #include "inst.h"
-#include "ast.h"
 #include "../include/comet_operand.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,6 +13,26 @@ bool typesAreEqual(CometType a, CometType b) {
 
     if (a.typeKind == COMET_STRUCT) {
         return a.structType == b.structType;
+    }
+
+    if (a.typeKind == COMET_ARRAY) {
+        
+        for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+
+            if (!(typesAreEqual(a.arrayType->elem[i], b.arrayType->elem[i]))) {
+                return false;
+            }
+
+            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i]) {
+                return false;
+            }
+
+            if (!a.arrayType->isFixedSize[i])
+                return true;
+            
+            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i])
+                return false;
+        }
     }
 
     return true;

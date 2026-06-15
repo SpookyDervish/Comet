@@ -37,6 +37,13 @@ int main(int argc, char** argv) {
         fprintf(stderr, "lexer error: %s\n", tokens.as.error);
         return 1;
     }
+
+    /*
+    // print tokens
+    for (size_t i = 0; i < tokens.as.success.count; i++) {
+        printf("%s\n", tokenToCStr(*get(tokens.as.success, i)));
+    }
+    */
     
     ResultType(parserPtr, charptr) parser = newParser(tokens.as.success);
     if (parser.error) {

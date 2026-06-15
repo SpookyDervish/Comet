@@ -1,4 +1,9 @@
 func main() -> int {
-    int[*] array = [[1, 2], 2, 3]
-    return array @ 0 @ 1
+    int[3] x = [
+        1,
+        2,
+        3
+    ]
+
+    return x : 0
 }

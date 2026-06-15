@@ -345,29 +345,8 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '[': append(tokens, TOKEN_LITERAL(CT_OPEN_SQUARE, "[")); break;
             case ']': append(tokens, TOKEN_LITERAL(CT_CLOSE_SQUARE, "]")); break;
             case '@': append(tokens, TOKEN_LITERAL(CT_AT, "@")); break;
-            case ':': {
-
-                ResultType(char, charptr) labelStart = lexerPeek(lexer);
-                
-
-                if (labelStart.error || !(isalnum(labelStart.as.success) || labelStart.as.success == '_')) {
-                    append(tokens, TOKEN_LITERAL(CT_COLON, ":"));
-                } else {
-                    lexerConsume(lexer);
-                    
-                    ResultType(CometToken, charptr) endLabel = lexerParseWord(lexer);
-
-                    if (endLabel.error) {
-                        return Error(tokenList, charptr, endLabel.as.error);
-                    }
-
-                    
-
-                    append(tokens, TOKEN_LITERAL(CT_END_LABEL, endLabel.as.success.value.literal));
-                }
-
-                break;
-            }
+            case ':': append(tokens, TOKEN_LITERAL(CT_COLON, ":")); break;
+            
             case '.': {
                 ResultType(char, charptr) nextDot = lexerPeek(lexer);
 

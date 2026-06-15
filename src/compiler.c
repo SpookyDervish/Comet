@@ -391,9 +391,6 @@ ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode)
     List(CometTypeMapEntry) typeMap = c->typeMap;
     char* baseTypeName = type.baseType->data.AST_IDENTIFIER.ident;
 
-    printNode(typeNode);
-    printf("\n");
-
     bool found = false;
     for (size_t i = 0; i < typeMap.count; i++) {
         CometTypeMapEntry type = *get(typeMap, i);
@@ -417,7 +414,29 @@ ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode)
 
         CometArrayType* arrayType = malloc(sizeof(CometArrayType));
         arrayType->elem = baseType;
-        arrayType->isFixedSize = false;
+
+        if (type.shape.count > MAX_ARRAY_DEPTH) {
+            return Error(CometType, charptr, "how deep is that array you're making?????");
+        }
+
+        for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+            if (i >= type.shape.count) {
+                arrayType->isFixedSize[i] = false;
+                continue;
+            }
+
+            CometASTNode* shapeNode = *get(type.shape, i);
+            printf("shape = ");
+            printNode(shapeNode);
+            printf("\n");
+
+            if (shapeNode->nodeType == AST_INT) {
+                arrayType->isFixedSize[i] = true;
+                arrayType->fixedSize[i] = shapeNode->data.AST_INT.number;
+            } else {
+                arrayType->isFixedSize[i] = false;
+            }
+        }
 
         finalType.arrayType = arrayType;
     } else {
@@ -478,7 +497,7 @@ ResultType(voidPtr, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
                     break;
                 }
 
-                case CT_AT: {
+                case CT_COLON: {
                     if (leftType.as.success.typeKind != COMET_ARRAY)
                         return Error(voidPtr, charptr, "Attempted to set element of something that isn't an array!");
 
@@ -652,22 +671,56 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
         case AST_DOUBLE: outTypeKind = COMET_DOUBLE; break;
 
         case AST_ARRAY: {
-            CometArrayType* arrayType = malloc(sizeof(CometArrayType));
+            List(astNodePtr) elements = node->data.AST_ARRAY.elements;
 
-            if (node->data.AST_ARRAY.elements.count < 1) {
+            if (elements.count < 1) {
                 return Error(CometType, charptr, "Empty array initializer!");
             }
 
-            CometType* elemType = malloc(sizeof(CometType));
+            CometArrayType* arrayType = malloc(sizeof(CometArrayType));
+            // Clear the memory to prevent garbage data in unused depth slots
+            memset(arrayType, 0, sizeof(CometArrayType)); 
 
-            ResultType(CometType, charptr) resolvedElemType = resolveType(c, *get(node->data.AST_ARRAY.elements, 0));
-            if (resolvedElemType.error)
-                return resolvedElemType;
+            // 1. Resolve the very first element to anchor our type layout
+            CometASTNode* firstElem = *get(elements, 0);
+            ResultType(CometType, charptr) firstResolved = resolveType(c, firstElem);
+            if (firstResolved.error) return firstResolved;
 
-            *elemType = resolvedElemType.as.success;
+            CometType firstType = firstResolved.as.success;
 
-            arrayType->elem = elemType;
-            arrayType->isFixedSize = false;
+            // 2. Set up the current outermost dimension (Level 0)
+            arrayType->isFixedSize[0] = true;
+            arrayType->fixedSize[0] = elements.count;
+
+            // 3. Propagate deeper dimensions if the child is already an array
+            if (firstType.typeKind == COMET_ARRAY) {
+                // Copy the child's dimensions, shifting them down by 1 level
+                for (size_t d = 0; d < MAX_ARRAY_DEPTH - 1; d++) {
+                    arrayType->elem[d + 1] = firstType.arrayType->elem[d];
+                    arrayType->isFixedSize[d + 1] = firstType.arrayType->isFixedSize[d];
+                    arrayType->fixedSize[d + 1] = firstType.arrayType->fixedSize[d];
+                }
+                // The immediately nested element type is the child's element type
+                arrayType->elem = firstType.arrayType->elem;
+            } else {
+                // It's a flat scalar array (e.g., [1, 2, 3])
+                CometType* scalarType = malloc(sizeof(CometType));
+                *scalarType = firstType;
+                arrayType->elem = scalarType;
+                arrayType->isFixedSize[1] = false; // Mark end of nesting depth
+            }
+
+            // 4. Validate that all *other* elements in this literal match the first one
+            for (size_t i = 1; i < elements.count; i++) {
+                CometASTNode* siblingElem = *get(elements, i);
+                ResultType(CometType, charptr) siblingResolved = resolveType(c, siblingElem);
+                if (siblingResolved.error) return siblingResolved;
+
+                if (!typesAreEqual(firstType, siblingResolved.as.success)) {
+                    // Free allocated memory here if needed to avoid leaks!
+                    return Error(CometType, charptr, "Inconsistent element types in array literal.");
+                }
+            }
 
             CometType outType = {
                 .typeKind = COMET_ARRAY,
@@ -676,6 +729,7 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
 
             return Success(CometType, charptr, outType);
         }
+
 
         case AST_IDENTIFIER: {
             char* varName = node->data.AST_IDENTIFIER.ident;
@@ -829,6 +883,14 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
     ResultType(CometType, charptr) exprType = resolveType(c, expr);
     if (exprType.error)
         return Error(CometOperand, charptr, exprType.as.error);
+
+    ResultType(CometType, charptr) varType = getType(c, node->data.AST_ASSIGN_STATEMENT.type);
+    if (varType.error)
+        return Error(CometOperand, charptr, varType.as.error);
+    
+    if (!typesAreEqual(varType.as.success, exprType.as.success)) {
+        return Error(CometOperand, charptr, "Variable type and expression type don't match in assignment.");
+    }
 
     ResultType(CometOperand, charptr) exprResult = visitValue(c, expr);
     if (exprResult.error)
@@ -992,7 +1054,7 @@ ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, Comet
 
         if (leftExpr.op.type == CT_DOT) { // struct reassign
             return visitFieldReassignStatement(c, node);
-        } else if (leftExpr.op.type == CT_AT) {
+        } else if (leftExpr.op.type == CT_COLON) {
             return visitArrayReassignStatement(c, node);
         } else {
             Estr errMsg = CREATE_ESTR("Cannot use operator \"");
@@ -1180,7 +1242,7 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
         }
 
         // list access
-        case CT_AT: {
+        case CT_COLON: {
             out = buildListAt(c);
             break;
         }

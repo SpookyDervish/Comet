@@ -41,7 +41,7 @@ char* tokenTypeToCStr(CometTokenType tokType) {
         case CT_DOT:
             return "CT_DOT";
         case CT_COLON:
-            return "CT_DOT";
+            return "CT_COLON";
         case CT_DOT_DOT:
             return "CT_DOT_DOT";
         case CT_END_LABEL:

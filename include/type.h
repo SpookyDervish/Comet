@@ -30,8 +30,8 @@ typedef struct CometArrayType CometArrayType;
 
 struct CometArrayType {
     CometType* elem; 
-    bool isFixedSize;
-    uint64_t fixedSize;
+    bool isFixedSize[MAX_ARRAY_DEPTH];
+    uint64_t fixedSize[MAX_ARRAY_DEPTH];
 };
 
 
