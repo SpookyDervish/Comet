@@ -1,10 +1,4 @@
-func foo(int[3] test) -> void {
-    
-}
-
 func main() -> int {
-    int[*] array = {1, 2, 3}
-    foo(array)
-
-    return array[0]
+    int[*] array = [[1, 2], 2, 3]
+    return array @ 0 @ 1
 }

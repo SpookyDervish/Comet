@@ -344,6 +344,7 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case ')': append(tokens, TOKEN_LITERAL(CT_CLOSE_PAREN, ")")); break;
             case '[': append(tokens, TOKEN_LITERAL(CT_OPEN_SQUARE, "[")); break;
             case ']': append(tokens, TOKEN_LITERAL(CT_CLOSE_SQUARE, "]")); break;
+            case '@': append(tokens, TOKEN_LITERAL(CT_AT, "@")); break;
             case ':': {
 
                 ResultType(char, charptr) labelStart = lexerPeek(lexer);

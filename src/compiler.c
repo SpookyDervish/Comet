@@ -249,19 +249,6 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
 
         case AST_NEW_STATEMENT: 
             return visitNewStatement(c, node);
-        
-        case AST_ARRAY_ACCESS: {
-            ResultType(CometOperand, charptr) index = visitValue(c, node->data.AST_ARRAY_ACCESS.expr);
-            if (index.error)
-                return index;
-
-            ResultType(CometOperand, charptr) leftValue = visitValue(c, node->data.AST_ARRAY_ACCESS.left);
-            if (leftValue.error)
-                return leftValue;
-
-            CometOperand new = buildListAt(c);
-            return Success(CometOperand, charptr, new);
-        }
 
         default: {
             Estr errMsg = CREATE_ESTR("Could not build expression: \"");
@@ -404,6 +391,9 @@ ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode)
     List(CometTypeMapEntry) typeMap = c->typeMap;
     char* baseTypeName = type.baseType->data.AST_IDENTIFIER.ident;
 
+    printNode(typeNode);
+    printf("\n");
+
     bool found = false;
     for (size_t i = 0; i < typeMap.count; i++) {
         CometTypeMapEntry type = *get(typeMap, i);
@@ -438,7 +428,7 @@ ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode)
     return Success(CometType, charptr, finalType);
 }
 
-ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
+ResultType(voidPtr, charptr) visitLValue(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_IDENTIFIER: {
             char* varName = node->data.AST_IDENTIFIER.ident;
@@ -448,7 +438,7 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
                 Estr errMsg = CREATE_ESTR("Undefined variable \"");
                 APPEND_ESTR(errMsg, varName);
                 APPEND_ESTR(errMsg, "\"");
-                return Error(CometType, charptr, errMsg.str);
+                return Error(voidPtr, charptr, errMsg.str);
             }
 
             uint32_t idx = varRecord->recordIdx;
@@ -463,7 +453,7 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
                 
             }
   
-            return Success(CometType, charptr, varRecord->type);
+            return Success(voidPtr, charptr, NULL);
         }
 
         case AST_INFIX_EXPRESSION: {
@@ -471,19 +461,31 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
 
             ResultType(CometType, charptr) leftType = resolveType(c, expr.left);
             if (leftType.error)
-                return Error(CometType, charptr, leftType.as.error);
+                return Error(voidPtr, charptr, leftType.as.error);
 
             ResultType(CometOperand, charptr) left = visitValue(c, expr.left);
             if (left.error)
-                return Error(CometType, charptr, left.as.error);
+                return Error(voidPtr, charptr, left.as.error);
+
 
             switch (expr.op.type) {
                 case CT_DOT: {
                     if (leftType.as.success.typeKind != COMET_STRUCT) 
-                        return Error(CometType, charptr, "Attempted to set field of something that isn't a struct!");
+                        return Error(voidPtr, charptr, "Attempted to set field of something that isn't a struct!");
 
                     uint32_t fieldIndex = getFieldIndex(leftType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
                     buildGetField(c, fieldIndex);
+                    break;
+                }
+
+                case CT_AT: {
+                    if (leftType.as.success.typeKind != COMET_ARRAY)
+                        return Error(voidPtr, charptr, "Attempted to set element of something that isn't an array!");
+
+                    ResultType(CometOperand, charptr) index = visitValue(c, expr.right);
+                    if (index.error)
+                        return Error(voidPtr, charptr, index.as.error);
+                    
                     break;
                 }
 
@@ -491,7 +493,7 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
                     Estr errMsg = CREATE_ESTR("Cannot use operator \"");
                     APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
                     APPEND_ESTR(errMsg, "\" in lvalue.");
-                    return Error(CometType, charptr, errMsg.str);
+                    return Error(voidPtr, charptr, errMsg.str);
                 }
             }
 
@@ -502,13 +504,11 @@ ResultType(CometType, charptr) visitLValue(CometCompiler* c, CometASTNode* node)
             Estr errMsg = CREATE_ESTR("\"");
             APPEND_ESTR(errMsg, ASTNodeTypeToCStr(node->nodeType));
             APPEND_ESTR(errMsg, "\" cannot be an lvalue.");
-            return Error(CometType, charptr, errMsg.str);
+            return Error(voidPtr, charptr, errMsg.str);
         }
     }
 
-    return Success(CometType, charptr, (CometType){
-        .typeKind = COMET_VOID
-    });
+    return Success(voidPtr, charptr, NULL);
 }
 
 ResultType(CometOperand, charptr) getModuleValue(CometCompiler* c, CometASTNode* infixExpr) {
@@ -785,17 +785,6 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
 
             return Success(CometType, charptr, funcSymbol->returnType);
         }
-        case AST_ARRAY_ACCESS: {
-            ResultType(CometType, charptr) leftType = resolveType(c, node->data.AST_ARRAY_ACCESS.left);
-            if (leftType.error)
-                return leftType;
-
-            if (leftType.as.success.typeKind != COMET_ARRAY) {
-                return Error(CometType, charptr, "Attempted to index something that wasn't an array!");
-            }
-
-            return Success(CometType, charptr, *leftType.as.success.arrayType->elem);
-        }
 
         default: {
             Estr errMsg = CREATE_ESTR("Could not resolve type of expression: \"");
@@ -853,9 +842,17 @@ ResultType(CometOperand, charptr) visitAssignStatement(CometCompiler* c, CometAS
 ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
 
-    ResultType(CometType, charptr) structType = visitLValue(c, expr.left);
+    ResultType(voidPtr, charptr) structResult = visitLValue(c, expr.left);
+    if (structResult.error)
+        return Error(CometOperand, charptr, structResult.as.error);
+
+    ResultType(CometType, charptr) structType = resolveType(c, expr.left);
     if (structType.error)
         return Error(CometOperand, charptr, structType.as.error);
+
+    if (structType.as.success.typeKind != COMET_STRUCT) {
+        return Error(CometOperand, charptr, "Attempted to reassign a field of something that isn't a struct!");
+    }
 
     int32_t fieldIndex = getFieldIndex(structType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
     ResultType(CometType, charptr) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
@@ -916,13 +913,94 @@ ResultType(CometOperand, charptr) visitFieldReassignStatement(CometCompiler* c, 
 
     return Success(CometOperand, charptr, NO_OPERAND);
 }
+ResultType(CometOperand, charptr) visitArrayReassignStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_INFIX_EXPRESSION expr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
+
+    ResultType(voidPtr, charptr) arrayResult = visitLValue(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    if (arrayResult.error)
+        return Error(CometOperand, charptr, arrayResult.as.error);
+
+    ResultType(CometType, charptr) arrayType = resolveType(c, expr.left);
+    if (arrayType.error)
+        return Error(CometOperand, charptr, arrayType.as.error);
+
+    if (arrayType.as.success.typeKind != COMET_ARRAY) {
+        return Error(CometOperand, charptr, "Attempted to reassign an element of something that isn't an array!");
+    }
+
+    ResultType(CometType, charptr) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
+    if (exprType.error)
+        return Error(CometOperand, charptr, exprType.as.error);
+
+    ResultType(CometType, charptr) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    if (varType.error) 
+        return Error(CometOperand, charptr, varType.as.error);
+    
+    if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
+        buildListAt(c);
+    }
+
+    CometType resultType = unifyType(varType.as.success, exprType.as.success);
+    if (resultType.typeKind != varType.as.success.typeKind) {
+        return Error(CometOperand, charptr, "Attempted to reassign type of element in array at runtime!");
+    }
+
+    switch (node->data.AST_REASSIGN_STATEMENT.op.type) {
+        case CT_PLUS_EQ: {
+            buildAdd(c, resultType);
+            break;
+        }
+        case CT_MINUS_EQ: {
+            buildSub(c, resultType);
+            break;
+        }
+        case CT_TIMES_EQ: {
+            buildMul(c, resultType);
+            break;
+        }
+        case CT_DIVIDE_EQ: {
+            buildDiv(c, resultType);
+            break;
+        }
+        case CT_EQ: break;
+        default: {
+            
+
+            Estr errMsg = CREATE_ESTR("Cannot use operator \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
+            APPEND_ESTR(errMsg, "\" to reassign element of array!");
+            return Error(CometOperand, charptr, errMsg.str);
+        }
+    }
+
+    if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
+        visitLValue(c, expr.left);
+    }
+
+    buildListSet(c);
+
+    return Success(CometOperand, charptr, NO_OPERAND);
+}
 ResultType(CometOperand, charptr) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
     ResultType(CometOperand, charptr) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
 
-    if (node->data.AST_ASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // struct reassign
-        return visitFieldReassignStatement(c, node);
+    if (node->data.AST_REASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // infix reassign
+
+        struct AST_INFIX_EXPRESSION leftExpr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
+
+        if (leftExpr.op.type == CT_DOT) { // struct reassign
+            return visitFieldReassignStatement(c, node);
+        } else if (leftExpr.op.type == CT_AT) {
+            return visitArrayReassignStatement(c, node);
+        } else {
+            Estr errMsg = CREATE_ESTR("Cannot use operator \"");
+            APPEND_ESTR(errMsg, tokenTypeToCStr(leftExpr.op.type));
+            APPEND_ESTR(errMsg, "\" in reassignment.");
+            return Error(CometOperand, charptr, errMsg.str);
+        }
+        
     }
 
     ResultType(CometType, charptr) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
@@ -1101,6 +1179,12 @@ ResultType(CometOperand, charptr) visitInfixExpression(CometCompiler* c, CometAS
             break;
         }
 
+        // list access
+        case CT_AT: {
+            out = buildListAt(c);
+            break;
+        }
+
         default: {
             Estr errMsg = CREATE_ESTR("Invalid operator for int and int: \"");
             APPEND_ESTR(errMsg, tokenTypeToCStr(expr.op.type));
@@ -1127,7 +1211,7 @@ ResultType(CometOperand, charptr) visitFuncDefStatement(CometCompiler* c, CometA
     for (size_t argTypeIdx = 0; argTypeIdx < funcDef.args.count; argTypeIdx++) {
         CometASTNode* argNode = *get(funcDef.args, argTypeIdx);
 
-        ResultType(CometType, charptr) argType = getType(c, argNode);
+        ResultType(CometType, charptr) argType = getType(c, argNode->data.AST_ARG_DEF.type);
         if (argType.error)
             return Error(CometOperand, charptr, argType.as.error);
 
@@ -2020,12 +2104,14 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     CometTypeMapEntry boolType =   { .name = "bool",   .type = (CometType){.typeKind = COMET_BOOL}   };
     CometTypeMapEntry floatType =  { .name = "float",  .type = (CometType){.typeKind = COMET_FLOAT}  };
     CometTypeMapEntry doubleType = { .name = "double", .type = (CometType){.typeKind = COMET_DOUBLE} };
+    CometTypeMapEntry voidType = { .name = "void", .type = (CometType){.typeKind = COMET_VOID} };
     append(newCompiler->typeMap, smallType);
     append(newCompiler->typeMap, intType);
     append(newCompiler->typeMap, bigType);
     append(newCompiler->typeMap, boolType);
     append(newCompiler->typeMap, floatType);
     append(newCompiler->typeMap, doubleType);
+    append(newCompiler->typeMap, voidType);
     
     return Success(cometCompilerPtr, charptr, newCompiler);
 }

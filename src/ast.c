@@ -153,12 +153,6 @@ void freeNode(CometASTNode* node) {
             break;
         }
 
-        case AST_ARRAY_ACCESS: {
-            freeNode(node->data.AST_ARRAY_ACCESS.left);
-            freeNode(node->data.AST_ARRAY_ACCESS.expr);
-            break;
-        }
-
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));
             break;
@@ -226,8 +220,6 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_ARG_DEF";
         case AST_NEW_STATEMENT:
             return "AST_NEW_STATEMENT";
-        case AST_ARRAY_ACCESS:
-            return "AST_ARRAY_ACCESS";
 
         default:
             return "AST_UNKOWN (FIXME)";

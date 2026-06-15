@@ -82,6 +82,8 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_NOT";
         case CT_NOT_EQ:
             return "CT_NOT_EQ";
+        case CT_AT:
+            return "CT_AT";
         default:
             return "FIXME";
         

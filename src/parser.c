@@ -34,7 +34,7 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_DOT, PRECEDENCE_INDEX},
     {CT_EQ, PRECEDENCE_SET},
     {CT_OPEN_PAREN, PRECEDENCE_CALL},
-    {CT_OPEN_SQUARE, PRECEDENCE_INDEX},
+    {CT_AT, PRECEDENCE_INDEX},
 };
 
 ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser);
@@ -61,7 +61,6 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
 };
 
 ResultType(astNodePtr, charptr) parseFunctionCall(CometParser* parser, CometASTNode* left);
-ResultType(astNodePtr, charptr) parseArrayAccess(CometParser* parser, CometASTNode* left);
 ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left);
 const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_EQ, parseInfixExpression},
@@ -85,8 +84,8 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_NOT_EQ, parseInfixExpression},
     {CT_DOT, parseInfixExpression},
     {CT_EQ, parseInfixExpression},
-    {CT_OPEN_PAREN, parseFunctionCall},
-    {CT_OPEN_SQUARE, parseArrayAccess},
+    {CT_AT, parseInfixExpression},
+    {CT_OPEN_PAREN, parseFunctionCall}
 };
 
 // -- HELPER METHODS -- //
@@ -539,14 +538,6 @@ void printNode(CometASTNode* node) {
             printf("breakpoint\n");
             break;
 
-        case AST_ARRAY_ACCESS: {
-            printNode(node->data.AST_ARRAY_ACCESS.left);
-            printf("[");
-            printNode(node->data.AST_ARRAY_ACCESS.expr);
-            printf("]");
-            break;
-        }
-
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
             break;
@@ -765,7 +756,7 @@ ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
 
     CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, newList(astNodePtr), 0);
 
-    parserNextToken(parser); // consume '<'
+    parserNextToken(parser); // consume '['
 
     while (true) {
 
@@ -1211,24 +1202,6 @@ ResultType(astNodePtr, charptr) parseFunctionCall(CometParser* parser, CometASTN
     }
     CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, left, args.as.success);
     return Success(astNodePtr, charptr, funcCallNode);
-}
-
-ResultType(astNodePtr, charptr) parseArrayAccess(CometParser* parser, CometASTNode* left) {
-    // "left" is the array we're indexing
-    parserNextToken(parser);
-
-
-    // parse expression inbetween square brackets
-    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
-    if (expr.error)
-        return expr;
-
-    ResultType(int, charptr) expectClose = expectPeek(parser, CT_CLOSE_SQUARE);
-    if (expectClose.error)
-        return Error(astNodePtr, charptr, expectClose.as.error);
-
-    CometASTNode* arrayAccessNode = AST_NODE(AST_ARRAY_ACCESS, left, expr.as.success);
-    return Success(astNodePtr, charptr, arrayAccessNode);
 }
 
 ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
