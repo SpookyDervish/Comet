@@ -1,9 +1,12 @@
+func foo(int[*] arr) -> void {
+    arr : 0 = 4
+
+    return 0
+}
+
 func main() -> int {
-    int[3, 3] x = [
-        [1, 2, 3],
-        [1, 2, 3],
-        [1, 2, 3]
-    ]
+    int[3] x = [1, 2, 3]
+    foo(x)
 
     return x : 0
 }

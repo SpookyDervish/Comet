@@ -393,7 +393,7 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_WHILE_STATEMENT.expression);
             printf(" {\n");
             printNode(node->data.AST_WHILE_STATEMENT.program);
-            printf("       } :while");
+            printf("       }");
             break;
         case AST_BREAK_STATEMENT:
             printf("break");
@@ -429,8 +429,7 @@ void printNode(CometASTNode* node) {
             } else {
                 printf("{\n");
                 printNode(node->data.AST_FUNC_DEF_STATEMENT.program);
-                printf("       } :");
-                printNode(node->data.AST_FUNC_DEF_STATEMENT.ident);
+                printf("       }");
             }
 
             break;
@@ -450,8 +449,6 @@ void printNode(CometASTNode* node) {
                 printNode(node->data.AST_IF_STATEMENT.elseProgram);
                 printf("       } ");
             }
-
-            printf(":if");
             break;
         case AST_FOR_STATEMENT:
             printf("for ");
@@ -466,7 +463,7 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_FOR_STATEMENT.step);
             printf(" {\n");
             printNode(node->data.AST_FOR_STATEMENT.program);
-            printf("       } :for");
+            printf("       }");
             break;
 
         case AST_STRUCT_DEF_STATEMENT:

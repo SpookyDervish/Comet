@@ -57,8 +57,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    /*
+    // print AST
     printNode(ast.as.success);
     printf("\n");
+    */
 
     ResultType(cometCompilerPtr, charptr) compiler = newCompiler();
     if (compiler.error) {
