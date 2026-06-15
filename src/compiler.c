@@ -199,6 +199,37 @@ ResultType(CometOperand, charptr) visitValue(CometCompiler* c, CometASTNode* nod
             return Success(CometOperand, charptr, new);
         }
 
+        case AST_STRING: {
+            for (size_t i = 0; i < strlen(node->data.AST_STRING.value); i++) {
+                CometOperand charVal = createOperand(CO_IMMEDIATE);
+                charVal.imm.typeKind = COMET_SMALL;
+                charVal.imm.smallVal = node->data.AST_STRING.value[i];
+
+                CometOperand charIdx = storeConst(c, charVal);
+                buildPushConst(c, charIdx);
+            }
+
+            // push zero
+            CometOperand zero = createOperand(CO_IMMEDIATE);
+            zero.imm.typeKind = COMET_SMALL;
+            zero.imm.intVal = 0;
+
+            CometOperand zeroIdx = storeConst(c, zero);
+            buildPushConst(c, zeroIdx);
+
+            // push size
+            CometOperand sizeVal = createOperand(CO_IMMEDIATE);
+            sizeVal.imm.typeKind = COMET_INT;
+            sizeVal.imm.intVal = strlen(node->data.AST_STRING.value) + 1;
+
+            CometOperand sizeIdx = storeConst(c, sizeVal);
+            buildPushConst(c, sizeIdx);
+
+            CometOperand new = buildBuildList(c);
+
+            return Success(CometOperand, charptr, new);
+        }
+
         case AST_ARRAY: {
             for (size_t i = 0; i < node->data.AST_ARRAY.elements.count; i++) {
                 ResultType(CometOperand, charptr) elementValue = visitValue(c, *get(node->data.AST_ARRAY.elements, i));
@@ -380,6 +411,23 @@ ResultType(astNodeList, charptr) flattenPath(CometCompiler* c, CometASTNode* typ
     }
 
     return Success(astNodeList, charptr, flattenedTypes);
+}
+
+ResultType(CometType, charptr) getTypeByName(CometCompiler* c, char* typeName) {
+    List(CometTypeMapEntry) typeMap = c->typeMap;
+
+    for (size_t i = 0; i < typeMap.count; i++) {
+        CometTypeMapEntry type = *get(typeMap, i);
+
+        if (strcmp(type.name, typeName) == 0) {
+            return Success(CometType, charptr, type.type);
+        }
+    }
+
+    Estr errMsg = CREATE_ESTR("Cannot find type with name \"");
+    APPEND_ESTR(errMsg, typeName);
+    APPEND_ESTR(errMsg, "\"");
+    return Error(CometType, charptr, errMsg.str);
 }
 
 ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode) {
@@ -666,6 +714,10 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
         case AST_INT: outTypeKind = COMET_INT; break;
         case AST_BOOL: outTypeKind = COMET_BOOL; break;
         case AST_DOUBLE: outTypeKind = COMET_DOUBLE; break;
+
+        case AST_STRING: {
+            return getTypeByName(c, "string");
+        }
 
         case AST_ARRAY: {
             List(astNodePtr) elements = node->data.AST_ARRAY.elements;
@@ -2174,6 +2226,24 @@ ResultType(cometCompilerPtr, charptr) newCompiler() {
     append(newCompiler->typeMap, floatType);
     append(newCompiler->typeMap, doubleType);
     append(newCompiler->typeMap, voidType);
+
+    // string type
+    CometType stringType;
+    stringType.typeKind = COMET_ARRAY;
+
+    CometArrayType* stringArrayType = calloc(1, sizeof(CometArrayType));
+
+    CometType* charType = malloc(sizeof(CometType));
+    charType->typeKind = COMET_SMALL;
+
+    stringArrayType->elem = charType;
+    stringType.arrayType = stringArrayType;
+
+    CometTypeMapEntry stringTypeEntry = { .name = "string", .type = stringType};
+    append(newCompiler->typeMap, stringTypeEntry);
+
+
+    // return new compiler
     
     return Success(cometCompilerPtr, charptr, newCompiler);
 }

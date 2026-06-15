@@ -1,12 +1,4 @@
-func foo(int[*] arr) -> void {
-    arr : 0 = 4
-
-    return 0
-}
-
 func main() -> int {
-    int[3] x = [1, 2, 3]
-    foo(x)
-
+    string x = "Hello, World!"
     return x : 0
 }
