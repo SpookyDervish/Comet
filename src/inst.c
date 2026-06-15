@@ -19,19 +19,18 @@ bool typesAreEqual(CometType a, CometType b) {
         
         for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
 
-            if (!(typesAreEqual(a.arrayType->elem[i], b.arrayType->elem[i]))) {
+            if (!(typesAreEqual(*a.arrayType->elem, *b.arrayType->elem))) 
                 return false;
-            }
 
-            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i]) {
+            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i]) 
                 return false;
-            }
 
             if (!a.arrayType->isFixedSize[i])
                 return true;
-            
-            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i])
+
+            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i]) 
                 return false;
+            
         }
     }
 

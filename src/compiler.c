@@ -426,9 +426,6 @@ ResultType(CometType, charptr) getType(CometCompiler* c, CometASTNode* typeNode)
             }
 
             CometASTNode* shapeNode = *get(type.shape, i);
-            printf("shape = ");
-            printNode(shapeNode);
-            printf("\n");
 
             if (shapeNode->nodeType == AST_INT) {
                 arrayType->isFixedSize[i] = true;
@@ -696,10 +693,10 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
             if (firstType.typeKind == COMET_ARRAY) {
                 // Copy the child's dimensions, shifting them down by 1 level
                 for (size_t d = 0; d < MAX_ARRAY_DEPTH - 1; d++) {
-                    arrayType->elem[d + 1] = firstType.arrayType->elem[d];
                     arrayType->isFixedSize[d + 1] = firstType.arrayType->isFixedSize[d];
                     arrayType->fixedSize[d + 1] = firstType.arrayType->fixedSize[d];
                 }
+
                 // The immediately nested element type is the child's element type
                 arrayType->elem = firstType.arrayType->elem;
             } else {
@@ -707,7 +704,10 @@ ResultType(CometType, charptr) resolveType(CometCompiler* c, CometASTNode* node)
                 CometType* scalarType = malloc(sizeof(CometType));
                 *scalarType = firstType;
                 arrayType->elem = scalarType;
-                arrayType->isFixedSize[1] = false; // Mark end of nesting depth
+
+                for (size_t i = 1; i < MAX_ARRAY_DEPTH; i++) {
+                    arrayType->isFixedSize[i] = false;
+                }
             }
 
             // 4. Validate that all *other* elements in this literal match the first one
