@@ -84,45 +84,6 @@ FORCE_INLINE int64_t popValue(CometVM* vm) {
     return value;
 }
 
-int64_t serializeValue(CometOperand value) {
-    if (value.type == CO_SYMBOL) {
-        return value.symbolIdx;
-    }
-
-    switch (value.imm.typeKind) {
-        case COMET_SMALL   : return value.imm.smallVal;
-        case COMET_INT     : return value.imm.intVal;
-        case COMET_BIG     : return value.imm.bigVal;
-        case COMET_BOOL    : return value.imm.boolVal;
-        case COMET_STRUCT  : return (int64_t)value.imm.objectVal;
-        case COMET_FLOAT   : {
-            int64_t serialized;
-            memcpy(&serialized, &value.imm.floatVal, sizeof(float));
-            return serialized;
-        }
-        case COMET_DOUBLE  : {
-            int64_t serialized;
-            memcpy(&serialized, &value.imm.doubleVal, sizeof(double));
-            return serialized;
-        }
-        default: return 0;
-    }
-}
-
-CometOperand deserializeValue(int64_t value, CometType type) {
-    switch (type.typeKind) {
-        case COMET_SMALL   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_SMALL,  .imm.smallVal = value };
-        case COMET_INT     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_INT,    .imm.intVal = value };
-        case COMET_BIG     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_BIG,    .imm.bigVal = value };
-        case COMET_FLOAT   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_FLOAT,  .imm.floatVal = value };
-        case COMET_DOUBLE  : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_DOUBLE, .imm.doubleVal = value };
-        case COMET_BOOL    : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_BOOL,   .imm.boolVal = value };
-        case COMET_FUNCTION: return (CometOperand){ .type = CO_SYMBOL, .symbolIdx = value };
-        case COMET_STRUCT  : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_STRUCT, .imm.objectVal = (CometObject*)value };
-        default: return  (CometOperand){ .type = CO_NONE };
-    }
-}
-
 void pushImm(CometVM* vm, CometImmediate imm) {
     switch (imm.typeKind) {
         case COMET_SMALL: pushValue(vm, (int64_t)imm.smallVal); break;
@@ -175,7 +136,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
     uint8_t numArgs = function->isVarArgs ? callArgs : function->numArgs;
 
     if (function->isExternal) {
-        CometOperand args[numArgs];
+        int64_t args[numArgs];
         CometType* argTypes = function->argTypes;
 
         for (int8_t argIdx = numArgs; argIdx > 0; argIdx--) {
@@ -183,12 +144,12 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
                                     argTypes[argIdx-1] :
                                     (CometType){ .typeKind = COMET_BIG };
 
-            args[argIdx - 1] = deserializeValue(popValue(vm), argType);
+            args[argIdx - 1] = popValue(vm);
         }
 
-        CometOperand returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+        int64_t returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
 
-        pushValue(vm, serializeValue(returnValue));
+        pushValue(vm, returnValue);
 
         return;
     }
@@ -227,6 +188,9 @@ void buildList(CometVM* vm) {
         assert(size < 0);
     }
 
+    // create list object
+    CometSerializedArray* array = malloc(sizeof(CometSerializedArray));
+
     // malloc list
     int64_t* arrayData = calloc(size, sizeof(int64_t));
 
@@ -235,8 +199,12 @@ void buildList(CometVM* vm) {
         arrayData[i - 1] = popValue(vm);
     }
 
+    array->data = arrayData;
+    array->capacity = (uint64_t)size;
+    array->elemType = (CometType){ .typeKind = COMET_SMALL };
+
     // push array onto stack
-    pushValue(vm, (int64_t)arrayData);
+    pushValue(vm, (int64_t)array);
 }
 
 FORCE_INLINE CometSerializedInst fetchNextInst(CometVM* vm) {
@@ -634,20 +602,38 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     }
     LIST_AT: {
         int64_t index = popValue(vm);
-        int64_t* array = (int64_t*)popValue(vm);
+        CometSerializedArray* array = (CometSerializedArray*)popValue(vm);
+
+        uint64_t capacity = array->capacity;
+
+        if (index < 0) index = capacity + index;
+        if (index < 0 || index >= capacity) {
+            char* buffer = malloc(128);
+            snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
+            return Error(voidPtr, charptr, "Arr");
+        }
 
         pushValue(
             vm, 
-            array[index]
+            array->data[index]
         );
         DISPATCH();
     }
     LIST_SET: {
         int64_t index = popValue(vm);
-        int64_t* array = (int64_t*)popValue(vm);
+        CometSerializedArray* array = (CometSerializedArray*)popValue(vm);
         int64_t newValue = popValue(vm);
 
-        array[index] = newValue;
+        uint64_t capacity = array->capacity;
+
+        if (index < 0) index = capacity + index;
+        if (index < 0 || index >= capacity) {
+            char* buffer = malloc(128);
+            snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
+            return Error(voidPtr, charptr, "Arr");
+        }
+
+        array->data[index] = newValue;
         DISPATCH();
     }
     BREAKPOINT: {

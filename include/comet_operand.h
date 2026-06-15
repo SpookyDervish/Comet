@@ -17,8 +17,7 @@ typedef enum {
 } CometOperandKind;
 
 typedef struct {
-    uint32_t length;
-    uint32_t capacity;
+    uint64_t capacity;
     CometOperand* data;
 } CometArray;
 
@@ -33,7 +32,7 @@ typedef struct {
         double doubleVal;
         bool boolVal;
         CometObject* objectVal;
-        CometArray* arrayVal;
+        CometArray arrayVal;
         CometEnvironment* moduleVal;
         CometType typeVal;
     };

@@ -81,6 +81,12 @@ typedef struct {
 } CometSerializedStructHeader;
 
 typedef struct {
+    int64_t* data;
+    uint64_t capacity;
+    CometType elemType;
+} CometSerializedArray;
+
+typedef struct {
     char magic[5];
     uint8_t version;
     uint32_t numConsts;

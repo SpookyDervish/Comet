@@ -23,6 +23,7 @@
 #define cometTypeDouble (CometType){.typeKind = COMET_DOUBLE}
 #define cometTypeBool (CometType){.typeKind = COMET_BOOL}
 #define cometTypeVoid (CometType){.typeKind = COMET_VOID}
+#define cometTypeString (CometType){.typeKind = COMET_ARRAY}
 
 #define on_import void onImport(CometEnvironment* env)
 
@@ -49,5 +50,9 @@ API_EXPORT CometSerializedStruct* cometCreateStruct(List(CometSerializedFunc) me
 API_EXPORT CometOperand cometCreateObject(CometSerializedStruct* structType);
 
 API_EXPORT CometOperand cometValue(CometValueTypeKind valueType, ...);
+
+API_EXPORT int64_t serializeValue(CometOperand value);
+API_EXPORT CometOperand deserializeValue(int64_t value, CometType type);
+API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType);
 
 #endif

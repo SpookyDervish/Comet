@@ -1,4 +1,6 @@
+import io
+
 func main() -> int {
-    string x = "Hello, World!"
-    return x : 0
+    small test = io.print("Hello, World!")
+    return test
 }

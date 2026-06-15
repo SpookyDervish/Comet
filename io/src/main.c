@@ -1,9 +1,14 @@
-#include "../../include/cometlib.h"
+#include <comet/cometlib.h>
 
-CometOperand impl_print(CometOperand* args, CometVM* vm) {
-    return cometValue(COMET_INT, args[0].imm.intVal - args[1].imm.intVal);
+int64_t impl_print(int64_t* args, CometVM* vm) {
+    CometOperand formatStringArray = deserializeValue(args[0], cometTypeString);
+    char* formatString = (char*)cometArrayToCArray(formatStringArray, cometTypeSmall);
+
+    printf("%s\n", formatString);
+
+    return 0;
 }
 
 on_import {
-    cometDefineFunc(env, "print", cometTypeVoid, 1, true, cometTypeBig);
+    cometDefineFunc(env, "print", cometTypeSmall, 1, true, cometTypeString);
 }
