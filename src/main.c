@@ -10,7 +10,7 @@
 #include "../lib/ansi.h"
 
 
-#define VERSION_NUMBER "0.5.0"
+#define VERSION_NUMBER "0.6.0"
 
 
 int main(int argc, char** argv) {
@@ -30,65 +30,47 @@ int main(int argc, char** argv) {
     }
 
     // compile file
-    char* source = getFileContents(args.as.success.filePath);
+    char* filePath = args.as.success.filePath;
+    char* source = getFileContents(filePath);
 
-    ErrorMessage errMsg = createError("InvalidSyntax", "Unexpected token \"#\"", NULL, 1);
-    createErrorRegion(&errMsg, "here", ESC_RED_FG, 1, 1);
-    printErrorMessage(errMsg, source);
-
-    return 0;
-
-    ResultType(CometLexer, charptr) lexer = newLexer(source);
-    ResultType(tokenList, charptr) tokens = lex(&lexer.as.success);
+    CometLexer lexer = newLexer(source, filePath);
+    ResultType(tokenList, ErrorMessage) tokens = lex(&lexer);
 
     if (tokens.error) {
-        fprintf(stderr, "lexer error: %s\n", tokens.as.error);
+        printErrorMessage(tokens.as.error);
         return 1;
     }
 
-    /*
-    // print tokens
-    for (size_t i = 0; i < tokens.as.success.count; i++) {
-        printf("%s\n", tokenToCStr(*get(tokens.as.success, i)));
-    }
-    */
-    
-    ResultType(parserPtr, charptr) parser = newParser(tokens.as.success);
+    ResultType(parserPtr, ErrorMessage) parser = newParser(tokens.as.success);
     if (parser.error) {
-        fprintf(stderr, "error while creating parser: %s\n", parser.as.error);
+        printErrorMessage(parser.as.error);
         return 1;
     }
 
-    ResultType(astNodePtr, charptr) ast = buildAST(parser.as.success);
+    ResultType(astNodePtr, ErrorMessage) ast = buildAST(parser.as.success);
     if (ast.error) {
-        fprintf(stderr, "error while building ast: %s\n", ast.as.error);
+        printErrorMessage(ast.as.error);
         return 1;
     }
 
-    /*
-    // print AST
-    printNode(ast.as.success);
-    printf("\n");
-    */
-
-    ResultType(cometCompilerPtr, charptr) compiler = newCompiler();
+    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(filePath, source);
     if (compiler.error) {
         freeNode(ast.as.success);
-        fprintf(stderr, "error while creating compiler: %s\n", ast.as.error);
+        printErrorMessage(compiler.as.error);
         return 1;
     }
 
-    ResultType(CometOperand, charptr) compileResult = compile(compiler.as.success, ast.as.success);
+    ResultType(CometOperand, ErrorMessage) compileResult = compile(compiler.as.success, ast.as.success);
     if (compileResult.error) {
         freeNode(ast.as.success);
-        fprintf(stderr, "error while compiling: %s\n", compileResult.as.error);
+        printErrorMessage(compileResult.as.error);
         return 1;
     }
 
-    ResultType(voidPtr, charptr) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath);
+    ResultType(voidPtr, ErrorMessage) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath);
     if (writeSuccess.error) {
         freeNode(ast.as.success);
-        fprintf(stderr, "error while writing output: %s\n", writeSuccess.as.error);
+        printErrorMessage(writeSuccess.as.error);
         return 1;
     }
 

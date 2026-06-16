@@ -14,4 +14,8 @@ char *repl_str(const char *str, const char *from, const char *to);
 // The caller is responsible for freeing the returned memory.
 char *getLineInString(const char *str, int target_line);
 
+// returns a dynamically allocated string containing the repeated string.
+// The caller is responsible for freeing the returned memory.
+char* repeatString(const char* str, int times);
+
 #endif

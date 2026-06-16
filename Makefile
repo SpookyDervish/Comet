@@ -8,7 +8,7 @@ CC=gcc
 CXX=g++
 CFLAGS=-Wall -Wextra -Wno-trigraphs -O3 -rdynamic
 LDFLAGS=
-LDLIBS=
+LDLIBS=-lm
 DEBUG_CFLAGS=-Wall -Wextra -Wno-trigraphs -ggdb -g -rdynamic -fsanitize=address 
 
 COMPILER_TARGET=cometc

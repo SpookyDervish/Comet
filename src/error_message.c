@@ -4,73 +4,108 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <math.h>
 
-ErrorRegion getRegion(ErrorMessage errMsg, int64_t i) {
-    if (i < 0)
-        i = errMsg.regions.count + i;
-
-    return *get(errMsg.regions, i);
-}
-
-void printErrorMessage(ErrorMessage errMsg, char* sourceCode) {
-    char* errorLineSource = getLineInString(sourceCode, errMsg.lineNumber);
-    if (errorLineSource == NULL)
+void printErrorMessage(ErrorMessage errMsg) {
+    char* errorLineSource = getLineInString(errMsg.sourceCode, errMsg.lineNumber);
+    bool lineSourceOwned = true;
+    if (errorLineSource == NULL) {
         errorLineSource = "??? (something REALLLYYY bad has happened)";
-    
-
-    // Error: SyntaxError
-    fprintf(stderr, ESC_BOLD "Error: " ESC_RED_FG ESC_UNDERLINE "%s\n" ESC_RESET, errMsg.errType);
-
-    //    × Unexpected token "#"
-    fprintf(stderr, ESC_BOLD ESC_RED_FG "   ×" ESC_RESET " %s\n", errMsg.message);
-    //     ╭─[line 1, column 1:1]
-    fprintf(stderr, "    ╭─[line %d, column %d:%d]\n", errMsg.lineNumber, getRegion(errMsg, 0).colStart, getRegion(errMsg, -1).colEnd);
-    //   1 │ # hello 
-    fprintf(stderr, ESC_DIM "  %d " ESC_RESET "│ %s\n", errMsg.lineNumber, errorLineSource);
-    //     . ┰ 
-    for (size_t i = 0; i < errMsg.regions.count; i++) {
-        
+        lineSourceOwned = false;
     }
 
-    //     . ╰─ here
-    //     ╰─
+    static const unsigned int linesToShow = 5; // 5 total - 2 above, 2 below
+
+    if (!errMsg.isWarning) {
+        // Error: SyntaxError
+        fprintf(stderr, ESC_BOLD "Error: " ESC_RED_FG ESC_UNDERLINE "%s\n" ESC_RESET, errMsg.errType);
+
+        //    × Unexpected token "#"
+        fprintf(stderr, ESC_BOLD ESC_RED_FG "   ×" ESC_RESET " %s\n", errMsg.message);
+    } else {
+        fprintf(stderr, ESC_BOLD "Warning: " ESC_YELLOW_FG ESC_UNDERLINE "%s\n" ESC_RESET, errMsg.errType);
+
+        fprintf(stderr, ESC_BOLD ESC_YELLOW_FG "   ǃ" ESC_RESET " %s\n", errMsg.message);
+    }
+
+    fprintf(
+        stderr,
+        "\n    ╭─ " ESC_BRIGHT_BLUE_FG ESC_BOLD "%s" ESC_RESET " [line %d, column %d:%d]\n",
+        errMsg.fileName,
+        errMsg.lineNumber,
+        errMsg.startCol,
+        errMsg.endCol
+    );
+
+    int half = floor((float)linesToShow / 2);
+    int startLine = errMsg.lineNumber - half;
+
+    if (startLine < 0)
+        startLine = 0;
+
+    int endLine = errMsg.lineNumber + (linesToShow - (errMsg.lineNumber - startLine));
+
+
+    for (unsigned int lineNumber = startLine + 1; lineNumber < endLine + 1; lineNumber++) {
+        char* line = getLineInString(errMsg.sourceCode, lineNumber);
+        if (line == NULL)
+            break;
+
+        fprintf(stderr, "    │  " ESC_DIM "%d" ESC_RESET "  %s\n", lineNumber, line);
+        if (lineNumber == errMsg.lineNumber) {
+            fprintf(stderr, "    ┊     ");
+            
+            char* padding = repeatString(" ", errMsg.startCol-1);
+            int underlineLen = errMsg.endCol - errMsg.startCol + 1;
+            char underline[underlineLen+1] = {};
+            underline[0] = '^';
+
+            char* middle = repeatString("-", underlineLen-1);
+            strcat(underline, middle);
+
+            underline[underlineLen] = 0;
+
+            if (!errMsg.isWarning)
+                fprintf(stderr, ESC_BOLD ESC_RED_FG "%s%s\n" ESC_RESET, padding, underline);
+            else
+                fprintf(stderr, ESC_BOLD ESC_YELLOW_FG "%s%s\n" ESC_RESET, padding, underline);
+
+        }
+    } 
+    
+
+    if (errMsg.help != NULL) {
+        fprintf(stderr, "    ╰────❯ " ESC_CYAN_FG ESC_DIM "help" ESC_RESET ": %s", errMsg.help);
+    } else {
+        fprintf(stderr, "    ╰────<\n");
+    }
 
 }
 
-ErrorMessage createError(char* errType, char* message, char* help, uint32_t lineNumber) {
+ErrorMessage createError(char* fileName, char* sourceCode, char* errType, char* message, char* help, uint32_t lineNumber, uint32_t startCol, uint32_t endCol) {
     return (ErrorMessage){
+        fileName,
+        sourceCode,
         message,
         errType,
         false,
         help,
-        newList(ErrorRegion),
+        startCol,
+        endCol,
         lineNumber
     };
 }
 
-ErrorMessage createWarning(char* errType, char* message, char* help, uint32_t lineNumber) {
+ErrorMessage createWarning(char* fileName, char* sourceCode, char* errType, char* message, char* help, uint32_t lineNumber, uint32_t startCol, uint32_t endCol) {
     return (ErrorMessage){
+        fileName,
+        sourceCode,
         message,
         errType,
         true,
         help,
-        newList(ErrorRegion),
+        startCol,
+        endCol,
         lineNumber
     };
-}
-
-void destroyError(ErrorMessage errMsg) {
-    destroy(errMsg.regions);
-}
-
-void createErrorRegion(ErrorMessage* errMsg, char* message, char* style, uint32_t colStart, uint32_t colEnd) {
-    ErrorRegion newRegion = {
-        colStart,
-        colEnd,
-        style,
-        message
-    };
-
-
-    append(errMsg->regions, newRegion);
 }

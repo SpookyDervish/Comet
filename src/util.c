@@ -156,3 +156,27 @@ char *getLineInString(const char *str, int target_line) {
 
     return NULL; // Return NULL if the line number does not exist
 }
+
+char* repeatString(const char* str, int times) {
+    // handle zero
+    if (times < 1) {
+        char* result = malloc(1);
+        if (result == NULL) 
+            return NULL;
+        
+        result[0] = 0;
+        return result;
+    }
+
+    char* result = malloc(strlen(str) * times + 1);
+    if (result == NULL)
+        return NULL;
+
+    strcpy(result, str);
+
+    for (int i = 1; i < times; i++) {
+        strcat(result, str);
+    }
+
+    return result;
+}

@@ -19,16 +19,16 @@ typedef void* voidPtr;
 
 typedef List(astNodePtr) astNodeList;
 
-Result(voidPtr, charptr);
-Result(CometType, charptr);
-Result(astNodeList, charptr);
-Result(CometFunctionTypeInfo, charptr);
+Result(voidPtr, ErrorMessage);
+Result(CometType, ErrorMessage);
+Result(astNodeList, ErrorMessage);
+Result(CometFunctionTypeInfo, ErrorMessage);
+Result(cometCompilerPtr, ErrorMessage);
 
 
-
-ResultType(CometOperand, charptr) compile(CometCompiler* c, CometASTNode* node);
-ResultType(cometCompilerPtr, charptr) newCompiler();
-ResultType(voidPtr, charptr) outputToFile(CometCompiler* c, const char* filePath);
+ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* node);
+ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode);
+ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath);
 CometOperand createOperand(CometOperandKind type);
 
 

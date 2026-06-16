@@ -63,6 +63,7 @@ UseList(astNodePtr);
 
 struct CometASTNode {
     CometASTNodeType nodeType;
+    
     union {
         struct AST_INT { int64_t number; } AST_INT;
         struct AST_DOUBLE { double number; } AST_DOUBLE;
@@ -142,6 +143,10 @@ struct CometASTNode {
         struct AST_BREAKPOINT_STATEMENT {} AST_BREAKPOINT_STATEMENT;
 
     } data;  
+
+    uint32_t lineNum;
+    uint32_t startCol;
+    uint32_t endCol;
 };
 
 // put a node on the heap

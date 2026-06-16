@@ -43,6 +43,10 @@ typedef struct {
         double doubleVal;
         bool boolVal;
     } value;
+
+    uint32_t startCol;
+    uint32_t endCol;
+    uint32_t lineNum;
 } CometToken;
 
 char* tokenTypeToCStr(CometTokenType tokType);

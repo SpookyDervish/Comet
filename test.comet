@@ -1,4 +1,0 @@
-func main() -> int {
-    int y = x + 5
-    return 0
-}

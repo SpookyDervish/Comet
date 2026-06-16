@@ -32,22 +32,18 @@ const char* KEYWORDS[] = {
     "breakpoint"
 };
 
-#define TOKEN_LITERAL(tokType, tokValue) (CometToken){ .literalType = CL_STRING, .type = tokType, .value.literal = tokValue }
+#define TOKEN_LITERAL(tokType, tokValue, lexer) (CometToken){ .literalType = CL_STRING, .type = tokType, .value.literal = tokValue, .lineNum = lexer->lineNum, .startCol = lexer->column - strlen(tokValue), .endCol = lexer->column }
+#define TOKEN_CHAR(tokType, tokValue, lexer) (CometToken){ .literalType = CL_STRING, .type = tokType, .value.literal = tokValue, .lineNum = lexer->lineNum, .startCol = lexer->column, .endCol = lexer->column }
 
-/*
-Allocate a new lexer.
 
-YOU MUST FREE THE LEXER WHEN YOU'RE DONE WITH IT.
-*/
-ResultType(CometLexer, charptr) newLexer(char* source) {
-    CometLexer newLexer = {
+CometLexer newLexer(char* source, char* filePath) {
+    return (CometLexer){
         .source = source,
         .sourceLen = strlen(source),
         .pos = 0,
-        .currentChar = source[0]
+        .currentChar = source[0],
+        .filePath = filePath
     };
-
-    return Success(CometLexer, charptr, newLexer);
 }
 
 ResultType(Nothing, charptr) lexerConsume(CometLexer* lexer) {
@@ -88,21 +84,22 @@ bool isBoolean(char* buffer) {
     return false;
 }
 
-ResultType(CometToken, charptr) booleanToken(char* buffer) {
-    CometToken tok = {
+CometToken booleanToken(char* buffer) {
+    return (CometToken){
         .literalType = CL_BOOL,
         .value.boolVal = strcmp(buffer, "true") == 0,
         .type = CT_BOOL_LITERAL
     };
-
-    return Success(CometToken, charptr, tok);
 }
 
-ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
+ResultType(CometToken, ErrorMessage) lexerParseWord(CometLexer* lexer) {
     CometToken tok;
 
     size_t bufferSize = 1;
-    unsigned int bufferPos = 0;
+
+    uint32_t startColumn = lexer->column;
+
+    uint32_t bufferPos = 0;
     char* buffer = malloc(bufferSize);
 
     while (lexer->pos < lexer->sourceLen) {
@@ -120,7 +117,19 @@ ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
             char* newPtr = realloc(buffer, bufferSize);
             if (!newPtr) {
                 free(buffer);
-                return Error(CometToken, charptr, "lexerParseWord: failed to allocate memory while increasing buffer size!");
+
+                ErrorMessage errMsg = createError(
+                    lexer->filePath,
+                    lexer->source,
+                    "MemoryAllocFail",
+                    "lexerParseWord: failed to allocate memory while increasing buffer size",
+                    NULL,
+                    lexer->lineNum,
+                    startColumn,
+                    lexer->column
+                );
+
+                return Error(CometToken, ErrorMessage, errMsg);
             }
 
             buffer = newPtr;
@@ -142,9 +151,9 @@ ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
         tok.type = CT_KEYWORD;
     } else if (isBoolean(buffer)) {
 
-        ResultType(CometToken, charptr) boolTok = booleanToken(buffer);
+        CometToken boolTok = booleanToken(buffer);
         free(buffer);
-        return boolTok;
+        return Success(CometToken, ErrorMessage, boolTok);
 
     } else {
         tok.type = CT_IDENT;
@@ -152,14 +161,17 @@ ResultType(CometToken, charptr) lexerParseWord(CometLexer* lexer) {
 
     tok.value.literal = buffer;
 
-    return Success(CometToken, charptr, tok);
+    return Success(CometToken, ErrorMessage, tok);
 }
 
-ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
+ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
     CometToken tok;
 
     size_t bufferSize = 1;
-    unsigned int bufferPos = 0;
+
+    uint32_t startColumn = lexer->column;
+
+    uint32_t bufferPos = 0;
     char* buffer = malloc(bufferSize);
 
     bool isNegative = false;
@@ -172,7 +184,19 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
         if (current == '-') {
             if (isNegative) {
                 free(buffer);
-                return Error(CometToken, charptr, "Malformed number! (has multiple negative signs)");
+
+                ErrorMessage errMsg = createError(
+                    lexer->filePath,
+                    lexer->source,
+                    "InvalidSyntax",
+                    "Malformed number! (has multiple negative signs)",
+                    NULL,
+                    lexer->lineNum,
+                    startColumn,
+                    lexer->column
+                );
+
+                return Error(CometToken, ErrorMessage, errMsg);
             }
 
             isNegative = true;
@@ -180,7 +204,19 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
 
             if (isFloat) {
                 free(buffer);
-                return Error(CometToken, charptr, "Malformed number! (has multiple dots)");
+
+                ErrorMessage errMsg = createError(
+                    lexer->filePath,
+                    lexer->source,
+                    "InvalidSyntax",
+                    "Malformed number! (has multiple dots)",
+                    NULL,
+                    lexer->lineNum,
+                    startColumn,
+                    lexer->column
+                );
+
+                return Error(CometToken, ErrorMessage, errMsg);
             }
 
             isFloat = true;
@@ -201,7 +237,19 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
             char* newPtr = realloc(buffer, bufferSize);
             if (!newPtr) {
                 free(buffer);
-                return Error(CometToken, charptr, "lexerParseNumber: failed to allocate memory while increasing buffer size!");
+
+                ErrorMessage errMsg = createError(
+                    lexer->filePath,
+                    lexer->source,
+                    "MemoryAllocFail",
+                    "lexerParseNumber: failed to allocate memory while increasing buffer size",
+                    NULL,
+                    lexer->lineNum,
+                    startColumn,
+                    lexer->column
+                );
+
+                return Error(CometToken, ErrorMessage, errMsg);
             }
 
             buffer = newPtr;
@@ -228,17 +276,19 @@ ResultType(CometToken, charptr) lexerParseNumber(CometLexer* lexer) {
         tok.value.intVal = strtoll(buffer, NULL, 10);
     }
 
-    return Success(CometToken, charptr, tok);
+    return Success(CometToken, ErrorMessage, tok);
 }
 
-ResultType(CometToken, charptr) lexerParseString(CometLexer* lexer, char startingQuote) {
+ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char startingQuote) {
     CometToken tok = {
         .literalType = CL_STRING,
         .type = CT_STRING_LITERAL
     };
 
+    uint32_t startColumn = lexer->column;
+
     size_t bufferSize = 1;
-    unsigned int bufferPos = 0;
+    uint32_t bufferPos = 0;
     char* buffer = malloc(bufferSize);
 
     lexerConsume(lexer); // consume first quote
@@ -258,7 +308,18 @@ ResultType(CometToken, charptr) lexerParseString(CometLexer* lexer, char startin
             char* newPtr = realloc(buffer, bufferSize);
             if (!newPtr) {
                 free(buffer);
-                return Error(CometToken, charptr, "lexerParseString: failed to allocate memory while increasing buffer size!");
+                ErrorMessage errMsg = createError(
+                    lexer->filePath,
+                    lexer->source,
+                    "MemoryAllocFail",
+                    "lexerParseString: failed to allocate memory while increasing buffer size",
+                    NULL,
+                    lexer->lineNum,
+                    startColumn,
+                    lexer->column
+                );
+
+                return Error(CometToken, ErrorMessage, errMsg);
             }
 
             buffer = newPtr;
@@ -277,10 +338,10 @@ ResultType(CometToken, charptr) lexerParseString(CometLexer* lexer, char startin
 
     tok.value.literal = buffer;
 
-    return Success(CometToken, charptr, tok);
+    return Success(CometToken, ErrorMessage, tok);
 }
 
-ResultType(tokenList, charptr) lex(CometLexer* lexer) {
+ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
     List(CometToken) tokens = newList(CometToken);
 
     while (lexer->pos < lexer->sourceLen) {
@@ -294,21 +355,32 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 ResultType(char, charptr) next = lexerPeek(lexer);
 
                 if (next.error || next.as.success != '=') {
-                    append(tokens, TOKEN_LITERAL(CT_NOT, "!"));
+                    append(tokens, TOKEN_CHAR(CT_NOT, "!", lexer));
                     break;
                 }
                 lexerConsume(lexer);
 
                 if (next.as.success == '=') {
                     
-                    append(tokens, TOKEN_LITERAL(CT_NOT_EQ, "!="));
+                    append(tokens, TOKEN_LITERAL(CT_NOT_EQ, "!=", lexer));
                 } else {
                     if (isspace(next.as.success)) {
-                        append(tokens, TOKEN_LITERAL(CT_NOT, "!"))
+                        append(tokens, TOKEN_LITERAL(CT_NOT, "!", lexer))
                         break;
                     }  
 
-                    return Error(tokenList, charptr, "Expected '=' after '!'.");
+                    ErrorMessage errMsg = createError(
+                        lexer->filePath,
+                        lexer->source,
+                        "InvalidSyntax",
+                        "Expected '=' after '!'",
+                        NULL,
+                        lexer->lineNum,
+                        lexer->column,
+                        lexer->column
+                    );
+
+                    return Error(tokenList, ErrorMessage, errMsg);
                 }
 
                 break;
@@ -317,44 +389,55 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                 ResultType(char, charptr) next = lexerPeek(lexer);
 
                 if (next.error) {
-                    append(tokens, TOKEN_LITERAL(CT_EQ, "="));
+                    append(tokens, TOKEN_CHAR(CT_EQ, "=", lexer));
                     break;
                 }
                 lexerConsume(lexer);
 
                 if (next.as.success == '=') {
                     
-                    append(tokens, TOKEN_LITERAL(CT_EQ_EQ, "=="));
+                    append(tokens, TOKEN_LITERAL(CT_EQ_EQ, "==", lexer));
                  } else if (next.as.success == '>') {
-                    append(tokens, TOKEN_LITERAL(CT_INLINE_FUNC_ARROW, "=>"))
+                    append(tokens, TOKEN_LITERAL(CT_INLINE_FUNC_ARROW, "=>", lexer))
                  } else {
                     if (isspace(next.as.success)) {
-                        append(tokens, TOKEN_LITERAL(CT_EQ, "="))
+                        append(tokens, TOKEN_CHAR(CT_EQ, "=", lexer))
                         break;
                     }  
 
-                    return Error(tokenList, charptr, "Expected '=' or '>' after '='.");
+                    ErrorMessage errMsg = createError(
+                        lexer->filePath,
+                        lexer->source,
+                        "InvalidSyntax",
+                        "Expected '=' or '>' after '='",
+                        NULL,
+                        lexer->lineNum,
+                        lexer->column,
+                        lexer->column
+                    );
+
+                    return Error(tokenList, ErrorMessage, errMsg);
                  }
 
                 break; 
             }
-            case '{': append(tokens, TOKEN_LITERAL(CT_OPEN_CURLY, "{")); break;
-            case '}': append(tokens, TOKEN_LITERAL(CT_CLOSE_CURLY, "}")); break;
-            case '(': append(tokens, TOKEN_LITERAL(CT_OPEN_PAREN, "(")); break;
-            case ')': append(tokens, TOKEN_LITERAL(CT_CLOSE_PAREN, ")")); break;
-            case '[': append(tokens, TOKEN_LITERAL(CT_OPEN_SQUARE, "[")); break;
-            case ']': append(tokens, TOKEN_LITERAL(CT_CLOSE_SQUARE, "]")); break;
-            case '@': append(tokens, TOKEN_LITERAL(CT_AT, "@")); break;
-            case ':': append(tokens, TOKEN_LITERAL(CT_COLON, ":")); break;
+            case '{': append(tokens, TOKEN_CHAR(CT_OPEN_CURLY, "{", lexer)); break;
+            case '}': append(tokens, TOKEN_CHAR(CT_CLOSE_CURLY, "}", lexer)); break;
+            case '(': append(tokens, TOKEN_CHAR(CT_OPEN_PAREN, "(", lexer)); break;
+            case ')': append(tokens, TOKEN_CHAR(CT_CLOSE_PAREN, ")", lexer)); break;
+            case '[': append(tokens, TOKEN_CHAR(CT_OPEN_SQUARE, "[", lexer)); break;
+            case ']': append(tokens, TOKEN_CHAR(CT_CLOSE_SQUARE, "]", lexer)); break;
+            case '@': append(tokens, TOKEN_CHAR(CT_AT, "@", lexer)); break;
+            case ':': append(tokens, TOKEN_CHAR(CT_COLON, ":", lexer)); break;
             
             case '.': {
                 ResultType(char, charptr) nextDot = lexerPeek(lexer);
 
                 if (!nextDot.error && nextDot.as.success == '.') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_DOT_DOT, ".."));
+                    append(tokens, TOKEN_LITERAL(CT_DOT_DOT, "..", lexer));
                  } else {
-                    append(tokens, TOKEN_LITERAL(CT_DOT, "."));
+                    append(tokens, TOKEN_CHAR(CT_DOT, ".", lexer));
                  }
 
                 break; 
@@ -362,10 +445,10 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             case '\"':
             case '\'': {
                 
-                ResultType(CometToken, charptr) stringTok = lexerParseString(lexer, lexer->currentChar);
+                ResultType(CometToken, ErrorMessage) stringTok = lexerParseString(lexer, lexer->currentChar);
 
                 if (stringTok.error) {
-                    return Error(tokenList, charptr, stringTok.as.error);
+                    return Error(tokenList, ErrorMessage, stringTok.as.error);
                 }
 
                 append(tokens, stringTok.as.success);
@@ -378,11 +461,11 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_PLUS_EQ, "+="));
+                    append(tokens, TOKEN_LITERAL(CT_PLUS_EQ, "+=", lexer));
                     break;
                 }
 
-                append(tokens, TOKEN_LITERAL(CT_PLUS, "+"));
+                append(tokens, TOKEN_CHAR(CT_PLUS, "+", lexer));
                 break;
             }
             case '-': {
@@ -390,19 +473,19 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!arrow.error && arrow.as.success == '>') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_ARROW, "->"));
+                    append(tokens, TOKEN_LITERAL(CT_ARROW, "->", lexer));
                 } else if (!arrow.error && arrow.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_MINUS_EQ, "-="));
+                    append(tokens, TOKEN_LITERAL(CT_MINUS_EQ, "-=", lexer));
                 } else if (isdigit(arrow.as.success)) {
 
-                    ResultType(CometToken, charptr) numberTok = lexerParseNumber(lexer);
+                    ResultType(CometToken, ErrorMessage) numberTok = lexerParseNumber(lexer);
                     if (numberTok.error)
-                        return Error(tokenList, charptr, numberTok.as.error);
+                        return Error(tokenList, ErrorMessage, numberTok.as.error);
 
                     append(tokens, numberTok.as.success);
                  } else {
-                    append(tokens, TOKEN_LITERAL(CT_MINUS, "-"));
+                    append(tokens, TOKEN_CHAR(CT_MINUS, "-", lexer));
                  }
 
                 break; 
@@ -412,11 +495,11 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_TIMES_EQ, "*="));
+                    append(tokens, TOKEN_LITERAL(CT_TIMES_EQ, "*=", lexer));
                     break;
                 }
 
-                append(tokens, TOKEN_LITERAL(CT_TIMES, "*"));
+                append(tokens, TOKEN_CHAR(CT_TIMES, "*", lexer));
                 break;
             }
             case '/': {
@@ -424,11 +507,11 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_DIVIDE_EQ, "/="));
+                    append(tokens, TOKEN_LITERAL(CT_DIVIDE_EQ, "/=", lexer));
                     break;
                 }
 
-                append(tokens, TOKEN_LITERAL(CT_TIMES, "/"));
+                append(tokens, TOKEN_CHAR(CT_TIMES, "/", lexer));
                 break;
             }
             case '%': {
@@ -436,11 +519,11 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_MOD_EQ, "%="));
+                    append(tokens, TOKEN_LITERAL(CT_MOD_EQ, "%=", lexer));
                     break;
                 }
 
-                append(tokens, TOKEN_LITERAL(CT_MOD, "%"));
+                append(tokens, TOKEN_CHAR(CT_MOD, "%", lexer));
                 break;
             }
             case '^': {
@@ -448,24 +531,24 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_POW_EQ, "^="));
+                    append(tokens, TOKEN_LITERAL(CT_POW_EQ, "^=", lexer));
                     break;
                 }
 
-                append(tokens, TOKEN_LITERAL(CT_POW_EQ, "^"));
+                append(tokens, TOKEN_CHAR(CT_POW_EQ, "^", lexer));
                 break;
             }
 
-            case ',': append(tokens, TOKEN_LITERAL(CT_COMMA, ",")) break;
+            case ',': append(tokens, TOKEN_CHAR(CT_COMMA, ",", lexer)) break;
 
             case '<': {
                 ResultType(char, charptr) ltEq = lexerPeek(lexer);
 
                 if (!ltEq.error && ltEq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_LTE, "<="));
+                    append(tokens, TOKEN_LITERAL(CT_LTE, "<=", lexer));
                  } else {
-                    append(tokens, TOKEN_LITERAL(CT_LT, "<"));
+                    append(tokens, TOKEN_CHAR(CT_LT, "<", lexer));
                  }
 
                 break; 
@@ -475,9 +558,9 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
 
                 if (!gtEq.error && gtEq.as.success == '=') {
                     lexerConsume(lexer);
-                    append(tokens, TOKEN_LITERAL(CT_GTE, ">="));
+                    append(tokens, TOKEN_LITERAL(CT_GTE, ">=", lexer));
                  } else {
-                    append(tokens, TOKEN_LITERAL(CT_GT, ">"));
+                    append(tokens, TOKEN_CHAR(CT_GT, ">", lexer));
                  }
 
                 break; 
@@ -485,18 +568,18 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
             
             default: {
                 if (isdigit(lexer->currentChar)) {
-                    ResultType(CometToken, charptr) token = lexerParseNumber(lexer);
+                    ResultType(CometToken, ErrorMessage) token = lexerParseNumber(lexer);
 
                     if (token.error) {
-                        return Error(tokenList, charptr, token.as.error);
+                        return Error(tokenList, ErrorMessage, token.as.error);
                     }
 
                     append(tokens, token.as.success);
                 } else if (isalnum(lexer->currentChar)) {
-                    ResultType(CometToken, charptr) token = lexerParseWord(lexer);
+                    ResultType(CometToken, ErrorMessage) token = lexerParseWord(lexer);
 
                     if (token.error) {
-                        return Error(tokenList, charptr, token.as.error);
+                        return Error(tokenList, ErrorMessage, token.as.error);
                     }
 
                     append(tokens, token.as.success);
@@ -506,7 +589,18 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
                     APPEND_ESTR(buffer, unexpected);
                     APPEND_ESTR(buffer, "\"")
 
-                    return Error(tokenList, charptr, buffer.str);
+                    ErrorMessage errMsg = createError(
+                        lexer->filePath,
+                        lexer->source,
+                        "InvalidSyntax",
+                        buffer.str,
+                        NULL,
+                        lexer->lineNum,
+                        lexer->column,
+                        lexer->column
+                    ); 
+
+                    return Error(tokenList, ErrorMessage, errMsg);
                 }
             }
         }
@@ -514,5 +608,5 @@ ResultType(tokenList, charptr) lex(CometLexer* lexer) {
         lexerConsume(lexer);
     }
 
-    return Success(tokenList, charptr, tokens);
+    return Success(tokenList, ErrorMessage, tokens);
 }

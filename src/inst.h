@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "error_message.h"
 
 #define NO_OPERAND ((CometOperand){0})
 
@@ -31,6 +32,9 @@ typedef struct {
     uint32_t functionCount;
     uint32_t labelCount;
 
+    char* inputFilePath;
+    char* sourceCode;
+
     CometOperand consts[512];
     CometLabel* labels[512];
     CometInst* outputProgram;
@@ -44,10 +48,7 @@ typedef struct {
 
 typedef CometCompiler* cometCompilerPtr;
 
-Result(CometOperand, charptr);
-Result(cometCompilerPtr, charptr);
-
-ResultType(cometCompilerPtr, charptr) newCompiler();
+Result(CometOperand, ErrorMessage);
 
 bool typesAreEqual(CometType a, CometType b);
 
