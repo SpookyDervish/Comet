@@ -75,7 +75,7 @@ void printErrorMessage(ErrorMessage errMsg) {
     
 
     if (errMsg.help != NULL) {
-        fprintf(stderr, "    ╰────❯ " ESC_CYAN_FG ESC_DIM "help" ESC_RESET ": %s", errMsg.help);
+        fprintf(stderr, "    ╰────❯ " ESC_CYAN_FG ESC_DIM "help" ESC_RESET ": %s\n", errMsg.help);
     } else {
         fprintf(stderr, "    ╰────<\n");
     }

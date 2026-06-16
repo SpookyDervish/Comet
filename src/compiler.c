@@ -1601,7 +1601,7 @@ ResultType(CometOperand, ErrorMessage) visitReassignStatement(CometCompiler* c, 
         ErrorMessage errMsg = createError(
             c->inputFilePath,
             c->sourceCode,
-            "UndefinedVariable",
+            "ImmutableReassignment",
             buffer.str,
             "Add \"mut\" to the variable definition to make this variable mutable.",
             node->lineNum,
@@ -2712,7 +2712,7 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
         return Error(CometOperand, ErrorMessage, tokens.as.error);
     }
 
-    ResultType(parserPtr, ErrorMessage) parser = newParser(tokens.as.success);
+    ResultType(parserPtr, ErrorMessage) parser = newParser(tokens.as.success, path, fileContents);
     if (parser.error) {
         return Error(CometOperand, ErrorMessage, parser.as.error);
     }

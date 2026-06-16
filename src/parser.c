@@ -10,7 +10,7 @@
 
 Result(int, charptr);
 
-ResultType(astNodePtr, charptr) parseStatement(CometParser* parser, bool isMutable, FieldAttribute attrib);
+ResultType(astNodePtr, ErrorMessage) parseStatement(CometParser* parser, bool isMutable, FieldAttribute attrib);
 
 const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_PLUS, PRECEDENCE_SUM},
@@ -37,16 +37,16 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_COLON, PRECEDENCE_INDEX},
 };
 
-ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser);
-ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser);
-ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser);
-ResultType(astNodePtr, charptr) parseBoolLiteral(CometParser* parser);
-ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser);
-ResultType(astNodePtr, charptr) parseArrayLiteral(CometParser* parser);
-ResultType(astNodePtr, charptr) parseType(CometParser* parser);
-ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser);
-ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser);
-ResultType(astNodePtr, charptr) parsePrefixExpression(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseIntLiteral(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseIdentifier(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseFloatLiteral(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseBoolLiteral(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseStringLiteral(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseArrayLiteral(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseType(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseGroupedExpression(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser);
 const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_INT_LITERAL, parseIntLiteral},
     {CT_FLOAT_LITERAL, parseFloatLiteral},
@@ -60,8 +60,8 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_NOT, parsePrefixExpression}
 };
 
-ResultType(astNodePtr, charptr) parseFunctionCall(CometParser* parser, CometASTNode* left);
-ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left);
+ResultType(astNodePtr, ErrorMessage) parseFunctionCall(CometParser* parser, CometASTNode* left);
+ResultType(astNodePtr, ErrorMessage) parseInfixExpression(CometParser* parser, CometASTNode* left);
 const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_EQ, parseInfixExpression},
     {CT_PLUS, parseInfixExpression},
@@ -91,15 +91,40 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
 // -- HELPER METHODS -- //
 
 // create a new CometParser instance
-ResultType(parserPtr, charptr) newParser(tokenList tokens) {
+ResultType(parserPtr, ErrorMessage) newParser(tokenList tokens, char* fileName, char* sourceCode) {
     CometParser* parser = malloc(sizeof(CometParser));
     if (!parser) {
-        return Error(parserPtr, charptr, "newCometParser: failed to allocate memory for new parser!");
+        ErrorMessage errMsg = createError(
+            fileName,
+            sourceCode, 
+            "MemoryAllocFail",
+            "newCometParser: failed to allocate memory for new parser",
+            NULL,
+            1,
+            1,
+            1
+        );
+
+        return Error(parserPtr, ErrorMessage, errMsg);
     }
 
     if (tokens.count == 0) {
-        return Error(parserPtr, charptr, "newCometParser: tokens list is empty!");
+        ErrorMessage errMsg = createError(
+            fileName,
+            sourceCode, 
+            "InvalidSyntax",
+            "File is empty",
+            NULL,
+            1,
+            1,
+            1
+        );
+
+        return Error(parserPtr, ErrorMessage, errMsg);
     }
+
+    parser->fileName = fileName;
+    parser->sourceCode = sourceCode;
 
     parser->tokens = tokens;
     parser->currentToken = get(tokens, 0);
@@ -121,10 +146,21 @@ ResultType(parserPtr, charptr) newParser(tokenList tokens) {
     );
 
     if (!parser->program->data.AST_PROGRAM.statements) {
-        return Error(parserPtr, charptr, "newCometParser: Failed to allocate memory for program node statements!");
+        ErrorMessage errMsg = createError(
+            fileName,
+            sourceCode, 
+            "MemoryAllocFail",
+            "newCometParser: Failed to allocate memory for program node statements",
+            NULL,
+            1,
+            1,
+            1
+        );
+
+        return Error(parserPtr, ErrorMessage, errMsg);
     }
     
-    return Success(parserPtr, charptr, parser);
+    return Success(parserPtr, ErrorMessage, parser);
 }
 
 void parserNextToken(CometParser* parser) {
@@ -184,37 +220,73 @@ bool currentTokenIsAssignment(CometParser* parser) {
     return false;
 }
 
-ResultType(int, charptr) expectPeek(CometParser* parser, CometTokenType tokenType) {
+ResultType(int, ErrorMessage) expectPeek(CometParser* parser, CometTokenType tokenType) {
     if (!parser->peekToken) {
         char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got <EOF> instead.", tokenTypeToCStr(tokenType));
-        return Error(int, charptr, buffer);
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "InvalidSyntax",
+            buffer,
+            NULL,
+            parser->currentToken->lineNum,
+            parser->currentToken->endCol,
+            parser->currentToken->endCol
+        );
+
+        return Error(int, ErrorMessage, errMsg);
     }
 
     if (!peekTokenIs(parser, tokenType)) {
         char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got %s instead.", tokenTypeToCStr(tokenType), tokenTypeToCStr(parser->peekToken->type));
-        return Error(int, charptr, buffer);
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "InvalidSyntax",
+            buffer,
+            NULL,
+            parser->peekToken->lineNum,
+            parser->peekToken->startCol,
+            parser->peekToken->endCol
+        );
+
+        return Error(int, ErrorMessage, errMsg);
     }
     parserNextToken(parser);
-    return Success(int, charptr, 1);
+    return Success(int, ErrorMessage, 1);
 }
 
-ResultType(int, charptr) expectPeekKeyword(CometParser* parser, const char* keyword) {
-    ResultType(int, charptr) next = expectPeek(parser, CT_KEYWORD);
+ResultType(int, ErrorMessage) expectPeekKeyword(CometParser* parser, const char* keyword) {
+    ResultType(int, ErrorMessage) next = expectPeek(parser, CT_KEYWORD);
     if (next.error) {
         return next;
     }
 
     
 
-    if (strcmp(parser->currentToken->value.literal, keyword) != 0) {
+    if (strcmp(parser->peekToken->value.literal, keyword) != 0) {
         char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got %s instead.", keyword, parser->peekToken->value.literal);
-        return Error(int, charptr, buffer);
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "InvalidSyntax",
+            buffer,
+            NULL,
+            parser->peekToken->lineNum,
+            parser->peekToken->startCol,
+            parser->peekToken->endCol
+        );
+
+        return Error(int, ErrorMessage, errMsg);
     }
 
-    return Success(int, charptr, 1);
+    return Success(int, ErrorMessage, 1);
 }
 
 bool peekKeywordIs(CometParser* parser, const char* keyword) {
@@ -257,24 +329,24 @@ CometPrecedenceType peekPrecedence(CometParser* parser) {
     return getPrecedence(parser->peekToken->type);
 }
 
-ResultType(prefixFuncType, charptr) getPrefixFunc(CometTokenType tokenType) {
+ResultType(prefixFuncType, int) getPrefixFunc(CometTokenType tokenType) {
     for (size_t i = 0; i < sizeof(PREFIX_PARSE_FUNCTIONS)/sizeof(PREFIX_PARSE_FUNCTIONS[0]); i++) {
         if (PREFIX_PARSE_FUNCTIONS[i].tokenType == tokenType) {
-            return Success(prefixFuncType, charptr, PREFIX_PARSE_FUNCTIONS[i].function);
+            return Success(prefixFuncType, int, PREFIX_PARSE_FUNCTIONS[i].function);
         }
     }
 
-    return Error(prefixFuncType, charptr, "getPrefixFunc: no prefix function found");
+    return Error(prefixFuncType, int, 1);
 }
 
-ResultType(infixFuncType, charptr) getInfixFunc(CometTokenType tokenType) {
+ResultType(infixFuncType, int) getInfixFunc(CometTokenType tokenType) {
     for (size_t i = 0; i < sizeof(INFIX_PARSE_FUNCTIONS)/sizeof(INFIX_PARSE_FUNCTIONS[0]); i++) {
         if (INFIX_PARSE_FUNCTIONS[i].tokenType == tokenType) {
-            return Success(infixFuncType, charptr, INFIX_PARSE_FUNCTIONS[i].function);
+            return Success(infixFuncType, int, INFIX_PARSE_FUNCTIONS[i].function);
         }
     }
 
-    return Error(infixFuncType, charptr, "getInfixFunc: no infix function found");
+    return Error(infixFuncType, int, 1);
 }
 
 void printNode(CometASTNode* node) {
@@ -543,22 +615,34 @@ void printNode(CometASTNode* node) {
 }
 
 // -- EXPRESSION METHODS -- //
-ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPrecedenceType precedence) {
-    ResultType(prefixFuncType, charptr) prefixFunc = getPrefixFunc(parser->currentToken->type);
+ResultType(astNodePtr, ErrorMessage) parseExpression(CometParser* parser, CometPrecedenceType precedence) {
+    ResultType(prefixFuncType, int) prefixFunc = getPrefixFunc(parser->currentToken->type);
 
     if (prefixFunc.error) {
         char* buffer = malloc(128);
         sprintf(buffer, "No prefix parse function for %s.\n", tokenTypeToCStr(parser->currentToken->type));
-        return Error(astNodePtr, charptr, buffer);
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "InvalidSyntax",
+            buffer,
+            NULL,
+            parser->currentToken->lineNum,
+            parser->currentToken->startCol,
+            parser->currentToken->endCol
+        );
+
+        return Error(astNodePtr, ErrorMessage, errMsg);
     }
 
    
 
 
-    ResultType(astNodePtr, charptr) leftExpr = prefixFunc.as.success(parser);
+    ResultType(astNodePtr, ErrorMessage) leftExpr = prefixFunc.as.success(parser);
 
     while (precedence < peekPrecedence(parser)) {
-        ResultType(infixFuncType, charptr) infixFunc = getInfixFunc(parser->peekToken->type);
+        ResultType(infixFuncType, int) infixFunc = getInfixFunc(parser->peekToken->type);
 
         if (infixFunc.error)
             return leftExpr;
@@ -573,16 +657,16 @@ ResultType(astNodePtr, charptr) parseExpression(CometParser* parser, CometPreced
     return leftExpr;
 }
 
-ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometASTNode* left) {
+ResultType(astNodePtr, ErrorMessage) parseInfixExpression(CometParser* parser, CometASTNode* left) {
     if (currentTokenIsAssignment(parser)) {
         CometToken op = *parser->currentToken;
 
         parserNextToken(parser);
 
-        ResultType(astNodePtr, charptr) right = parseExpression(parser, PRECEDENCE_LOWEST);
+        ResultType(astNodePtr, ErrorMessage) right = parseExpression(parser, PRECEDENCE_LOWEST);
 
         CometASTNode* assign = AST_NODE(AST_REASSIGN_STATEMENT, left, right.as.success, op);
-        return Success(astNodePtr, charptr, assign);
+        return Success(astNodePtr, ErrorMessage, assign);
     }
 
     CometASTNode* infixExpr = AST_NODE(AST_INFIX_EXPRESSION, left, NULL, *parser->currentToken);
@@ -590,34 +674,45 @@ ResultType(astNodePtr, charptr) parseInfixExpression(CometParser* parser, CometA
     CometPrecedenceType precedence = currentPrecedence(parser);
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) right = parseExpression(parser, precedence);
+    ResultType(astNodePtr, ErrorMessage) right = parseExpression(parser, precedence);
     if (right.error)
         return right;
 
     infixExpr->data.AST_INFIX_EXPRESSION.right = right.as.success;
 
-    return Success(astNodePtr, charptr, infixExpr);
+    return Success(astNodePtr, ErrorMessage, infixExpr);
 }
 
-ResultType(astNodePtr, charptr) parseGroupedExpression(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseGroupedExpression(CometParser* parser) {
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
-    ResultType(int, charptr) expect = expectPeek(parser, CT_CLOSE_PAREN);
+    ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(int, ErrorMessage) expect = expectPeek(parser, CT_CLOSE_PAREN);
 
     if (expect.error) {
-        return Error(astNodePtr, charptr, expect.as.error);
+        return Error(astNodePtr, ErrorMessage, expect.as.error);
     }
 
     return expr;
 }
 
-ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
+ResultType(argList, ErrorMessage) parseFunctionDefArgs(CometParser* parser) {
     List(astNodePtr) args = newList(astNodePtr);
 
     while (parser->currentToken->type != CT_CLOSE_PAREN) {
         if (parser->peekToken->type == CT_EOF) {
-            return Error(argList, charptr, "Function args were not closed!");
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                "Function args were not closed!",
+                NULL,
+                parser->currentToken->lineNum,
+                parser->currentToken->startCol,
+                parser->currentToken->startCol
+            );
+            
+            return Error(argList, ErrorMessage, errMsg);
         } else if (parser->peekToken->type == CT_CLOSE_PAREN) {
             parserNextToken(parser);
             break;
@@ -625,44 +720,55 @@ ResultType(argList, charptr) parseFunctionDefArgs(CometParser* parser) {
 
         
 
-        ResultType(int, charptr) expectType = expectPeek(parser, CT_IDENT);
+        ResultType(int, ErrorMessage) expectType = expectPeek(parser, CT_IDENT);
         if (expectType.error) {
-            return Error(argList, charptr, expectType.as.error);
+            return Error(argList, ErrorMessage, expectType.as.error);
         }
 
-        ResultType(astNodePtr, charptr) type = parseType(parser);
+        ResultType(astNodePtr, ErrorMessage) type = parseType(parser);
         if (type.error)
-            return Error(argList, charptr, type.as.error);
+            return Error(argList, ErrorMessage, type.as.error);
 
-        ResultType(int, charptr) expectArgName = expectPeek(parser, CT_IDENT);
+        ResultType(int, ErrorMessage) expectArgName = expectPeek(parser, CT_IDENT);
         if (expectArgName.error) {
-            return Error(argList, charptr, expectArgName.as.error);
+            return Error(argList, ErrorMessage, expectArgName.as.error);
         }
         CometASTNode* argName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
         append(args, AST_NODE(AST_ARG_DEF, type.as.success, argName));
 
-        ResultType(int, charptr) expectComma = expectPeek(parser, CT_COMMA);
+        ResultType(int, ErrorMessage) expectComma = expectPeek(parser, CT_COMMA);
         if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
-            return Error(argList, charptr, expectComma.as.error);
+            return Error(argList, ErrorMessage, expectComma.as.error);
         }
     }
 
-    return Success(argList, charptr, args);
+    return Success(argList, ErrorMessage, args);
 }
 
-ResultType(argList, charptr) parseFunctionCallArgs(CometParser* parser) {
+ResultType(argList, ErrorMessage) parseFunctionCallArgs(CometParser* parser) {
     List(astNodePtr) args = newList(astNodePtr);
     parserNextToken(parser); // skip open paren '('
 
     while (parser->currentToken->type != CT_CLOSE_PAREN) {
         if (parser->peekToken->type == CT_EOF) {
-            return Error(argList, charptr, "Function args were not closed!");
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                "Function args were not closed!",
+                NULL,
+                parser->currentToken->lineNum,
+                parser->currentToken->startCol,
+                parser->currentToken->startCol
+            );
+
+            return Error(argList, ErrorMessage, errMsg);
         }
 
-        ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+        ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
         if (expr.error) {
-            return Error(argList, charptr, expr.as.error);
+            return Error(argList, ErrorMessage, expr.as.error);
         }
         append(args, expr.as.success);
 
@@ -672,38 +778,49 @@ ResultType(argList, charptr) parseFunctionCallArgs(CometParser* parser) {
         if (currentTokenIs(parser, CT_COMMA)) {
             parserNextToken(parser);
         } else if (!currentTokenIs(parser, CT_CLOSE_PAREN)) {
-            return Error(argList, charptr, "Expected ',' or ')' after function argument.");
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                "Expected ',' or ')' after function argument",
+                NULL,
+                parser->currentToken->lineNum,
+                parser->currentToken->startCol,
+                parser->currentToken->startCol
+            );
+
+            return Error(argList, ErrorMessage, errMsg);
         }
     }
 
-    return Success(argList, charptr, args);
+    return Success(argList, ErrorMessage, args);
 }
 
 // -- PREFIX METHODS -- //
-ResultType(astNodePtr, charptr) parseIntLiteral(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_INT, parser->currentToken->value.intVal));
+ResultType(astNodePtr, ErrorMessage) parseIntLiteral(CometParser* parser) {
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_INT, parser->currentToken->value.intVal));
 }
 
-ResultType(astNodePtr, charptr) parseFloatLiteral(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_DOUBLE, parser->currentToken->value.doubleVal));
+ResultType(astNodePtr, ErrorMessage) parseFloatLiteral(CometParser* parser) {
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_DOUBLE, parser->currentToken->value.doubleVal));
 }
 
-ResultType(astNodePtr, charptr) parseBoolLiteral(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_BOOL, parser->currentToken->value.boolVal));
+ResultType(astNodePtr, ErrorMessage) parseBoolLiteral(CometParser* parser) {
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_BOOL, parser->currentToken->value.boolVal));
 }
 
-ResultType(astNodePtr, charptr) parseStringLiteral(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_STRING, parser->currentToken->value.literal));
+ResultType(astNodePtr, ErrorMessage) parseStringLiteral(CometParser* parser) {
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_STRING, parser->currentToken->value.literal));
 }
 
-ResultType(astNodePtr, charptr) parseArrayLiteral(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseArrayLiteral(CometParser* parser) {
     CometASTNode* literal = AST_NODE(AST_ARRAY, newList(astNodePtr));
 
     
 
     while (true) {
         parserNextToken(parser);
-        ResultType(astNodePtr, charptr) value = parseExpression(parser, PRECEDENCE_LOWEST);
+        ResultType(astNodePtr, ErrorMessage) value = parseExpression(parser, PRECEDENCE_LOWEST);
         if (value.error)
             return value;
 
@@ -715,38 +832,50 @@ ResultType(astNodePtr, charptr) parseArrayLiteral(CometParser* parser) {
             parserNextToken(parser);
             continue;
         } else {
-            Estr errMsg = CREATE_ESTR("Expected ',' or ']', got \"");
-            APPEND_ESTR(errMsg, tokenTypeToCStr(parser->peekToken->type));
-            APPEND_ESTR(errMsg, "\" instead.");
-            return Error(astNodePtr, charptr, errMsg.str);
+            Estr buffer = CREATE_ESTR("Expected ',' or ']', got \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(parser->peekToken->type));
+            APPEND_ESTR(buffer, "\" instead.");
+
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                buffer.str,
+                NULL,
+                parser->peekToken->lineNum,
+                parser->peekToken->startCol,
+                parser->peekToken->endCol
+            );
+
+            return Error(astNodePtr, ErrorMessage, errMsg);
         }
     }
 
     parserNextToken(parser); // skip ']'
 
-    return Success(astNodePtr, charptr, literal);
+    return Success(astNodePtr, ErrorMessage, literal);
 }
 
-ResultType(astNodePtr, charptr) parseIdentifier(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseIdentifier(CometParser* parser) {
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-    return Success(astNodePtr, charptr, ident);
+    return Success(astNodePtr, ErrorMessage, ident);
 }
 
-ResultType(astNodePtr, charptr) parsePrefixExpression(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) {
     CometASTNode* expr = AST_NODE(AST_PREFIX_EXPRESSION, *parser->currentToken, NULL);
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) rightSide = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) rightSide = parseExpression(parser, PRECEDENCE_LOWEST);
     if (rightSide.error)
         return rightSide;
 
     expr->data.AST_PREFIX_EXPRESSION.right = rightSide.as.success;
-    return Success(astNodePtr, charptr, expr);
+    return Success(astNodePtr, ErrorMessage, expr);
 }
 
 // -- TYPE PARSING -- //
-ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
     
     CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     parserNextToken(parser); // consume base type
@@ -768,7 +897,7 @@ ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
             );
 
         } else {
-            ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+            ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
             if (expr.error)
                 return expr;
 
@@ -788,24 +917,36 @@ ResultType(astNodePtr, charptr) parseArrayType(CometParser* parser) {
         } else if (currentTokenIs(parser, CT_CLOSE_SQUARE)) {
             break;
         } else {
-            Estr errMsg = CREATE_ESTR("Expected ',' or ']' when continuing array type, got \"");
-            APPEND_ESTR(errMsg, tokenTypeToCStr(parser->currentToken->type));
-            APPEND_ESTR(errMsg, "\" instead.");
-            return Error(astNodePtr, charptr, errMsg.str);
+            Estr buffer = CREATE_ESTR("Expected ',' or ']' when continuing array type, got \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(parser->currentToken->type));
+            APPEND_ESTR(buffer, "\" instead.");
+
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                buffer.str,
+                NULL,
+                parser->currentToken->lineNum,
+                parser->currentToken->startCol,
+                parser->currentToken->endCol
+            );
+
+            return Error(astNodePtr, ErrorMessage, errMsg);
         }
     }
 
-    return Success(astNodePtr, charptr, typeNode);
+    return Success(astNodePtr, ErrorMessage, typeNode);
 }
 
-ResultType(astNodePtr, charptr) parseScalarType(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
     CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, NULL, 0);
 
-    return Success(astNodePtr, charptr, typeNode);
+    return Success(astNodePtr, ErrorMessage, typeNode);
 }
 
-ResultType(astNodePtr, charptr) parseType(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseType(CometParser* parser) {
     if (peekTokenIs(parser, CT_OPEN_SQUARE)) {
         return parseArrayType(parser);
     } else {
@@ -814,8 +955,8 @@ ResultType(astNodePtr, charptr) parseType(CometParser* parser) {
 }
 
 // -- STATEMENT METHODS -- //
-ResultType(astNodePtr, charptr) parseExpressionStatement(CometParser* parser) {
-    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+ResultType(astNodePtr, ErrorMessage) parseExpressionStatement(CometParser* parser) {
+    ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
     
     if (expr.error) {
         return expr;
@@ -823,10 +964,10 @@ ResultType(astNodePtr, charptr) parseExpressionStatement(CometParser* parser) {
     
     CometASTNode* stmt = AST_NODE(AST_EXPRESSION_STATEMENT, expr.as.success);
 
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bool isMutable, FieldAttribute fieldAttrib) {
+ResultType(astNodePtr, ErrorMessage) parseAssignmentStatement(CometParser* parser, bool isMutable, FieldAttribute fieldAttrib) {
     // basic format:
     // small myVar = 10
 
@@ -835,7 +976,18 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
 
         if (strcmp(keyword, "mut") == 0) {
             if (isMutable) {
-                return Error(astNodePtr, charptr, "\"mut\" keyword appears twice in variable declaration.");
+                ErrorMessage errMsg = createError(
+                    parser->fileName,
+                    parser->sourceCode, 
+                    "InvalidSyntax",
+                    "\"mut\" keyword appears twice in variable declaration.",
+                    "Remove one \"mut\" to silence this error.",
+                    parser->currentToken->lineNum,
+                    parser->currentToken->startCol,
+                    parser->currentToken->endCol
+                );
+
+                return Error(astNodePtr, ErrorMessage, errMsg);
             }
             
             parserNextToken(parser);
@@ -845,7 +997,18 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
             strcmp(keyword, "protected") == 0 ||
             strcmp(keyword, "readonly") == 0) {
             if (fieldAttrib != FIELD_PUBLIC) {
-                return Error(astNodePtr, charptr, "Cannot set multiple attributes to struct field.");
+                ErrorMessage errMsg = createError(
+                    parser->fileName,
+                    parser->sourceCode, 
+                    "InvalidSyntax",
+                    "Cannot set multiple attributes to struct field.",
+                    NULL,
+                    parser->currentToken->lineNum,
+                    parser->currentToken->startCol,
+                    parser->currentToken->endCol
+                );
+
+                return Error(astNodePtr, ErrorMessage, errMsg);
             }
 
             parserNextToken(parser);
@@ -853,7 +1016,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
         }
     }
 
-    ResultType(astNodePtr, charptr) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    ResultType(astNodePtr, ErrorMessage) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     if (type.error)
         return type;
 
@@ -870,7 +1033,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
     
 
     if (!hasValue) {
-        return Success(astNodePtr, charptr, stmt);
+        return Success(astNodePtr, ErrorMessage, stmt);
     }
 
     parserNextToken(parser);
@@ -879,7 +1042,7 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
     
     
 
-    ResultType(astNodePtr, charptr) value = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) value = parseExpression(parser, PRECEDENCE_LOWEST);
     if (value.error) {
         return value;
     }
@@ -888,30 +1051,41 @@ ResultType(astNodePtr, charptr) parseAssignmentStatement(CometParser* parser, bo
 
     
     
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseBlockStatement(CometParser* parser) {
     CometASTNode** statements = calloc(1, sizeof(CometASTNode*));
     if (!statements) {
-        return Error(astNodePtr, charptr, "parseBlockStatement: failed to allocate memory for block statement!");
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "MemoryAllocFail",
+            "parseBlockStatement: failed to allocate memory for block statement",
+            NULL,
+            parser->currentToken->lineNum,
+            parser->currentToken->startCol,
+            parser->currentToken->endCol
+        );
+
+        return Error(astNodePtr, ErrorMessage, errMsg);
     }
 
     CometASTNode* program = AST_NODE(AST_PROGRAM, statements, 0, 1);
 
-    ResultType(int, charptr) openCurly = expectPeek(parser, CT_OPEN_CURLY);
+    ResultType(int, ErrorMessage) openCurly = expectPeek(parser, CT_OPEN_CURLY);
     if (openCurly.error) {
-        return Error(astNodePtr, charptr, openCurly.as.error);
+        return Error(astNodePtr, ErrorMessage, openCurly.as.error);
     }
 
     parserNextToken(parser);
 
     while (parser->currentToken->type != CT_CLOSE_CURLY) {
         if (parser->currentToken->type == CT_EOF) {
-            return Error(astNodePtr, charptr, "Block statement was not closed!");
+            return Error(astNodePtr, ErrorMessage, "Block statement was not closed!");
         }
 
-        ResultType(astNodePtr, charptr) stmt = parseStatement(parser, false, FIELD_PUBLIC);
+        ResultType(astNodePtr, ErrorMessage) stmt = parseStatement(parser, false, FIELD_PUBLIC);
         if (stmt.error)
             return stmt;
 
@@ -921,10 +1095,10 @@ ResultType(astNodePtr, charptr) parseBlockStatement(CometParser* parser) {
         
     }
 
-    return Success(astNodePtr, charptr, program);
+    return Success(astNodePtr, ErrorMessage, program);
 }
 
-ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseOptionalBlockStatement(CometParser* parser) {
     // used for stuff like
     // if x + 1 == 2
     //     break
@@ -933,14 +1107,25 @@ ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser)
     if (!peekTokenIs(parser, CT_OPEN_CURLY)) { // if 1+1 == 2 return
 
         parserNextToken(parser);
-        ResultType(astNodePtr, charptr) innerStmt = parseStatement(parser, false, FIELD_PUBLIC);
+        ResultType(astNodePtr, ErrorMessage) innerStmt = parseStatement(parser, false, FIELD_PUBLIC);
 
         if (innerStmt.error)
             return innerStmt;
 
         CometASTNode** statements = calloc(1, sizeof(CometASTNode*));
         if (!statements) {
-            return Error(astNodePtr, charptr, "parseOptionalBlockStatement: failed to allocate memory for block statement!");
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "MemoryAllocFail",
+                "parseOptionalBlockStatement: failed to allocate memory for block statement",
+                NULL,
+                parser->currentToken->lineNum,
+                parser->currentToken->startCol,
+                parser->currentToken->endCol
+            );
+
+            return Error(astNodePtr, ErrorMessage, errMsg);
         }
 
         CometASTNode* program = AST_NODE(AST_PROGRAM, statements, 0, 1);
@@ -949,7 +1134,7 @@ ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser)
         stmt = program;
     } else {                                             // if 1+1 == 2 { return }
         
-        ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+        ResultType(astNodePtr, ErrorMessage) block = parseBlockStatement(parser);
         if (block.error) {
             return block;
         }
@@ -959,78 +1144,78 @@ ResultType(astNodePtr, charptr) parseOptionalBlockStatement(CometParser* parser)
         
     }
 
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseWhileStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseWhileStatement(CometParser* parser) {
     // basic format:
     // while true {}
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) expression = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) expression = parseExpression(parser, PRECEDENCE_LOWEST);
     if (expression.error) {
         return expression;
     }
 
-    ResultType(astNodePtr, charptr) program = parseOptionalBlockStatement(parser);
+    ResultType(astNodePtr, ErrorMessage) program = parseOptionalBlockStatement(parser);
     if (program.error) {
         return program;
     }
 
     CometASTNode* stmt = AST_NODE(AST_WHILE_STATEMENT, expression.as.success, program.as.success);
 
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
     // basic format
     // for int i in 0 .. 10 {}
 
-    ResultType(int, charptr) expectType = expectPeek(parser, CT_IDENT);
+    ResultType(int, ErrorMessage) expectType = expectPeek(parser, CT_IDENT);
     if (expectType.error) {
-        return Error(astNodePtr, charptr, expectType.as.error);
+        return Error(astNodePtr, ErrorMessage, expectType.as.error);
     }
 
-    ResultType(astNodePtr, charptr) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    ResultType(astNodePtr, ErrorMessage) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     if (type.error)
         return type;
 
-    ResultType(int, charptr) expectIdent = expectPeek(parser, CT_IDENT);
+    ResultType(int, ErrorMessage) expectIdent = expectPeek(parser, CT_IDENT);
     if (expectIdent.error) {
-        return Error(astNodePtr, charptr, expectIdent.as.error);
+        return Error(astNodePtr, ErrorMessage, expectIdent.as.error);
     }
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     
 
-    ResultType(int, charptr) expectIn = expectPeekKeyword(parser, "in");
+    ResultType(int, ErrorMessage) expectIn = expectPeekKeyword(parser, "in");
     if (expectIn.error) {
-        return Error(astNodePtr, charptr, expectIn.as.error);
+        return Error(astNodePtr, ErrorMessage, expectIn.as.error);
     }
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) start = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) start = parseExpression(parser, PRECEDENCE_LOWEST);
     if (start.error) {
         return start;
     }
 
-    ResultType(int, charptr) dotDot = expectPeek(parser, CT_DOT_DOT);
+    ResultType(int, ErrorMessage) dotDot = expectPeek(parser, CT_DOT_DOT);
     if (dotDot.error) {
-        return Error(astNodePtr, charptr, dotDot.as.error);
+        return Error(astNodePtr, ErrorMessage, dotDot.as.error);
     }
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) end = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) end = parseExpression(parser, PRECEDENCE_LOWEST);
     if (end.error) {
         return end;
     }
 
-    ResultType(astNodePtr, charptr) stepNode;
-    ResultType(int, charptr) step = expectPeekKeyword(parser, "step");
+    ResultType(astNodePtr, ErrorMessage) stepNode;
+    ResultType(int, ErrorMessage) step = expectPeekKeyword(parser, "step");
    
     if (!step.error) {
         parserNextToken(parser);
@@ -1039,10 +1224,10 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
             return stepNode;
         }
     } else {
-        stepNode = Success(astNodePtr, charptr, AST_NODE(AST_INT, 1));
+        stepNode = Success(astNodePtr, ErrorMessage, AST_NODE(AST_INT, 1));
     }
 
-    ResultType(astNodePtr, charptr) block = parseOptionalBlockStatement(parser);
+    ResultType(astNodePtr, ErrorMessage) block = parseOptionalBlockStatement(parser);
     if (block.error) {
         return block;
     }
@@ -1056,29 +1241,29 @@ ResultType(astNodePtr, charptr) parseForStatement(CometParser* parser) {
         stepNode.as.success,
         block.as.success
     );
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseBreakStatement(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_BREAK_STATEMENT));
+ResultType(astNodePtr, ErrorMessage) parseBreakStatement(CometParser* parser) {
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_BREAK_STATEMENT));
 }
 
-ResultType(astNodePtr, charptr) parseContinueStatement(CometParser* parser) {
-    return Success(astNodePtr, charptr, AST_NODE(AST_CONTINUE_STATEMENT));
+ResultType(astNodePtr, ErrorMessage) parseContinueStatement(CometParser* parser) {
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_CONTINUE_STATEMENT));
 }
 
-ResultType(astNodePtr, charptr) parseIfStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseIfStatement(CometParser* parser) {
     // basic format
     // if 1+1 == 2 {}
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
     if (expr.error) {
         return expr;
     }
     
-    ResultType(astNodePtr, charptr) body = parseOptionalBlockStatement(parser);
+    ResultType(astNodePtr, ErrorMessage) body = parseOptionalBlockStatement(parser);
     if (body.error)
         return body;
 
@@ -1088,7 +1273,7 @@ ResultType(astNodePtr, charptr) parseIfStatement(CometParser* parser) {
 
     if (elseKeyword) {
         parserNextToken(parser);
-        ResultType(astNodePtr, charptr) elseResult = parseOptionalBlockStatement(parser);
+        ResultType(astNodePtr, ErrorMessage) elseResult = parseOptionalBlockStatement(parser);
         if (elseResult.error)
             return elseResult;
 
@@ -1105,10 +1290,10 @@ ResultType(astNodePtr, charptr) parseIfStatement(CometParser* parser) {
     
 
 
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, FieldAttribute fieldAttrib) {
+ResultType(astNodePtr, ErrorMessage) parseFunctionDefStatement(CometParser* parser, FieldAttribute fieldAttrib) {
     // basic format
     // func func_name(type arg_name, type2 arg_name2) -> return_type {
     //     return arg_name + arg_name2
@@ -1117,50 +1302,62 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, F
     // inline body func
     // func func_name(type arg_name, type2 arg_name2) => arg_name + arg_name2
 
-    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+    ResultType(int, ErrorMessage) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error) {
-        return Error(astNodePtr, charptr, expectName.as.error);
+        return Error(astNodePtr, ErrorMessage, expectName.as.error);
     }
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     bool isInline = false;
 
-    ResultType(int, charptr) expectOpenParen = expectPeek(parser, CT_OPEN_PAREN);
+    ResultType(int, ErrorMessage) expectOpenParen = expectPeek(parser, CT_OPEN_PAREN);
     if (expectOpenParen.error) {
-        return Error(astNodePtr, charptr, expectOpenParen.as.error);
+        return Error(astNodePtr, ErrorMessage, expectOpenParen.as.error);
     }
 
     // parse args
-    ResultType(argList, charptr) args = parseFunctionDefArgs(parser);
+    ResultType(argList, ErrorMessage) args = parseFunctionDefArgs(parser);
     if (args.error) {
-        return Error(astNodePtr, charptr, args.as.error);
+        return Error(astNodePtr, ErrorMessage, args.as.error);
     }
 
-    ResultType(int, charptr) expectArrow = expectPeek(parser, CT_ARROW);
+    ResultType(int, ErrorMessage) expectArrow = expectPeek(parser, CT_ARROW);
     if (expectArrow.error) {
-        return Error(astNodePtr, charptr, expectArrow.as.error);
+        return Error(astNodePtr, ErrorMessage, expectArrow.as.error);
     }
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, charptr) returnType = parseType(parser);
+    ResultType(astNodePtr, ErrorMessage) returnType = parseType(parser);
     if (returnType.error)
         return returnType;
 
     isInline = peekTokenIs(parser, CT_INLINE_FUNC_ARROW);
 
     if (!(isInline || peekTokenIs(parser, CT_OPEN_CURLY))) {
-        Estr errMsg = CREATE_ESTR("Expected next token to be '{' '=>', got \"");
-        APPEND_ESTR(errMsg, tokenTypeToCStr(parser->peekToken->type));
-        APPEND_ESTR(errMsg, "\" instead.");
-        return Error(astNodePtr, charptr, errMsg.str);
+        Estr buffer = CREATE_ESTR("Expected next token to be '{' '=>', got \"");
+        APPEND_ESTR(buffer, tokenTypeToCStr(parser->peekToken->type));
+        APPEND_ESTR(buffer, "\" instead.");
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "InvalidSyntax",
+            buffer.str,
+            NULL,
+            parser->peekToken->lineNum,
+            parser->peekToken->startCol,
+            parser->peekToken->endCol
+        );
+
+        return Error(astNodePtr, ErrorMessage, errMsg);
     }
 
 
     CometASTNode* block = NULL;    
     CometASTNode* inlineExpr = NULL;    
     if (!isInline) {
-        ResultType(astNodePtr, charptr) blockResult = parseBlockStatement(parser);
+        ResultType(astNodePtr, ErrorMessage) blockResult = parseBlockStatement(parser);
         if (blockResult.error) {
             return blockResult;
         }
@@ -1169,7 +1366,7 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, F
     } else {
         parserNextToken(parser); // skip return type
         parserNextToken(parser); // skip the arrow
-        ResultType(astNodePtr, charptr) exprResult = parseExpression(parser, PRECEDENCE_LOWEST);
+        ResultType(astNodePtr, ErrorMessage) exprResult = parseExpression(parser, PRECEDENCE_LOWEST);
         if (exprResult.error) {
             return exprResult;
         }
@@ -1188,48 +1385,48 @@ ResultType(astNodePtr, charptr) parseFunctionDefStatement(CometParser* parser, F
         inlineExpr,
         fieldAttrib
     );
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseFunctionCall(CometParser* parser, CometASTNode* left) {
+ResultType(astNodePtr, ErrorMessage) parseFunctionCall(CometParser* parser, CometASTNode* left) {
     // 'left' is the already-parsed expression before the '('
-    ResultType(argList, charptr) args = parseFunctionCallArgs(parser);
+    ResultType(argList, ErrorMessage) args = parseFunctionCallArgs(parser);
     if (args.error) {
-        return Error(astNodePtr, charptr, args.as.error);
+        return Error(astNodePtr, ErrorMessage, args.as.error);
     }
     CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, left, args.as.success);
-    return Success(astNodePtr, charptr, funcCallNode);
+    return Success(astNodePtr, ErrorMessage, funcCallNode);
 }
 
-ResultType(astNodePtr, charptr) parseReturnStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseReturnStatement(CometParser* parser) {
     
 
     parserNextToken(parser);
-    ResultType(astNodePtr, charptr) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
     if (expr.error) {
         return expr;
     }
 
-    return Success(astNodePtr, charptr, AST_NODE(AST_RETURN_STATEMENT, expr.as.success));
+    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_RETURN_STATEMENT, expr.as.success));
 }
 
-ResultType(astNodePtr, charptr) parseConstructorDef(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
     parserNextToken(parser);
 
-    ResultType(argList, charptr) constructorArgs = parseFunctionDefArgs(parser);
+    ResultType(argList, ErrorMessage) constructorArgs = parseFunctionDefArgs(parser);
     if (constructorArgs.error)
-        return Error(astNodePtr, charptr, constructorArgs.as.error);
+        return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
 
-    ResultType(astNodePtr, charptr) body = parseBlockStatement(parser);
+    ResultType(astNodePtr, ErrorMessage) body = parseBlockStatement(parser);
     if (body.error)
         return body;
 
     CometASTNode* stmt = AST_NODE(AST_CONSTRUCTOR_DEF, body.as.success, constructorArgs.as.success);
 
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser) {
     // basic format:
     /*
     struct Animal {
@@ -1244,9 +1441,9 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         }
     }*/
 
-    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+    ResultType(int, ErrorMessage) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error) {
-        return Error(astNodePtr, charptr, expectName.as.error);
+        return Error(astNodePtr, ErrorMessage, expectName.as.error);
     }
 
     CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
@@ -1257,18 +1454,18 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
     if (inherits) {
         parserNextToken(parser);
 
-        ResultType(int, charptr) expectParentName = expectPeek(parser, CT_IDENT);
+        ResultType(int, ErrorMessage) expectParentName = expectPeek(parser, CT_IDENT);
         if (expectParentName.error)
-            return Error(astNodePtr, charptr, expectParentName.as.error);
+            return Error(astNodePtr, ErrorMessage, expectParentName.as.error);
 
         parentName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     }
 
     List(astNodePtr) fieldDefs = newList(astNodePtr);
 
-    ResultType(astNodePtr, charptr) block = parseBlockStatement(parser);
+    ResultType(astNodePtr, ErrorMessage) block = parseBlockStatement(parser);
     if (block.error) {
-        return Error(astNodePtr, charptr, block.as.error);
+        return Error(astNodePtr, ErrorMessage, block.as.error);
     }
 
     struct AST_PROGRAM blockProgram = block.as.success->data.AST_PROGRAM;
@@ -1291,10 +1488,22 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
             }
 
             default: {
-                Estr errMsg = CREATE_ESTR("\"");
-                APPEND_ESTR(errMsg, ASTNodeTypeToCStr(statement->nodeType));
-                APPEND_ESTR(errMsg, "\" cannot be used in struct definition.");
-                return Error(astNodePtr, charptr, errMsg.str);
+                Estr buffer = CREATE_ESTR("\"");
+                APPEND_ESTR(buffer, ASTNodeTypeToCStr(statement->nodeType));
+                APPEND_ESTR(buffer, "\" cannot be used in struct definition.");
+
+                ErrorMessage errMsg = createError(
+                    parser->fileName,
+                    parser->sourceCode, 
+                    "SemanticError",
+                    buffer.str,
+                    NULL,
+                    statement->lineNum,
+                    statement->startCol,
+                    statement->endCol
+                );
+
+                return Error(astNodePtr, ErrorMessage, errMsg);
                 break;
             }
         }
@@ -1308,39 +1517,39 @@ ResultType(astNodePtr, charptr) parseStructDefStatement(CometParser* parser) {
         NULL,
         parentName
     );
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseStructCreateStatement(CometParser* parser) {
-    ResultType(int, charptr) expectName = expectPeek(parser, CT_IDENT);
+ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* parser) {
+    ResultType(int, ErrorMessage) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error)
-        return Error(astNodePtr, charptr, expectName.as.error);
+        return Error(astNodePtr, ErrorMessage, expectName.as.error);
 
     CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
 
     parserNextToken(parser);
 
-    ResultType(argList, charptr) constructorArgs = parseFunctionCallArgs(parser);
+    ResultType(argList, ErrorMessage) constructorArgs = parseFunctionCallArgs(parser);
     if (constructorArgs.error)
-        return Error(astNodePtr, charptr, constructorArgs.as.error);
+        return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
 
     CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, structName, constructorArgs.as.success);
 
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseOverrideStatement(CometParser* parser, FieldAttribute fieldAttrib) {
+ResultType(astNodePtr, ErrorMessage) parseOverrideStatement(CometParser* parser, FieldAttribute fieldAttrib) {
     parserNextToken(parser); // skip "override"
 
-    ResultType(astNodePtr, charptr) funcDef = parseFunctionDefStatement(parser, fieldAttrib);
+    ResultType(astNodePtr, ErrorMessage) funcDef = parseFunctionDefStatement(parser, fieldAttrib);
     if (funcDef.error)
         return funcDef;
 
     CometASTNode* stmt = AST_NODE(AST_OVERRIDE_STATEMENT, funcDef.as.success);
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseImportStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseImportStatement(CometParser* parser) {
     parserNextToken(parser); // skip "import"
 
     List(astNodePtr) importChain = newList(astNodePtr);
@@ -1360,15 +1569,15 @@ ResultType(astNodePtr, charptr) parseImportStatement(CometParser* parser) {
     }
 
     CometASTNode* stmt = AST_NODE(AST_IMPORT_STATEMENT, importChain);
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseBreakpointStatement(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) parseBreakpointStatement(CometParser* parser) {
     CometASTNode* stmt = AST_NODE(AST_BREAKPOINT_STATEMENT);
-    return Success(astNodePtr, charptr, stmt);
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
-ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
+ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
     if (strcmp(keyword, "while") == 0) {
@@ -1407,12 +1616,24 @@ ResultType(astNodePtr, charptr) parseKeyword(CometParser* parser, FieldAttribute
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
-        return Error(astNodePtr, charptr, buffer);
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "ParserIssue",
+            buffer,
+            NULL,
+            parser->currentToken->lineNum,
+            parser->currentToken->startCol,
+            parser->currentToken->endCol
+        );
+
+        return Error(astNodePtr, ErrorMessage, errMsg);
     }
 }
 
 // -- PARSER HELPERS -- //
-ResultType(astNodePtr, charptr) parseStatement(CometParser* parser, bool isMutable, FieldAttribute fieldAttrib) {
+ResultType(astNodePtr, ErrorMessage) parseStatement(CometParser* parser, bool isMutable, FieldAttribute fieldAttrib) {
     switch (parser->currentToken->type) {
         case CT_IDENT:
             return parseAssignmentStatement(parser, isMutable, fieldAttrib);
@@ -1426,10 +1647,10 @@ ResultType(astNodePtr, charptr) parseStatement(CometParser* parser, bool isMutab
 }
 
 // -- MAIN -- //
-ResultType(astNodePtr, charptr) buildAST(CometParser* parser) {
+ResultType(astNodePtr, ErrorMessage) buildAST(CometParser* parser) {
     
     while (parser->currentToken->type != CT_EOF) {
-        ResultType(astNodePtr, charptr) stmt = parseStatement(parser, false, FIELD_PUBLIC);
+        ResultType(astNodePtr, ErrorMessage) stmt = parseStatement(parser, false, FIELD_PUBLIC);
         if (stmt.error)
             return stmt;
 
@@ -1437,5 +1658,5 @@ ResultType(astNodePtr, charptr) buildAST(CometParser* parser) {
         parserNextToken(parser);
     }
 
-    return Success(astNodePtr, charptr, parser->program);
+    return Success(astNodePtr, ErrorMessage, parser->program);
 }

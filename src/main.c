@@ -41,7 +41,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ResultType(parserPtr, ErrorMessage) parser = newParser(tokens.as.success);
+    ResultType(parserPtr, ErrorMessage) parser = newParser(tokens.as.success, filePath, source);
     if (parser.error) {
         printErrorMessage(parser.as.error);
         return 1;

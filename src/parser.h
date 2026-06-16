@@ -15,21 +15,25 @@ typedef struct {
     CometASTNode* program;
     size_t statementIndex;
     size_t statementArraySize;
+
+    char* fileName;
+    char* sourceCode;
 } CometParser;
 
 typedef CometParser* parserPtr;
 
 typedef List(astNodePtr) argList;
 
-Result(astNodePtr, charptr);
+Result(astNodePtr, ErrorMessage);
 
-typedef ResultType(astNodePtr, charptr) (*prefixFuncType)(CometParser*);
-typedef ResultType(astNodePtr, charptr) (*infixFuncType)(CometParser*, CometASTNode* left);
+typedef ResultType(astNodePtr, ErrorMessage) (*prefixFuncType)(CometParser*);
+typedef ResultType(astNodePtr, ErrorMessage) (*infixFuncType)(CometParser*, CometASTNode* left);
 
-Result(parserPtr, charptr);
-Result(prefixFuncType, charptr);
-Result(infixFuncType, charptr);
-Result(argList, charptr);
+Result(int, ErrorMessage);
+Result(parserPtr, ErrorMessage);
+Result(prefixFuncType, int);
+Result(infixFuncType, int);
+Result(argList, ErrorMessage);
 
 typedef enum {
     PRECEDENCE_LOWEST = 1,
@@ -64,8 +68,8 @@ typedef struct {
 extern const CometInfixParseFn INFIX_PARSE_FUNCTIONS[];
 
 // allocate a new Parser
-ResultType(parserPtr, charptr) newParser(tokenList tokens);
+ResultType(parserPtr, ErrorMessage) newParser(tokenList tokens, char* fileName, char* sourceCode);
 // parse tokens via lexer and return the AST
-ResultType(astNodePtr, charptr) buildAST(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) buildAST(CometParser* parser);
 
 void printNode(CometASTNode* node);
