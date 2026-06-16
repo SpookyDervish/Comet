@@ -120,3 +120,39 @@ end_repl_str:
 	free(pos_cache);
 	return ret;
 }
+
+char *getLineInString(const char *str, int target_line) {
+	const char *current = str;
+    int line_num = 1;
+
+    // Advance through the string until reaching the target line
+    while (current && line_num < target_line) {
+        current = strchr(current, '\n');
+        if (current) {
+            current++; // Move past the '\n' character
+            line_num++;
+        }
+    }
+
+    // If the target line was found
+    if (current && line_num == target_line) {
+        const char *next_newline = strchr(current, '\n');
+        
+        // Calculate length of the target line
+        size_t length = next_newline ? (size_t)(next_newline - current) : strlen(current);
+        
+        // Allocate memory (+1 for the null terminator)
+        char *result = malloc(length + 1);
+        if (result == NULL) {
+            return NULL; // Return NULL if memory allocation fails
+        }
+        
+        // Copy the line into the new buffer and null-terminate it
+        strncpy(result, current, length);
+        result[length] = '\0';
+        
+        return result;
+    }
+
+    return NULL; // Return NULL if the line number does not exist
+}

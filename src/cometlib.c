@@ -38,7 +38,7 @@ void cometDefineFunc(
     };
 
     va_list args;
-    va_start(args, numArgs);
+    va_start(args, isVarArgs);
 
     CometType* argTypes = numArgs > 0 ? calloc(numArgs, sizeof(CometType)) : NULL;
     for (size_t i = 0; i < numArgs; i++) {

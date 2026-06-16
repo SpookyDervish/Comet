@@ -4,6 +4,7 @@
 #include "parser.h"
 #include "args.h"
 #include "util.h"
+#include "error_message.h"
 #include <stddef.h>
 #include <stdio.h>
 #include "../lib/ansi.h"
@@ -13,6 +14,7 @@
 
 
 int main(int argc, char** argv) {
+
     // parse command line args
     ResultType(CometArgs, charptr) args = parseArgs(argc, argv);
     if (args.error) {
@@ -29,6 +31,12 @@ int main(int argc, char** argv) {
 
     // compile file
     char* source = getFileContents(args.as.success.filePath);
+
+    ErrorMessage errMsg = createError("InvalidSyntax", "Unexpected token \"#\"", NULL, 1);
+    createErrorRegion(&errMsg, "here", ESC_RED_FG, 1, 1);
+    printErrorMessage(errMsg, source);
+
+    return 0;
 
     ResultType(CometLexer, charptr) lexer = newLexer(source);
     ResultType(tokenList, charptr) tokens = lex(&lexer.as.success);

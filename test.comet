@@ -1,6 +1,4 @@
-import io
-
 func main() -> int {
-    small test = io.print("Hello, World!")
-    return test
+    int y = x + 5
+    return 0
 }

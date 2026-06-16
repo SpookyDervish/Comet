@@ -10,4 +10,8 @@
 char* getFileContents(const char* filename);
 char *repl_str(const char *str, const char *from, const char *to);
 
+// Returns a dynamically allocated string containing the target line.
+// The caller is responsible for freeing the returned memory.
+char *getLineInString(const char *str, int target_line);
+
 #endif
