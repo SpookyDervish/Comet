@@ -14,7 +14,7 @@ void printErrorMessage(ErrorMessage errMsg) {
         lineSourceOwned = false;
     }
 
-    static const unsigned int linesToShow = 5; // 5 total - 2 above, 2 below
+    static const unsigned int linesToShow = 2; // 2 above, 2 below
 
     if (!errMsg.isWarning) {
         // Error: SyntaxError
@@ -37,16 +37,11 @@ void printErrorMessage(ErrorMessage errMsg) {
         errMsg.endCol
     );
 
-    int half = floor((float)linesToShow / 2);
-    int startLine = errMsg.lineNumber - half;
+    int startLine = errMsg.lineNumber - linesToShow;
+    if (startLine < 1)
+        startLine = 1;
 
-    if (startLine < 0)
-        startLine = 0;
-
-    int endLine = errMsg.lineNumber + (linesToShow - (errMsg.lineNumber - startLine));
-
-
-    for (unsigned int lineNumber = startLine + 1; lineNumber < endLine + 1; lineNumber++) {
+    for (unsigned int lineNumber = startLine; lineNumber < errMsg.lineNumber + linesToShow; lineNumber++) {
         char* line = getLineInString(errMsg.sourceCode, lineNumber);
         if (line == NULL)
             break;
