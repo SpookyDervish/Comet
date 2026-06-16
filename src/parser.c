@@ -1139,12 +1139,13 @@ ResultType(astNodePtr, ErrorMessage) parseBlockStatement(CometParser* parser) {
         return Error(astNodePtr, ErrorMessage, errMsg);
     }
 
-    
-
     ResultType(int, ErrorMessage) openCurly = expectPeek(parser, CT_OPEN_CURLY);
     if (openCurly.error) {
         return Error(astNodePtr, ErrorMessage, openCurly.as.error);
     }
+
+    uint32_t startCol = parser->currentToken->startCol;
+    uint32_t lineNum = parser->currentToken->lineNum;
 
     CometASTNode* program = AST_NODE(AST_PROGRAM, parser->currentToken->lineNum, statements, 0, 1);
     program->startCol = parser->currentToken->startCol;
@@ -1153,7 +1154,18 @@ ResultType(astNodePtr, ErrorMessage) parseBlockStatement(CometParser* parser) {
 
     while (parser->currentToken->type != CT_CLOSE_CURLY) {
         if (parser->currentToken->type == CT_EOF) {
-            return Error(astNodePtr, ErrorMessage, "Block statement was not closed!");
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                "Block statement was not closed",
+                NULL,
+                lineNum,
+                startCol,
+                startCol
+            );
+
+            return Error(astNodePtr, ErrorMessage, errMsg);
         }
 
         ResultType(astNodePtr, ErrorMessage) stmt = parseStatement(parser, false, FIELD_PUBLIC);
