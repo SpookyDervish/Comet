@@ -262,16 +262,15 @@ ResultType(int, ErrorMessage) expectPeek(CometParser* parser, CometTokenType tok
 }
 
 ResultType(int, ErrorMessage) expectPeekKeyword(CometParser* parser, const char* keyword) {
+
     ResultType(int, ErrorMessage) next = expectPeek(parser, CT_KEYWORD);
     if (next.error) {
         return next;
     }
 
-    
-
-    if (strcmp(parser->peekToken->value.literal, keyword) != 0) {
-        char* buffer = malloc(256);
-        sprintf(buffer, "Expected next token to be %s but got %s instead.", keyword, parser->peekToken->value.literal);
+    if (!parser->peekToken) {
+        char* buffer = malloc(128);
+        snprintf(buffer, 128, "Expected next token to be %s but got <EOF> instead.", keyword);
 
         ErrorMessage errMsg = createError(
             parser->fileName,
@@ -279,9 +278,27 @@ ResultType(int, ErrorMessage) expectPeekKeyword(CometParser* parser, const char*
             "InvalidSyntax",
             buffer,
             NULL,
-            parser->peekToken->lineNum,
-            parser->peekToken->startCol,
-            parser->peekToken->endCol
+            parser->currentToken->lineNum,
+            parser->currentToken->endCol,
+            parser->currentToken->endCol
+        );
+
+        return Error(int, ErrorMessage, errMsg);
+    }
+
+    if (strcmp(parser->currentToken->value.literal, keyword) != 0) {
+        char* buffer = malloc(128);
+        snprintf(buffer, 128, "Expected next token to be %s but got %s instead.", keyword, parser->peekToken->value.literal);
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode, 
+            "InvalidSyntax",
+            buffer,
+            NULL,
+            parser->currentToken->lineNum,
+            parser->currentToken->startCol,
+            parser->currentToken->endCol
         );
 
         return Error(int, ErrorMessage, errMsg);
@@ -1255,6 +1272,7 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
     ident->startCol = parser->currentToken->startCol;
     ident->endCol = parser->currentToken->endCol;
+    
     
 
     ResultType(int, ErrorMessage) expectIn = expectPeekKeyword(parser, "in");
