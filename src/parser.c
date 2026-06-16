@@ -140,6 +140,7 @@ ResultType(parserPtr, ErrorMessage) newParser(tokenList tokens, char* fileName, 
     parser->statementArraySize = 8;
     parser->program = AST_NODE(
         AST_PROGRAM,
+        1,
         calloc(parser->statementArraySize, sizeof(CometASTNode*)),
         0,
         parser->statementArraySize
@@ -665,11 +666,15 @@ ResultType(astNodePtr, ErrorMessage) parseInfixExpression(CometParser* parser, C
 
         ResultType(astNodePtr, ErrorMessage) right = parseExpression(parser, PRECEDENCE_LOWEST);
 
-        CometASTNode* assign = AST_NODE(AST_REASSIGN_STATEMENT, left, right.as.success, op);
+        CometASTNode* assign = AST_NODE(AST_REASSIGN_STATEMENT, left->lineNum, left, right.as.success, op);
+        assign->startCol = left->startCol;
+        assign->endCol = right.as.success->endCol;
+
         return Success(astNodePtr, ErrorMessage, assign);
     }
 
-    CometASTNode* infixExpr = AST_NODE(AST_INFIX_EXPRESSION, left, NULL, *parser->currentToken);
+    CometASTNode* infixExpr = AST_NODE(AST_INFIX_EXPRESSION, left->lineNum, left, NULL, *parser->currentToken);
+    infixExpr->startCol = left->startCol;
 
     CometPrecedenceType precedence = currentPrecedence(parser);
     parserNextToken(parser);
@@ -679,6 +684,7 @@ ResultType(astNodePtr, ErrorMessage) parseInfixExpression(CometParser* parser, C
         return right;
 
     infixExpr->data.AST_INFIX_EXPRESSION.right = right.as.success;
+    infixExpr->endCol = right.as.success->endCol;
 
     return Success(astNodePtr, ErrorMessage, infixExpr);
 }
@@ -733,9 +739,15 @@ ResultType(argList, ErrorMessage) parseFunctionDefArgs(CometParser* parser) {
         if (expectArgName.error) {
             return Error(argList, ErrorMessage, expectArgName.as.error);
         }
-        CometASTNode* argName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+        CometASTNode* argName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+        argName->startCol = parser->currentToken->startCol;
+        argName->endCol = parser->currentToken->endCol;
 
-        append(args, AST_NODE(AST_ARG_DEF, type.as.success, argName));
+        CometASTNode* argDef = AST_NODE(AST_ARG_DEF, type.as.success->lineNum, type.as.success, argName);
+        argDef->startCol = argName->startCol;
+        argDef->endCol = type.as.success->endCol;
+        append(args, argDef);
+
 
         ResultType(int, ErrorMessage) expectComma = expectPeek(parser, CT_COMMA);
         if (expectComma.error && !peekTokenIs(parser, CT_CLOSE_PAREN)) {
@@ -798,24 +810,36 @@ ResultType(argList, ErrorMessage) parseFunctionCallArgs(CometParser* parser) {
 
 // -- PREFIX METHODS -- //
 ResultType(astNodePtr, ErrorMessage) parseIntLiteral(CometParser* parser) {
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_INT, parser->currentToken->value.intVal));
+    CometASTNode* node = AST_NODE(AST_INT, parser->currentToken->lineNum, parser->currentToken->value.intVal);
+    node->startCol = parser->currentToken->startCol;
+    node->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, node);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseFloatLiteral(CometParser* parser) {
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_DOUBLE, parser->currentToken->value.doubleVal));
+    CometASTNode* node = AST_NODE(AST_DOUBLE, parser->currentToken->lineNum, parser->currentToken->value.doubleVal);
+    node->startCol = parser->currentToken->startCol;
+    node->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, node);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseBoolLiteral(CometParser* parser) {
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_BOOL, parser->currentToken->value.boolVal));
+    CometASTNode* node = AST_NODE(AST_BOOL, parser->currentToken->lineNum, parser->currentToken->value.boolVal);
+    node->startCol = parser->currentToken->startCol;
+    node->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, node);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseStringLiteral(CometParser* parser) {
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_STRING, parser->currentToken->value.literal));
+    CometASTNode* node = AST_NODE(AST_STRING, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    node->startCol = parser->currentToken->startCol;
+    node->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, node);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseArrayLiteral(CometParser* parser) {
-    CometASTNode* literal = AST_NODE(AST_ARRAY, newList(astNodePtr));
-
+    CometASTNode* literal = AST_NODE(AST_ARRAY, parser->currentToken->lineNum, newList(astNodePtr));
+    literal->startCol = parser->currentToken->startCol;
     
 
     while (true) {
@@ -851,18 +875,23 @@ ResultType(astNodePtr, ErrorMessage) parseArrayLiteral(CometParser* parser) {
         }
     }
 
+    literal->endCol = parser->currentToken->endCol;
+
     parserNextToken(parser); // skip ']'
 
     return Success(astNodePtr, ErrorMessage, literal);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseIdentifier(CometParser* parser) {
-    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    ident->startCol = parser->currentToken->startCol;
+    ident->endCol = parser->currentToken->endCol;
     return Success(astNodePtr, ErrorMessage, ident);
 }
 
 ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) {
-    CometASTNode* expr = AST_NODE(AST_PREFIX_EXPRESSION, *parser->currentToken, NULL);
+    CometASTNode* expr = AST_NODE(AST_PREFIX_EXPRESSION, parser->currentToken->lineNum, *parser->currentToken, NULL);
+    expr->startCol = parser->currentToken->startCol;
 
     parserNextToken(parser);
 
@@ -871,16 +900,22 @@ ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) 
         return rightSide;
 
     expr->data.AST_PREFIX_EXPRESSION.right = rightSide.as.success;
+
+    expr->endCol = rightSide.as.success->endCol;
+
     return Success(astNodePtr, ErrorMessage, expr);
 }
 
 // -- TYPE PARSING -- //
 ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
     
-    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    baseType->startCol = parser->currentToken->startCol;
+    baseType->endCol = parser->currentToken->endCol;
     parserNextToken(parser); // consume base type
 
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, newList(astNodePtr), 0);
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType->lineNum, baseType, newList(astNodePtr), 0);
+    typeNode->startCol = baseType->startCol;
 
     parserNextToken(parser); // consume '['
 
@@ -891,9 +926,13 @@ ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
             buffer[0] = '*';
             buffer[1] = 0;
 
+            CometASTNode* node = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, buffer);
+            node->startCol = parser->currentToken->startCol;
+            node->endCol = parser->currentToken->endCol;
+
             append(
                 typeNode->data.AST_TYPE.shape,
-                AST_NODE(AST_IDENTIFIER, buffer)
+                node
             );
 
         } else {
@@ -940,8 +979,13 @@ ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
 }
 
 ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
-    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType, NULL, 0);
+    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    baseType->startCol = parser->currentToken->startCol;
+    baseType->endCol = parser->currentToken->endCol;
+
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType->lineNum, baseType, NULL, 0);
+    typeNode->startCol = baseType->startCol;
+    typeNode->endCol = baseType->endCol;
 
     return Success(astNodePtr, ErrorMessage, typeNode);
 }
@@ -962,7 +1006,9 @@ ResultType(astNodePtr, ErrorMessage) parseExpressionStatement(CometParser* parse
         return expr;
     }
     
-    CometASTNode* stmt = AST_NODE(AST_EXPRESSION_STATEMENT, expr.as.success);
+    CometASTNode* stmt = AST_NODE(AST_EXPRESSION_STATEMENT, expr.as.success->lineNum, expr.as.success);
+    stmt->startCol = expr.as.success->startCol;
+    stmt->endCol = expr.as.success->endCol;
 
     return Success(astNodePtr, ErrorMessage, stmt);
 }
@@ -1025,14 +1071,19 @@ ResultType(astNodePtr, ErrorMessage) parseAssignmentStatement(CometParser* parse
         return parseExpression(parser, PRECEDENCE_LOWEST);
     parserNextToken(parser);
 
-    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    ident->startCol = parser->currentToken->startCol;
+    ident->endCol = parser->currentToken->endCol;
 
-    CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, ident, NULL, type.as.success, isMutable, fieldAttrib);
+    CometASTNode* stmt = AST_NODE(AST_ASSIGN_STATEMENT, type.as.success->lineNum, ident, NULL, type.as.success, isMutable, fieldAttrib);
+    stmt->startCol = type.as.success->startCol;
+    
 
     bool hasValue = peekTokenIs(parser, CT_EQ);
     
 
     if (!hasValue) {
+        stmt->endCol = ident->endCol;
         return Success(astNodePtr, ErrorMessage, stmt);
     }
 
@@ -1048,7 +1099,7 @@ ResultType(astNodePtr, ErrorMessage) parseAssignmentStatement(CometParser* parse
     }
 
     stmt->data.AST_ASSIGN_STATEMENT.expression = value.as.success;
-
+    stmt->endCol = value.as.success->endCol;
     
     
     return Success(astNodePtr, ErrorMessage, stmt);
@@ -1071,12 +1122,15 @@ ResultType(astNodePtr, ErrorMessage) parseBlockStatement(CometParser* parser) {
         return Error(astNodePtr, ErrorMessage, errMsg);
     }
 
-    CometASTNode* program = AST_NODE(AST_PROGRAM, statements, 0, 1);
+    
 
     ResultType(int, ErrorMessage) openCurly = expectPeek(parser, CT_OPEN_CURLY);
     if (openCurly.error) {
         return Error(astNodePtr, ErrorMessage, openCurly.as.error);
     }
+
+    CometASTNode* program = AST_NODE(AST_PROGRAM, parser->currentToken->lineNum, statements, 0, 1);
+    program->startCol = parser->currentToken->startCol;
 
     parserNextToken(parser);
 
@@ -1094,6 +1148,8 @@ ResultType(astNodePtr, ErrorMessage) parseBlockStatement(CometParser* parser) {
         parserNextToken(parser);
         
     }
+
+    program->endCol = parser->currentToken->endCol;
 
     return Success(astNodePtr, ErrorMessage, program);
 }
@@ -1128,7 +1184,9 @@ ResultType(astNodePtr, ErrorMessage) parseOptionalBlockStatement(CometParser* pa
             return Error(astNodePtr, ErrorMessage, errMsg);
         }
 
-        CometASTNode* program = AST_NODE(AST_PROGRAM, statements, 0, 1);
+        CometASTNode* program = AST_NODE(AST_PROGRAM, innerStmt.as.success->lineNum, statements, 0, 1);
+        program->startCol = innerStmt.as.success->startCol;
+        program->endCol = innerStmt.as.success->endCol;
         appendStatement(program, innerStmt.as.success);
 
         stmt = program;
@@ -1151,6 +1209,8 @@ ResultType(astNodePtr, ErrorMessage) parseWhileStatement(CometParser* parser) {
     // basic format:
     // while true {}
 
+    CometASTNode* stmt = AST_NODE(AST_WHILE_STATEMENT, parser->currentToken->startCol, NULL, NULL);
+
     parserNextToken(parser);
 
     ResultType(astNodePtr, ErrorMessage) expression = parseExpression(parser, PRECEDENCE_LOWEST);
@@ -1158,12 +1218,15 @@ ResultType(astNodePtr, ErrorMessage) parseWhileStatement(CometParser* parser) {
         return expression;
     }
 
+    stmt->data.AST_WHILE_STATEMENT.expression = expression.as.success;
+
     ResultType(astNodePtr, ErrorMessage) program = parseOptionalBlockStatement(parser);
     if (program.error) {
         return program;
     }
 
-    CometASTNode* stmt = AST_NODE(AST_WHILE_STATEMENT, expression.as.success, program.as.success);
+    stmt->data.AST_WHILE_STATEMENT.program = program.as.success;
+    stmt->endCol = program.as.success->endCol;
 
     return Success(astNodePtr, ErrorMessage, stmt);
 }
@@ -1171,6 +1234,9 @@ ResultType(astNodePtr, ErrorMessage) parseWhileStatement(CometParser* parser) {
 ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
     // basic format
     // for int i in 0 .. 10 {}
+
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
 
     ResultType(int, ErrorMessage) expectType = expectPeek(parser, CT_IDENT);
     if (expectType.error) {
@@ -1186,8 +1252,9 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
         return Error(astNodePtr, ErrorMessage, expectIdent.as.error);
     }
 
-    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
-
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    ident->startCol = parser->currentToken->startCol;
+    ident->endCol = parser->currentToken->endCol;
     
 
     ResultType(int, ErrorMessage) expectIn = expectPeekKeyword(parser, "in");
@@ -1234,6 +1301,7 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
 
     CometASTNode* stmt = AST_NODE(
         AST_FOR_STATEMENT,
+        lineNum,
         type.as.success,
         ident,
         start.as.success,
@@ -1241,20 +1309,32 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
         stepNode.as.success,
         block.as.success
     );
+    stmt->startCol = startCol;
+    stmt->endCol = block.as.success->endCol;
+
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseBreakStatement(CometParser* parser) {
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_BREAK_STATEMENT));
+    CometASTNode* n = AST_NODE(AST_BREAK_STATEMENT, parser->currentToken->lineNum);
+    n->startCol = parser->currentToken->startCol;
+    n->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, n);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseContinueStatement(CometParser* parser) {
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_CONTINUE_STATEMENT));
+    CometASTNode* n = AST_NODE(AST_CONTINUE_STATEMENT, parser->currentToken->lineNum);
+    n->startCol = parser->currentToken->startCol;
+    n->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, n);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseIfStatement(CometParser* parser) {
     // basic format
     // if 1+1 == 2 {}
+
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
 
     parserNextToken(parser);
 
@@ -1282,10 +1362,13 @@ ResultType(astNodePtr, ErrorMessage) parseIfStatement(CometParser* parser) {
 
     CometASTNode* stmt = AST_NODE(
         AST_IF_STATEMENT,
+        lineNum,
         expr.as.success,
         body.as.success,
         elseBody
     );
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
      
     
 
@@ -1302,12 +1385,18 @@ ResultType(astNodePtr, ErrorMessage) parseFunctionDefStatement(CometParser* pars
     // inline body func
     // func func_name(type arg_name, type2 arg_name2) => arg_name + arg_name2
 
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     ResultType(int, ErrorMessage) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error) {
         return Error(astNodePtr, ErrorMessage, expectName.as.error);
     }
 
-    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    ident->startCol = parser->currentToken->startCol;
+    ident->endCol = parser->currentToken->endCol;
+
     bool isInline = false;
 
     ResultType(int, ErrorMessage) expectOpenParen = expectPeek(parser, CT_OPEN_PAREN);
@@ -1377,6 +1466,7 @@ ResultType(astNodePtr, ErrorMessage) parseFunctionDefStatement(CometParser* pars
 
     CometASTNode* stmt = AST_NODE(
         AST_FUNC_DEF_STATEMENT,
+        lineNum,
         ident,
         block,
         args.as.success,
@@ -1385,21 +1475,32 @@ ResultType(astNodePtr, ErrorMessage) parseFunctionDefStatement(CometParser* pars
         inlineExpr,
         fieldAttrib
     );
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
+
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseFunctionCall(CometParser* parser, CometASTNode* left) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     // 'left' is the already-parsed expression before the '('
     ResultType(argList, ErrorMessage) args = parseFunctionCallArgs(parser);
     if (args.error) {
         return Error(astNodePtr, ErrorMessage, args.as.error);
     }
-    CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, left, args.as.success);
+
+    CometASTNode* funcCallNode = AST_NODE(AST_FUNC_CALL, lineNum, left, args.as.success);
+    funcCallNode->startCol = startCol;
+    funcCallNode->endCol = parser->currentToken->endCol;
+
     return Success(astNodePtr, ErrorMessage, funcCallNode);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseReturnStatement(CometParser* parser) {
-    
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
 
     parserNextToken(parser);
     ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
@@ -1407,10 +1508,17 @@ ResultType(astNodePtr, ErrorMessage) parseReturnStatement(CometParser* parser) {
         return expr;
     }
 
-    return Success(astNodePtr, ErrorMessage, AST_NODE(AST_RETURN_STATEMENT, expr.as.success));
+    CometASTNode* stmt = AST_NODE(AST_RETURN_STATEMENT, expr.as.success->lineNum, expr.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = expr.as.success->endCol;
+
+    return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     parserNextToken(parser);
 
     ResultType(argList, ErrorMessage) constructorArgs = parseFunctionDefArgs(parser);
@@ -1421,7 +1529,9 @@ ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
     if (body.error)
         return body;
 
-    CometASTNode* stmt = AST_NODE(AST_CONSTRUCTOR_DEF, body.as.success, constructorArgs.as.success);
+    CometASTNode* stmt = AST_NODE(AST_CONSTRUCTOR_DEF, lineNum, body.as.success, constructorArgs.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = body.as.success->endCol;
 
     return Success(astNodePtr, ErrorMessage, stmt);
 }
@@ -1441,12 +1551,18 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
         }
     }*/
 
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     ResultType(int, ErrorMessage) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error) {
         return Error(astNodePtr, ErrorMessage, expectName.as.error);
     }
 
-    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    structName->startCol = parser->currentToken->startCol;
+    structName->endCol = parser->currentToken->endCol;
+
     CometASTNode* parentName = NULL;
 
     // the class inherits from something
@@ -1458,7 +1574,9 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
         if (expectParentName.error)
             return Error(astNodePtr, ErrorMessage, expectParentName.as.error);
 
-        parentName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+        parentName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+        parentName->startCol = parser->currentToken->startCol;
+        parentName->endCol = parser->currentToken->endCol;
     }
 
     List(astNodePtr) fieldDefs = newList(astNodePtr);
@@ -1511,21 +1629,30 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
 
     CometASTNode* stmt = AST_NODE(
         AST_STRUCT_DEF_STATEMENT,
+        lineNum,
         structName,
         fieldDefs,
         constructor,
         NULL,
         parentName
     );
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
+
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* parser) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     ResultType(int, ErrorMessage) expectName = expectPeek(parser, CT_IDENT);
     if (expectName.error)
         return Error(astNodePtr, ErrorMessage, expectName.as.error);
 
-    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    structName->startCol = parser->currentToken->startCol;
+    structName->endCol = parser->currentToken->endCol;
 
     parserNextToken(parser);
 
@@ -1533,29 +1660,43 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     if (constructorArgs.error)
         return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
 
-    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, structName, constructorArgs.as.success);
+    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structName, constructorArgs.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
 
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseOverrideStatement(CometParser* parser, FieldAttribute fieldAttrib) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     parserNextToken(parser); // skip "override"
 
     ResultType(astNodePtr, ErrorMessage) funcDef = parseFunctionDefStatement(parser, fieldAttrib);
     if (funcDef.error)
         return funcDef;
 
-    CometASTNode* stmt = AST_NODE(AST_OVERRIDE_STATEMENT, funcDef.as.success);
+    CometASTNode* stmt = AST_NODE(AST_OVERRIDE_STATEMENT, lineNum, funcDef.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = funcDef.as.success->endCol;
+
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseImportStatement(CometParser* parser) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     parserNextToken(parser); // skip "import"
 
     List(astNodePtr) importChain = newList(astNodePtr);
 
     while (true) {
-        CometASTNode* importName = AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
+        CometASTNode* importName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+        importName->startCol = parser->currentToken->startCol;
+        importName->endCol = parser->currentToken->endCol;
+
         append(importChain, importName);
 
 
@@ -1568,12 +1709,17 @@ ResultType(astNodePtr, ErrorMessage) parseImportStatement(CometParser* parser) {
         
     }
 
-    CometASTNode* stmt = AST_NODE(AST_IMPORT_STATEMENT, importChain);
+    CometASTNode* stmt = AST_NODE(AST_IMPORT_STATEMENT, lineNum, importChain);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
+
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
 ResultType(astNodePtr, ErrorMessage) parseBreakpointStatement(CometParser* parser) {
-    CometASTNode* stmt = AST_NODE(AST_BREAKPOINT_STATEMENT);
+    CometASTNode* stmt = AST_NODE(AST_BREAKPOINT_STATEMENT, parser->currentToken->lineNum);
+    stmt->startCol = parser->currentToken->startCol;
+    stmt->endCol = parser->currentToken->endCol;
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 

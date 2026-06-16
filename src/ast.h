@@ -154,4 +154,4 @@ CometASTNode* allocateNode(CometASTNode parent);
 void freeNode(CometASTNode* node);
 char* ASTNodeTypeToCStr(CometASTNodeType nodeType);
 
-#define AST_NODE(nodeType, ...) allocateNode((CometASTNode){nodeType, {.nodeType=(struct nodeType){__VA_ARGS__}}})
+#define AST_NODE(type, lineNumber, ...) allocateNode((CometASTNode){.nodeType = type, {.type=(struct type){__VA_ARGS__}}, .lineNum = lineNumber})
