@@ -621,7 +621,7 @@ ResultType(astNodePtr, ErrorMessage) parseExpression(CometParser* parser, CometP
 
     if (prefixFunc.error) {
         char* buffer = malloc(128);
-        sprintf(buffer, "No prefix parse function for %s.\n", tokenTypeToCStr(parser->currentToken->type));
+        sprintf(buffer, "No prefix parse function for %s.", tokenTypeToCStr(parser->currentToken->type));
 
         ErrorMessage errMsg = createError(
             parser->fileName,
