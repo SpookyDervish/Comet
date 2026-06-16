@@ -42,11 +42,20 @@ CometLexer newLexer(char* source, char* filePath) {
         .sourceLen = strlen(source),
         .pos = 0,
         .currentChar = source[0],
-        .filePath = filePath
+        .filePath = filePath,
+        .lineNum = 1,
+        .column = 1
     };
 }
 
 ResultType(Nothing, charptr) lexerConsume(CometLexer* lexer) {
+    if (lexer->currentChar == '\n') {
+        lexer->column = 1;
+        lexer->lineNum++;
+    } else {
+        lexer->column++;
+    }
+
     lexer->pos++;
 
     if (lexer->pos >= lexer->sourceLen) {
@@ -54,6 +63,7 @@ ResultType(Nothing, charptr) lexerConsume(CometLexer* lexer) {
     }
 
     lexer->currentChar = lexer->source[lexer->pos];
+    
 
     return Success(Nothing, charptr, {});
 }
@@ -348,8 +358,8 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
         switch (lexer->currentChar) {
             case ' ':
             case '\t':
-            case '\n':
             case '\r':
+            case '\n':
                 break;
             case '!': {
                 ResultType(char, charptr) next = lexerPeek(lexer);
