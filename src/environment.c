@@ -61,7 +61,7 @@ uint32_t defineVar(CometEnvironment* env, char* name, RecordType recordType, Com
 CometEnvironment* destroyEnv(CometEnvironment* env) {
     CometEnvironment* parent = env->parent;
 
-    parent->recordIdx -= env->recordIdx;
+    //parent->recordIdx -= env->recordIdx;
     free(env);
 
     return parent;

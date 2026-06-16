@@ -1309,7 +1309,7 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
             return stepNode;
         }
     } else {
-        stepNode = Success(astNodePtr, ErrorMessage, AST_NODE(AST_INT, 1));
+        stepNode = Success(astNodePtr, ErrorMessage, AST_NODE(AST_INT, parser->currentToken->lineNum, 1));
     }
 
     ResultType(astNodePtr, ErrorMessage) block = parseOptionalBlockStatement(parser);
