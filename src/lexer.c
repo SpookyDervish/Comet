@@ -103,7 +103,10 @@ CometToken booleanToken(char* buffer) {
 }
 
 ResultType(CometToken, ErrorMessage) lexerParseWord(CometLexer* lexer) {
-    CometToken tok;
+    CometToken tok = {
+        .startCol = lexer->column,
+        .lineNum = lexer->lineNum
+    };
 
     size_t bufferSize = 1;
 
@@ -171,11 +174,16 @@ ResultType(CometToken, ErrorMessage) lexerParseWord(CometLexer* lexer) {
 
     tok.value.literal = buffer;
 
+    tok.endCol = lexer->column;
+
     return Success(CometToken, ErrorMessage, tok);
 }
 
 ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
-    CometToken tok;
+    CometToken tok = {
+        .startCol = lexer->column,
+        .lineNum = lexer->lineNum
+    };
 
     size_t bufferSize = 1;
 
@@ -286,13 +294,17 @@ ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
         tok.value.intVal = strtoll(buffer, NULL, 10);
     }
 
+    tok.endCol = lexer->column;
+
     return Success(CometToken, ErrorMessage, tok);
 }
 
 ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char startingQuote) {
     CometToken tok = {
         .literalType = CL_STRING,
-        .type = CT_STRING_LITERAL
+        .type = CT_STRING_LITERAL,
+        .startCol = lexer->column,
+        .lineNum = lexer->lineNum
     };
 
     uint32_t startColumn = lexer->column;
@@ -347,6 +359,7 @@ ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char st
     lexerConsume(lexer); // consume last quote
 
     tok.value.literal = buffer;
+    tok.endCol = lexer->column;
 
     return Success(CometToken, ErrorMessage, tok);
 }
