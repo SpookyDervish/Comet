@@ -1,4 +1,4 @@
-func main(stringp[*] argv, int argc) -> int {
-    string[*] test = argv
+func main(string[*] argv, int argc) -> int {
+    string[1] test = argv
     return 0
 }

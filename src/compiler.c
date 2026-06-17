@@ -1428,8 +1428,8 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
             "Variable type and expression type don't match in assignment.",
             help.str,
             node->lineNum,
-            node->startCol,
-            node->endCol
+            expr->startCol,
+            expr->endCol
         );
 
         return Error(CometOperand, ErrorMessage, errMsg);
