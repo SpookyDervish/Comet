@@ -288,6 +288,28 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
     return newVal;
 }
 
+CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType) {
+    CometOperand out = {
+        .type = CO_IMMEDIATE
+    };
+
+    CometOperand* serializedData = calloc(length, sizeof(CometOperand));
+    if (!serializedData)
+        return (CometOperand){.type = CO_NONE};
+
+    for (size_t i = 0; i < length; i++) {
+        serializedData[i] = deserializeValue(((int64_t*)arrayValue)[i], elemType);
+    }
+
+    out.imm.typeKind = COMET_ARRAY;
+    out.imm.arrayVal = (CometArray){
+        .capacity = length,
+        .data = serializedData
+    };
+
+    return out;
+}
+
 CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]) {
     CometType* elemPtr = malloc(sizeof(CometType));
     if (!elemPtr) return cometTypeVoid;
@@ -305,12 +327,13 @@ CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[]
             arrayType->fixedSize[i] = fixedSize[i];
         } else {
             arrayType->isFixedSize[i] = false;
+
         }
     }
 
     memcpy(arrayType->isFixedSize, isFixedSize, sizeof(bool) * dimensions);
     memcpy(arrayType->fixedSize, fixedSize, sizeof(uint64_t) * dimensions);
-
+    
     return (CometType){
         .typeKind = COMET_ARRAY,
         .arrayType = arrayType

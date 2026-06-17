@@ -2,9 +2,13 @@
 
 static CometType cometTypeString = cometTypeVoid;
 
-int64_t impl_print(int64_t* args, CometVM* vm) {
+void ensureStringType() {
     if (cometTypeString.typeKind == COMET_VOID)
         cometTypeString = createArrayType(cometTypeSmall, 1, (bool[]){false}, (uint64_t[]){});
+}
+
+int64_t impl_print(int64_t* args, CometVM* vm) {
+    ensureStringType();
 
     CometOperand formatStringArray = deserializeValue(args[0], cometTypeString);
     char* formatString = (char*)cometArrayToCArray(formatStringArray, cometTypeSmall);
@@ -56,6 +60,27 @@ int64_t impl_println(int64_t* args, CometVM* vm) {
     return returnVal;
 }
 
+int64_t impl_getline(int64_t* args, CometVM* vm) {
+    ensureStringType();
+
+    char* userInput;
+    size_t numChars;
+    int64_t result = getline(&userInput, &numChars, stdin);
+    if (result == -1) {
+        return 0;
+    }
+
+    userInput[numChars] = 0;
+
+
+
+    CometOperand strValue = CArrayToCometArray(userInput, numChars + 1, cometTypeSmall);
+
+    int64_t serializedStr = serializeValue(strValue);
+
+    return serializedStr;
+}
+
 
 on_import {
     if (cometTypeString.typeKind == COMET_VOID)
@@ -63,4 +88,5 @@ on_import {
 
     cometDefineFunc(env, "print", cometTypeSmall, 1, true, cometTypeString);
     cometDefineFunc(env, "println", cometTypeSmall, 1, true, cometTypeString);
+    cometDefineFunc(env, "getline", cometTypeString, 0, false);
 }

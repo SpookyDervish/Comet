@@ -1,8 +1,8 @@
 import io
 
 func main() -> int {
+    string userInput = io.getline()
 
-    io.println("Hello, %s!", "bob")
-
+    io.println("Hello, %n!", 123)
     return 0
 }

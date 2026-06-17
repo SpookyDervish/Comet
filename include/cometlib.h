@@ -55,5 +55,6 @@ API_EXPORT CometOperand cometValue(CometValueTypeKind valueType, ...);
 API_EXPORT int64_t serializeValue(CometOperand value);
 API_EXPORT CometOperand deserializeValue(int64_t value, CometType type);
 API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType);
+API_EXPORT CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType);
 
 #endif
