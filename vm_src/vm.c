@@ -84,7 +84,7 @@ FORCE_INLINE int64_t popValue(CometVM* vm) {
     return value;
 }
 
-void pushImm(CometVM* vm, CometImmediate imm) {
+FORCE_INLINE void pushImm(CometVM* vm, CometImmediate imm) {
     switch (imm.typeKind) {
         case COMET_SMALL: pushValue(vm, (int64_t)imm.smallVal); break;
         case COMET_INT: pushValue(vm, (int64_t)imm.intVal); break;
@@ -111,7 +111,7 @@ void pushImm(CometVM* vm, CometImmediate imm) {
     }
 }
 
-void pushOperand(CometVM* vm, CometOperand operand) {
+FORCE_INLINE void pushOperand(CometVM* vm, CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE: {
             pushImm(vm, operand.imm);
@@ -610,7 +610,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         if (index < 0 || index >= capacity) {
             char* buffer = malloc(128);
             snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
-            return Error(voidPtr, charptr, "Arr");
+            return Error(voidPtr, charptr, buffer);
         }
 
         pushValue(
@@ -630,7 +630,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         if (index < 0 || index >= capacity) {
             char* buffer = malloc(128);
             snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
-            return Error(voidPtr, charptr, "Arr");
+            return Error(voidPtr, charptr, buffer);
         }
 
         array->data[index] = newValue;
