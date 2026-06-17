@@ -995,6 +995,8 @@ ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
         }
     }
 
+    typeNode->endCol = parser->currentToken->endCol;
+
     return Success(astNodePtr, ErrorMessage, typeNode);
 }
 

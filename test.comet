@@ -1,4 +1,4 @@
-func main() -> int {
-    string[2, 3, 2] arr = [[["test", "xyz"], ["hi", "xyz"], ["abc", "xyz"]], [["a", "xyz"], ["b", "xyz"], ["c", "xyz"]]]
+func main(stringp[*] argv, int argc) -> int {
+    string[*] test = argv
     return 0
 }

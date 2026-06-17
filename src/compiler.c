@@ -597,8 +597,8 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
             buffer.str,
             NULL,
             typeNode->lineNum,
-            typeNode->startCol,
-            typeNode->endCol
+            typeNode->data.AST_TYPE.baseType->startCol,
+            typeNode->data.AST_TYPE.baseType->endCol
         );
 
         return Error(CometType, ErrorMessage, errMsg);
