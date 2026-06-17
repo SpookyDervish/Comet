@@ -1,4 +1,8 @@
-func main(string[*] argv, int argc) -> int {
-    string[1] test = [argv : 0]
+import io
+
+func main() -> int {
+
+    io.println("Hello, %n!", 123)
+
     return 0
 }
