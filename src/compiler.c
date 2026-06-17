@@ -1075,6 +1075,30 @@ ResultType(CometType, ErrorMessage) getModuleAttribType(CometCompiler* c, CometA
     return Error(CometType, ErrorMessage, errMsg);
 }
 
+CometType getTopArrayElemType(CometArrayType* arrayType) {
+    
+
+    if (arrayType->dims == 1) {
+        return *arrayType->elem;
+    }
+
+    CometArrayType* outArrayType = calloc(1, sizeof(CometArrayType));
+    outArrayType->elem = arrayType->elem;
+
+    CometType outType = {
+        .typeKind = COMET_ARRAY,
+        .arrayType = outArrayType
+    };
+
+    outArrayType->dims = arrayType->dims - 1;
+    for (size_t i = 0; i < arrayType->dims - 1; i++) {
+        outArrayType->fixedSize[i] = arrayType->fixedSize[i];
+        outArrayType->isFixedSize[i] = arrayType->isFixedSize[i];
+    }
+
+    return outType;
+}
+
 ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* node) {
     CometValueTypeKind outTypeKind;
 
@@ -1224,6 +1248,24 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
             switch (expr.op.type) {
                 case CT_DIVIDE: // division always results in a double
                     return Success(CometType, ErrorMessage, {.typeKind = COMET_DOUBLE});
+
+                case CT_COLON:
+                    if (left.as.success.typeKind != COMET_ARRAY) {
+                        ErrorMessage errMsg = createError(
+                            c->inputFilePath,
+                            c->sourceCode,
+                            "TypeError",
+                            "Attempted to index something that isn't an array!",
+                            NULL,
+                            node->lineNum,
+                            node->startCol,
+                            node->endCol
+                        );
+
+                        return Error(CometType, ErrorMessage, errMsg);
+                    }
+
+                    return Success(CometType, ErrorMessage, getTopArrayElemType(left.as.success.arrayType));
 
                 case CT_DOT: { // get type of field
                     if (left.as.success.typeKind == COMET_MODULE)

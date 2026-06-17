@@ -1,4 +1,4 @@
 func main(string[*] argv, int argc) -> int {
-    string[1] test = argv
+    string[1] test = [argv : 0]
     return 0
 }
