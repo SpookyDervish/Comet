@@ -1,6 +1,11 @@
 #include <comet/cometlib.h>
 
+static CometType cometTypeString = cometTypeVoid;
+
 int64_t impl_print(int64_t* args, CometVM* vm) {
+    if (cometTypeString.typeKind == COMET_VOID)
+        cometTypeString = createArrayType(cometTypeSmall, 1, (bool[]){false}, (uint64_t[]){});
+
     CometOperand formatStringArray = deserializeValue(args[0], cometTypeString);
     char* formatString = (char*)cometArrayToCArray(formatStringArray, cometTypeSmall);
 
@@ -22,6 +27,12 @@ int64_t impl_print(int64_t* args, CometVM* vm) {
                 case 'b': {
                     bool boolVal = deserializeValue(args[argIdx], cometTypeBool).imm.boolVal;
                     printf( boolVal ? "true" : "false");
+                    break;
+                }
+                case 's': {
+                    CometOperand strArr = deserializeValue(args[argIdx], cometTypeString);
+                    char* str = (char*)cometArrayToCArray(strArr, cometTypeSmall);
+                    printf("%s", str);
                     break;
                 }
                 default: 
@@ -47,6 +58,9 @@ int64_t impl_println(int64_t* args, CometVM* vm) {
 
 
 on_import {
+    if (cometTypeString.typeKind == COMET_VOID)
+        cometTypeString = createArrayType(cometTypeSmall, 1, (bool[]){false}, (uint64_t[]){});
+
     cometDefineFunc(env, "print", cometTypeSmall, 1, true, cometTypeString);
     cometDefineFunc(env, "println", cometTypeSmall, 1, true, cometTypeString);
 }

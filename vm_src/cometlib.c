@@ -287,3 +287,32 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
     va_end(args);
     return newVal;
 }
+
+CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]) {
+    CometType* elemPtr = malloc(sizeof(CometType));
+    if (!elemPtr) return cometTypeVoid;
+
+    *elemPtr = elem;
+
+    CometArrayType* arrayType = malloc(sizeof(CometArrayType));
+    if (!arrayType) return cometTypeVoid;
+
+    arrayType->elem = elemPtr;
+    arrayType->dims = dimensions;
+    for (size_t i = 0; i < dimensions; i++) {
+        if (isFixedSize[i]) {
+            arrayType->isFixedSize[i] = true;
+            arrayType->fixedSize[i] = fixedSize[i];
+        } else {
+            arrayType->isFixedSize[i] = false;
+        }
+    }
+
+    memcpy(arrayType->isFixedSize, isFixedSize, sizeof(bool) * dimensions);
+    memcpy(arrayType->fixedSize, fixedSize, sizeof(uint64_t) * dimensions);
+
+    return (CometType){
+        .typeKind = COMET_ARRAY,
+        .arrayType = arrayType
+    };
+}

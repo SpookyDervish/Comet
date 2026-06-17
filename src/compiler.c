@@ -28,6 +28,39 @@ char* typeToString(CometType type) {
         case COMET_BOOL: return "bool";
         case COMET_VOID: return "void";
 
+        case COMET_FUNCTION: {
+            int buffsize = 256;
+            char* buffer = malloc(buffsize);
+            if (!buffer)
+                return NULL;
+
+            int remaining = buffsize;
+            int written = 0;
+
+            CometFunction* f = type.functionType;
+
+            written += snprintf(buffer + written, remaining, "%s(", f->name);
+            remaining = buffsize - written;
+
+            for (size_t i = 0; i < f->argCount; i++) {
+                if (i >= f->argCount-1) // end of args
+
+                    if (f->isVarArgs) // add dots if this function has variadic args
+                        written += snprintf(buffer + written, remaining, "%s, ...) -> ", typeToString(f->argTypes[i]));
+                    else
+                        written += snprintf(buffer + written, remaining, "%s) -> ", typeToString(f->argTypes[i]));
+
+                else // not end of args yet
+                    written += snprintf(buffer + written, remaining, "%s, ", typeToString(f->argTypes[i]));
+                remaining = buffsize - written;
+            }
+
+            written += snprintf(buffer + written, remaining, "%s", typeToString(f->returnType));
+            remaining = buffsize - written;
+            
+            return buffer;
+        }
+
         case COMET_ARRAY: {
             int buffSize = 128;
 
@@ -177,11 +210,12 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
     onLibImport(libEnv);
 
     // whenever an external lib creates a function we need to create a symbol for it in the compiler
-    for (size_t methodIdx = 0; methodIdx < libEnv->recordIdx; methodIdx++) {
-        if (libEnv->records[methodIdx].type.typeKind != COMET_FUNCTION) continue;
 
-        Record* libFuncRecord = &libEnv->records[methodIdx];
-        CometFunction* funcVal = (CometFunction*)libFuncRecord->value.imm.bigVal; // i sure do love casting pointers to ints lmao
+    Record* current, *tmp;
+    HASH_ITER(hh, libEnv->records, current, tmp) {
+        if (current->type.typeKind != COMET_FUNCTION) continue;
+
+        CometFunction* funcVal = (CometFunction*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
 
         CometOperand funcOperand = buildFunction(
             c,
@@ -195,7 +229,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
             libIdx
         );
 
-        libEnv->records[methodIdx].value = funcOperand;
+        current->value = funcOperand;
     }
 
     CometOperand libValue = createOperand(CO_IMMEDIATE);

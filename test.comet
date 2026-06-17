@@ -2,7 +2,7 @@ import io
 
 func main() -> int {
 
-    io.println("Hello, %n!", 123)
+    io.println("Hello, %s!", "bob")
 
     return 0
 }

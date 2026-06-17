@@ -23,11 +23,12 @@
 #define cometTypeDouble (CometType){.typeKind = COMET_DOUBLE}
 #define cometTypeBool (CometType){.typeKind = COMET_BOOL}
 #define cometTypeVoid (CometType){.typeKind = COMET_VOID}
-#define cometTypeString (CometType){.typeKind = COMET_ARRAY}
 
 #define on_import void onImport(CometEnvironment* env)
 
 UseList(CometSerializedFunc);
+
+CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
 
 API_EXPORT void cometDefineFunc(
     CometEnvironment* env,
