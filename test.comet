@@ -1,21 +1,9 @@
+import io
+
 func main() -> int {
-    mut int x = 0
+    small[1, *] arr = ["test"]
 
-    for int i in 0 .. 10 {
-        x += 1
-    }
+    io.print(arr : 0)
 
-    return x
+    return 0
 }
-
-
-
-
-
-
-
-
-
-
-
-func main

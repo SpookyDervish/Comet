@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "ast.h"
+#include "error_message.h"
 #include "lexer.h"
 #include "token.h"
 #include <stdbool.h>
@@ -132,7 +133,9 @@ ResultType(parserPtr, ErrorMessage) newParser(tokenList tokens, char* fileName, 
     if (tokens.count > 1) {
         parser->peekToken = get(tokens, 1);
     } else {
-        parser->peekToken = NULL;
+        CometToken* eof = malloc(sizeof(CometToken));
+        *eof = (CometToken){ .type = CT_EOF };
+        parser->peekToken = eof;
     }
 
     parser->tokenIndex = 0;
@@ -222,7 +225,7 @@ bool currentTokenIsAssignment(CometParser* parser) {
 }
 
 ResultType(int, ErrorMessage) expectPeek(CometParser* parser, CometTokenType tokenType) {
-    if (!parser->peekToken) {
+    if (!parser->peekToken || parser->peekToken->type == CT_EOF) {
         char* buffer = malloc(256);
         sprintf(buffer, "Expected next token to be %s but got <EOF> instead.", tokenTypeToCStr(tokenType));
 
@@ -996,6 +999,25 @@ ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
 }
 
 ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
+    if (!currentTokenIs(parser, CT_IDENT)) {
+        Estr buffer = CREATE_ESTR("Expected type name, got ");
+        APPEND_ESTR(buffer, tokenTypeToCStr(parser->currentToken->type));
+        APPEND_ESTR(buffer, " instead");
+
+        ErrorMessage errMsg = createError(
+            parser->fileName,
+            parser->sourceCode,
+            "InvalidSyntax",
+            buffer.str,
+            NULL,
+            parser->currentToken->lineNum,
+            parser->currentToken->startCol,
+            parser->currentToken->endCol
+        );
+
+        return Error(astNodePtr, ErrorMessage, errMsg);
+    }
+
     CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
     baseType->startCol = parser->currentToken->startCol;
     baseType->endCol = parser->currentToken->endCol;

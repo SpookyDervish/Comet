@@ -16,6 +16,71 @@
 
 
 // -- HELPER METHODS -- //
+char* typeToString(CometType type) {
+    
+
+    switch (type.typeKind) {
+        case COMET_SMALL: return "small";
+        case COMET_INT: return "int";
+        case COMET_BIG: return "big";
+        case COMET_FLOAT: return "float";
+        case COMET_DOUBLE: return "double";
+        case COMET_BOOL: return "bool";
+        case COMET_VOID: return "void";
+
+        case COMET_ARRAY: {
+            int buffSize = 128;
+
+            char* buffer = malloc(buffSize);
+            if (!buffer)
+                return NULL;
+
+            int written = snprintf(buffer, buffSize, "%s[", typeToString(*type.arrayType->elem));
+            int remaining = buffSize - written;
+    
+            for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+                if (type.arrayType->isFixedSize[i]) {
+                    written += snprintf(
+                        buffer + written,
+                        remaining,
+                        "%lu", 
+                        type.arrayType->fixedSize[i]
+                    );
+                } else {
+                    written += snprintf(
+                        buffer + written,
+                        remaining,
+                        "*"
+                    );
+                }
+    
+                if (i >= MAX_ARRAY_DEPTH - 1) {
+    
+                    written += snprintf(
+                        buffer + written, 
+                        remaining,
+                        "]"
+                    );
+                    
+                    
+                } else {
+                    written += snprintf(
+                        buffer + written, 
+                        remaining,
+                        ", "
+                    );
+                }
+    
+                remaining = buffSize - written;
+            }
+
+            return buffer;
+        }
+
+        default: return "unkown";
+    }
+}
+
 bool isAssignmentOperator(CometASTNode* expr) {
     CometTokenType assignmentOps[] = {
         CT_PLUS_EQ,
@@ -1299,12 +1364,17 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
         return Error(CometOperand, ErrorMessage, varType.as.error);
     
     if (!typesAreEqual(varType.as.success, exprType.as.success)) {
+        Estr help = CREATE_ESTR("Variable is type ");
+        APPEND_ESTR(help, typeToString(varType.as.success));
+        APPEND_ESTR(help, " but expression is type ");
+        APPEND_ESTR(help, typeToString(exprType.as.success));
+
         ErrorMessage errMsg = createError(
             c->inputFilePath,
             c->sourceCode,
             "TypeMismatch",
             "Variable type and expression type don't match in assignment.",
-            NULL,
+            help.str,
             node->lineNum,
             node->startCol,
             node->endCol
