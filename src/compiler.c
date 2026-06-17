@@ -38,7 +38,7 @@ char* typeToString(CometType type) {
             int written = snprintf(buffer, buffSize, "%s[", typeToString(*type.arrayType->elem));
             int remaining = buffSize - written;
     
-            for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+            for (size_t i = 0; i < type.arrayType->dims; i++) {
                 if (type.arrayType->isFixedSize[i]) {
                     written += snprintf(
                         buffer + written,
@@ -54,7 +54,7 @@ char* typeToString(CometType type) {
                     );
                 }
     
-                if (i >= MAX_ARRAY_DEPTH - 1) {
+                if (i >= type.arrayType->dims - 1) {
     
                     written += snprintf(
                         buffer + written, 
@@ -524,6 +524,48 @@ ResultType(CometType, ErrorMessage) getTypeByName(CometCompiler* c, char* typeNa
 
 }
 
+CometType flattenArrayType(CometType type) {
+    CometArrayType* outArrayType = calloc(1, sizeof(CometArrayType));
+    if (!outArrayType) 
+        return (CometType){ .typeKind = COMET_VOID };
+    
+    CometType out = {
+        .typeKind = COMET_ARRAY,
+        .arrayType = outArrayType
+    };
+
+    if (type.arrayType->elem->typeKind != COMET_ARRAY) {
+        CometType* elem = malloc(sizeof(CometType));
+        if (!elem)
+            return (CometType){ .typeKind = COMET_VOID };
+
+        *elem = type;
+
+        outArrayType->elem = elem;
+        outArrayType->dims = 1;
+        return out;
+    }
+
+    
+
+    CometArrayType* innerArray = flattenArrayType(*type.arrayType->elem).arrayType;
+
+    for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+        if (type.arrayType->isFixedSize[i]) {
+            outArrayType->isFixedSize[i] = type.arrayType->isFixedSize[i];
+            outArrayType->fixedSize[i] = type.arrayType->fixedSize[i];
+        } else {
+            outArrayType->isFixedSize[i] = innerArray->isFixedSize[i];
+            outArrayType->fixedSize[i] = innerArray->fixedSize[i];
+        }
+    }
+
+    outArrayType->elem = innerArray->elem->arrayType->elem;
+    outArrayType->dims = type.arrayType->dims + innerArray->dims; // NOTE: I HAVE NO CLUE IF THIS WORKS OR NOT LMAO
+
+    return out;
+}
+
 ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* typeNode) {
     struct AST_TYPE type = typeNode->data.AST_TYPE;
 
@@ -584,7 +626,9 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
             return Error(CometType, ErrorMessage, errMsg);
         }
 
-        for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+        arrayType->dims = type.dimensions;
+
+        for (size_t i = 0; i < type.dimensions; i++) {
             if (i >= type.shape.count) {
                 arrayType->isFixedSize[i] = false;
                 continue;
@@ -604,6 +648,10 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
     } else {
         finalType = *baseType;
         free(baseType);
+    }
+
+    if (finalType.typeKind == COMET_ARRAY && finalType.arrayType->elem->typeKind == COMET_ARRAY) {
+        finalType = flattenArrayType(finalType);
     }
 
     return Success(CometType, ErrorMessage, finalType);
@@ -1074,8 +1122,10 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
 
             // 3. Propagate deeper dimensions if the child is already an array
             if (firstType.typeKind == COMET_ARRAY) {
+                arrayType->dims = firstType.arrayType->dims + 1;
+
                 // Copy the child's dimensions, shifting them down by 1 level
-                for (size_t d = 0; d < MAX_ARRAY_DEPTH - 1; d++) {
+                for (size_t d = 0; d < firstType.arrayType->dims; d++) {
                     arrayType->isFixedSize[d + 1] = firstType.arrayType->isFixedSize[d];
                     arrayType->fixedSize[d + 1] = firstType.arrayType->fixedSize[d];
                 }
@@ -1083,6 +1133,8 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                 // The immediately nested element type is the child's element type
                 arrayType->elem = firstType.arrayType->elem;
             } else {
+                arrayType->dims = 1;
+
                 // It's a flat scalar array (e.g., [1, 2, 3])
                 CometType* scalarType = malloc(sizeof(CometType));
                 *scalarType = firstType;
@@ -2952,6 +3004,7 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
     stringType.typeKind = COMET_ARRAY;
 
     CometArrayType* stringArrayType = calloc(1, sizeof(CometArrayType));
+    stringArrayType->dims = 1;
 
     CometType* charType = malloc(sizeof(CometType));
     charType->typeKind = COMET_SMALL;

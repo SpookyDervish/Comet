@@ -17,7 +17,10 @@ bool typesAreEqual(CometType a, CometType b) {
 
     if (a.typeKind == COMET_ARRAY) {
         
-        for (size_t i = 0; i < MAX_ARRAY_DEPTH; i++) {
+        if (a.arrayType->dims != b.arrayType->dims)
+            return false;
+
+        for (size_t i = 0; i < a.arrayType->dims; i++) {
 
             if (!(typesAreEqual(*a.arrayType->elem, *b.arrayType->elem))) 
                 return false;

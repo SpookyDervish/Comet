@@ -32,6 +32,7 @@ struct CometArrayType {
     CometType* elem; 
     bool isFixedSize[MAX_ARRAY_DEPTH];
     uint64_t fixedSize[MAX_ARRAY_DEPTH];
+    uint8_t dims;
 };
 
 

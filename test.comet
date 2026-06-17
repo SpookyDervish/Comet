@@ -1,9 +1,4 @@
-import io
-
 func main() -> int {
-    small[1, *] arr = ["test"]
-
-    io.print(arr : 0)
-
+    string[2, 3, 2] arr = [[["test", "xyz"], ["hi", "xyz"], ["abc", "xyz"]], [["a", "xyz"], ["b", "xyz"], ["c", "xyz"]]]
     return 0
 }
