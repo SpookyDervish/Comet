@@ -288,6 +288,32 @@ ResultType(charptr, charptr) stackHandler(CometDebugger* dbgr, int argc, char** 
     return Success(charptr, charptr, NULL);
 }
 
+void printValue(CometOperand value) {
+    switch (value.type) {
+        case CO_IMMEDIATE: {
+            switch (value.imm.typeKind) {
+                case COMET_SMALL:
+                case COMET_INT:
+                case COMET_BIG:
+                    printf("%ld", value.imm.bigVal);
+                    break;
+                case COMET_FLOAT:
+                case COMET_DOUBLE:
+                    printf("%f", value.imm.doubleVal);
+                    break;
+                case COMET_BOOL:
+                    printf(value.imm.boolVal ? "true" : "false");
+                    break;
+                default: printf("(unkown)"); break;
+            }
+
+            break;
+        }
+
+        default: printf("(unkown)"); break;
+    }
+}
+
 ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char** argv) {
     if (argc < 1) 
         return Error(charptr, charptr, "1 arg required");
@@ -297,8 +323,34 @@ ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char
     if (range.start < 0 || range.end >= MAX_VARIABLES) 
         return Error(charptr, charptr, "variable index out of bounds");
 
+    char* varType = argc > 1 ? argv[1] : "hex";
+
     for (uint32_t i = range.start; i <= range.end; i++) {
-        printf(ESC_BOLD "vars[%d]" ESC_RESET " = 0x%08lx\n", i, dbgr->vm->variables[i]);
+        printf(ESC_BOLD "vars[%d]" ESC_RESET " = ", i);
+
+        if (strcmp(varType, "hex") == 0) {
+            printf("0x%08llx", dbgr->vm->variables[i]);
+        } else if (strcmp(varType, "int") == 0) {
+            printf("%lld", dbgr->vm->variables[i]);
+        } else if (strcmp(varType, "float") == 0) {
+            double out;
+            memcpy(&out, &dbgr->vm->variables[i], sizeof(double));
+
+            printf("%f", out);
+        } else if (strcmp(varType, "array") == 0) {
+            CometArray* arr = (CometArray*)dbgr->vm->variables[i];
+            printf("{capacity = %llu, data = %p}\n", arr->capacity, arr->data);
+
+            for (size_t i = 0; i < arr->capacity; i++) {
+                CometOperand elemVal = arr->data[i];
+
+                printf("    [%zu]=", i);
+                printValue(elemVal);
+                putchar('\n');
+            }
+        }
+
+        putchar('\n');
     }
 
     return Success(charptr, charptr, NULL);

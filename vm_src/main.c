@@ -40,10 +40,12 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    double timeSpentTotal = (double)(end - startWarmup) / CLOCKS_PER_SEC;
-    double timeSpentExec = (double)(end - startExec) / CLOCKS_PER_SEC;
-    printf("Execution took %f seconds (warmup + exec)\n", timeSpentTotal);
-    printf("Execution took %f seconds (exec)\n", timeSpentExec);
+    if (args.as.success.showExecTime) {
+        double timeSpentTotal = (double)(end - startWarmup) / CLOCKS_PER_SEC;
+        double timeSpentExec = (double)(end - startExec) / CLOCKS_PER_SEC;
+        printf("Execution took %f seconds (warmup + exec)\n", timeSpentTotal);
+        printf("Execution took %f seconds (exec)\n", timeSpentExec);
+    }
 
     return result.as.success;
 }

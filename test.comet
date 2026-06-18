@@ -1,8 +1,11 @@
 import io
 
 func main() -> int {
-    string userInput = io.getline()
+    io.print("What is your name? ")
+    breakpoint
+    string name = io.getline()
 
-    io.println("Hello, %n!", 123)
+    
+    io.println("Hello, %s!", name)
     return 0
 }

@@ -5,6 +5,7 @@
 const struct argp_option options[] = {
     { "file", 'f', "FILE", 0, "input file to compile", 0 },
     { "version", 'v', 0, 0, "display version number and quit", 0 },
+    { "time", 't', 0, 0, "display execution time on exit", 0 },
     { 0 }
 };
 
@@ -14,6 +15,10 @@ int parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
     switch (key) {
         case 'v':
             args->showVersion = true;
+            break;
+
+        case 't':
+            args->showExecTime = true;
             break;
 
         case ARGP_KEY_ARG:

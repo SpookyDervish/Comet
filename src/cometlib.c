@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -63,6 +64,11 @@ int64_t serializeValue(CometOperand value) {
         case COMET_BIG     : return value.imm.bigVal;
         case COMET_BOOL    : return value.imm.boolVal;
         case COMET_STRUCT  : return (int64_t)value.imm.objectVal;
+        case COMET_ARRAY   : {
+            CometArray* arr = malloc(sizeof(CometArray));
+            *arr = value.imm.arrayVal;
+            return (int64_t)arr;
+        }
         case COMET_FLOAT   : {
             int64_t serialized;
             memcpy(&serialized, &value.imm.floatVal, sizeof(float));
@@ -288,6 +294,15 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
     return newVal;
 }
 
+size_t GetCometTypeSize(CometType type) {
+    switch (type.typeKind) {
+        case COMET_SMALL: case COMET_BOOL:   return 1;
+        case COMET_INT:   case COMET_FLOAT:  return 4;
+        case COMET_BIG:   case COMET_DOUBLE: return 8;
+        default: return 0;
+    }
+}
+
 CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType) {
     CometOperand out = {
         .type = CO_IMMEDIATE
@@ -297,8 +312,24 @@ CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemT
     if (!serializedData)
         return (CometOperand){.type = CO_NONE};
 
+    size_t elemSize = GetCometTypeSize(elemType);
+
+    uint8_t* bytePtr = (uint8_t*)arrayValue;
+
     for (size_t i = 0; i < length; i++) {
-        serializedData[i] = deserializeValue(((int64_t*)arrayValue)[i], elemType);
+        void* elemAddr = bytePtr + (i * elemSize);
+        int64_t extractedValue = 0;
+
+        switch (elemSize) {
+            case 1: extractedValue = *(int8_t*)elemAddr; break;
+            case 2: extractedValue = *(int16_t*)elemAddr; break;
+            case 4: extractedValue = *(int32_t*)elemAddr; break;
+            case 8: extractedValue = *(int64_t*)elemAddr; break;
+            default: break;
+        }
+
+        printf("%lld\n", extractedValue);
+        serializedData[i] = deserializeValue(extractedValue, elemType);
     }
 
     out.imm.typeKind = COMET_ARRAY;

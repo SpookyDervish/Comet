@@ -9,6 +9,7 @@
 typedef struct {
     char* filePath;
     bool showVersion;
+    bool showExecTime;
 } CometArgs;
 
 Result(CometArgs, charptr);

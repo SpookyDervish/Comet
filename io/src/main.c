@@ -1,4 +1,5 @@
 #include <comet/cometlib.h>
+#include <stdlib.h>
 
 static CometType cometTypeString = cometTypeVoid;
 
@@ -63,18 +64,22 @@ int64_t impl_println(int64_t* args, CometVM* vm) {
 int64_t impl_getline(int64_t* args, CometVM* vm) {
     ensureStringType();
 
-    char* userInput;
-    size_t numChars;
+    char* userInput = NULL;
+    size_t numChars = 0;
+
     int64_t result = getline(&userInput, &numChars, stdin);
     if (result == -1) {
+        if (userInput) free(userInput);
         return 0;
     }
 
-    userInput[numChars] = 0;
+    if (result > 0 && userInput[result - 1] == '\n') {
+        userInput[result - 1] = '\0';
+        result--;
+    }
 
-
-
-    CometOperand strValue = CArrayToCometArray(userInput, numChars + 1, cometTypeSmall);
+    CometOperand strValue = CArrayToCometArray(userInput, result, cometTypeSmall);
+    free(userInput);
 
     int64_t serializedStr = serializeValue(strValue);
 
