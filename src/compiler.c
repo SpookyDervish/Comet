@@ -2238,22 +2238,18 @@ ResultType(CometOperand, ErrorMessage) visitWhileStatement(CometCompiler* c, Com
     CometEnvironment* whileEnv = newEnvironment("whileLoop", c->env, false);
     c->env = whileEnv;
 
+    resolveLabel(c, startLabel);
     ResultType(CometOperand, ErrorMessage) condition = visitValue(c, whileStmt.expression);
     if (condition.error)
         return condition;
 
     buildJumpIfFalse(c, endLabel);
-    resolveLabel(c, startLabel);
 
     ResultType(CometOperand, ErrorMessage) whileBodyResult = compile(c, whileStmt.program);
     if (whileBodyResult.error)
         return whileBodyResult;
 
-    condition = visitValue(c, whileStmt.expression);
-    if (condition.error)
-        return condition;
-
-    buildJumpIfTrue(c, startLabel);
+    buildJump(c, startLabel);
     resolveLabel(c, endLabel);
 
     c->env = destroyEnv(whileEnv);

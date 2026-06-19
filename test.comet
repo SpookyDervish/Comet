@@ -3,8 +3,7 @@ import io
 func main() -> int {
     mut int count = 0
 
-    while count < 10 {
-        io.println("%n", count)
+    while count < 1000000 {
         count = count + 1
     }
 
