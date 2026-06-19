@@ -2996,7 +2996,7 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
             .isVarArgs = c->functions[i]->isVarArgs
         };
         strcpy(serializedFunc.name, c->functions[i]->name);
-        memcpy(serializedFunc.argTypes, c->functions[i]->argTypes, sizeof(CometType) * c->functions[i]->argCount);
+        //memcpy(serializedFunc.argTypes, c->functions[i]->argTypes, sizeof(CometType) * c->functions[i]->argCount);
 
         fwrite(&serializedFunc, sizeof(CometSerializedFunc), 1, file);
     }

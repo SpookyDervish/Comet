@@ -1,13 +1,11 @@
 import io
 
 func main() -> int {
-    io.println("This program will repeat anything you type back to you.")
+    mut int count = 0
 
-    while true {
-        io.print("> ")
-        string x = io.getline()
-        
-        io.println(x)
+    while count < 10 {
+        io.println("%n", count)
+        count = count + 1
     }
 
     return 0
