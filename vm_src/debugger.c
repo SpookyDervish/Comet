@@ -292,18 +292,12 @@ void printValue(CometOperand value) {
     switch (value.type) {
         case CO_IMMEDIATE: {
             switch (value.imm.typeKind) {
-                case COMET_SMALL:
-                case COMET_INT:
-                case COMET_BIG:
-                    printf("%ld", value.imm.bigVal);
-                    break;
-                case COMET_FLOAT:
-                case COMET_DOUBLE:
-                    printf("%f", value.imm.doubleVal);
-                    break;
-                case COMET_BOOL:
-                    printf(value.imm.boolVal ? "true" : "false");
-                    break;
+                case COMET_SMALL: printf("%d ('%c')", value.imm.smallVal, value.imm.smallVal); break;
+                case COMET_INT: printf("%d", value.imm.intVal); break;
+                case COMET_BIG: printf("%ld", value.imm.bigVal); break;
+                case COMET_FLOAT: printf("%f", value.imm.floatVal); break;
+                case COMET_DOUBLE: printf("%f", value.imm.doubleVal); break;
+                case COMET_BOOL: printf(value.imm.boolVal ? "true" : "false"); break;
                 default: printf("(unkown)"); break;
             }
 
@@ -338,15 +332,13 @@ ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char
 
             printf("%f", out);
         } else if (strcmp(varType, "array") == 0) {
-            CometArray* arr = (CometArray*)dbgr->vm->variables[i];
-            printf("{capacity = %llu, data = %p}\n", arr->capacity, arr->data);
+            CometSerializedArray* arr = (CometSerializedArray*)dbgr->vm->variables[i];
+            printf("{capacity = %lu, data = %p}\n", arr->capacity, arr->data);
 
             for (size_t i = 0; i < arr->capacity; i++) {
-                CometOperand elemVal = arr->data[i];
+                int64_t elemVal = arr->data[i];
 
-                printf("    [%zu]=", i);
-                printValue(elemVal);
-                putchar('\n');
+                printf("    [%zu] = 0x%08lx", i, elemVal);
             }
         }
 

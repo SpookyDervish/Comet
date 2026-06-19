@@ -1,11 +1,14 @@
 import io
 
 func main() -> int {
-    io.print("What is your name? ")
-    breakpoint
-    string name = io.getline()
+    io.println("This program will repeat anything you type back to you.")
 
-    
-    io.println("Hello, %s!", name)
+    while true {
+        io.print("> ")
+        string x = io.getline()
+        
+        io.println(x)
+    }
+
     return 0
 }

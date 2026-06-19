@@ -65,8 +65,22 @@ int64_t serializeValue(CometOperand value) {
         case COMET_BOOL    : return value.imm.boolVal;
         case COMET_STRUCT  : return (int64_t)value.imm.objectVal;
         case COMET_ARRAY   : {
-            CometArray* arr = malloc(sizeof(CometArray));
-            *arr = value.imm.arrayVal;
+            uint64_t capacity = value.imm.arrayVal.capacity;
+
+            CometSerializedArray* arr = malloc(sizeof(CometSerializedArray));
+            if (!arr)
+                return 0;
+
+            arr->data = malloc(sizeof(int64_t) * capacity);
+            if (!arr->data)
+                return 0;
+
+            for (size_t i = 0; i < capacity; i++) {
+                arr->data[i] = serializeValue(value.imm.arrayVal.data[i]);
+            }
+            arr->capacity = capacity;
+            arr->elemType = cometTypeBig;
+
             return (int64_t)arr;
         }
         case COMET_FLOAT   : {
@@ -123,6 +137,7 @@ CometOperand deserializeValue(int64_t value, CometType type) {
             };
 
             int64_t* serializedData = array->data;
+
             for (size_t i = 0; i < capacity; i++) {
                 deserializedData[i] = deserializeValue(serializedData[i], array->elemType);
             }
@@ -328,7 +343,6 @@ CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemT
             default: break;
         }
 
-        printf("%lld\n", extractedValue);
         serializedData[i] = deserializeValue(extractedValue, elemType);
     }
 
