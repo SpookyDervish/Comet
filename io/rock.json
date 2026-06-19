@@ -1,7 +1,10 @@
 {
-    "name": "io",
-    "description": "Input / Output",
-    "dependencies": {
-        "test": "1.0.0"
+    "configVersion": 1,
+    "rock": {
+        "name": "io",
+        "description": "Input / Output",
+        "dependencies": {
+            "test": "1.0.0"
+        }
     }
 }
