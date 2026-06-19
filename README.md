@@ -19,7 +19,7 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [x] For loops
 - [ ] Standard library
   - [ ] IO - Input/Output
-    - [ ] Printing
+    - [x] Printing
     - [ ] File IO
   - [ ] Collections - data structures
     - [ ] List
@@ -27,8 +27,8 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [ ] Memory - manual memory management
   - [ ] Ansi - ANSI colour codes
   - [ ] String - string handling and management
-- [ ] Imports
-  - [ ] Package system
+- [x] Imports
+  - [x] Package system
   - [ ] Package manager
 - [x] Functions
   - [x] Returning
@@ -44,14 +44,14 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
     - [ ] Destructor
   - [x] "new" keyword
   - [x] Calling methods
-  - [ ] Inheritance
+  - [x] Inheritance
   - [ ] Templates
     - [ ] Template attributes
 - [x] Command line args
-- [ ] Arrays
+- [x] Arrays
   - [x] Creation
   - [x] Access
-  - [ ] Changing values
+  - [x] Changing values
 - [ ] Exceptions
   - [ ] Throw exceptions
   - [ ] Catch exceptions
