@@ -553,6 +553,15 @@ CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOpe
 void buildBreakpoint(CometCompiler* c) {
     buildInst(c, INST_BREAKPOINT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
+void buildTry(CometCompiler* c) {
+    buildInst(c, INST_TRY, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+}
+void buildEndTry(CometCompiler* c) {
+    buildInst(c, INST_END_TRY, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+}
+void buildThrow(CometCompiler* c) {
+    buildInst(c, INST_THROW, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+}
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && !typeIsInt(after)) {
         buildI2F(c);

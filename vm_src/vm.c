@@ -170,6 +170,18 @@ ResultType(voidPtr, charptr) invalidInstruction(CometSerializedInst inst) {
     return Error(voidPtr, charptr, buffer);
 }
 
+void throw(CometVM* vm) {
+    if (vm->currentExcept == 0) {
+        char* trace = stackTrace(vm);
+        fprintf(stderr, "Unhandled Exception\n%s", trace);
+        assert(vm->currentExcept == 0);
+    }
+
+    ExceptFrame frame = vm->exceptStack[--vm->currentExcept];
+    vm->sp = frame.restoredSP;
+    vm->currentFrame->ip = frame.handlerIP;
+}
+
 ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     CometSerializedInst inst;
 
@@ -320,7 +332,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t b = popValue(vm);
 
         if (b == 0) {
-            return Error(voidPtr, charptr, "Division by zero");
+            throw(vm);
+            DISPATCH();
         }
 
         int64_t a = popValue(vm);
@@ -339,7 +352,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&bDouble, &b, sizeof(double));
 
         if (bDouble == 0) {
-            return Error(voidPtr, charptr, "Division by zero");
+            throw(vm);
+            DISPATCH();
         }
 
         int64_t a = popValue(vm);
@@ -604,15 +618,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     THROW: {
-        if (vm->currentExcept == 0) {
-            char* trace = stackTrace(vm);
-            fprintf(stderr, "Unhandled Exception\n%s", trace);
-            assert(vm->currentExcept == 0);
-        }
-
-        ExceptFrame frame = vm->exceptStack[--vm->currentExcept];
-        vm->sp = frame.restoredSP;
-        vm->currentFrame->ip = frame.handlerIP;
+        throw(vm);
         DISPATCH();
     }
     BREAKPOINT: {

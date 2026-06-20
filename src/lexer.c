@@ -537,7 +537,7 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
                     break;
                 }
 
-                append(tokens, TOKEN_CHAR(CT_TIMES, "/", lexer));
+                append(tokens, TOKEN_CHAR(CT_DIVIDE, "/", lexer));
                 break;
             }
             case '%': {

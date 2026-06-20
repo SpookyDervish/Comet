@@ -2948,6 +2948,49 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
+ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, CometASTNode* node) {
+    CometLabel* tryLabel = buildLabel(c);
+    CometLabel* exceptLabel = buildLabel(c);
+    CometLabel* endLabel = buildLabel(c);
+    
+    buildJump(c, tryLabel);
+
+    // build except block
+    c->env = newEnvironment("except", c->env, false);
+    resolveLabel(c, exceptLabel);
+    
+    ResultType(CometOperand, ErrorMessage) exceptBody = compile(c, node->data.AST_TRY_STATEMENT.exceptBlock);
+    if (exceptBody.error)
+        return exceptBody;
+
+    buildJump(c, endLabel);
+    c->env = destroyEnv(c->env);
+
+    // build try block
+    c->env = newEnvironment("try", c->env, false);
+    resolveLabel(c, tryLabel);
+
+    // push except handler onto stack
+    CometOperand exceptPos = createOperand(CO_IMMEDIATE);
+    exceptPos.imm.typeKind = COMET_BIG;
+    exceptPos.imm.bigVal = exceptLabel->pos;
+    CometOperand exceptConst = storeConst(c, exceptPos);
+    buildPushConst(c, exceptConst);
+
+    buildTry(c);
+
+    ResultType(CometOperand, ErrorMessage) tryBody = compile(c, node->data.AST_TRY_STATEMENT.tryBlock);
+    if (tryBody.error)
+        return tryBody;
+
+    buildEndTry(c);
+    
+    c->env = destroyEnv(c->env);
+    resolveLabel(c, endLabel);
+    
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 
 // -- MAIN -- //
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath) {
@@ -3123,6 +3166,8 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitBreakpointStatement(c);
         case AST_IMPORT_STATEMENT:
             return visitImportStatement(c, node);
+        case AST_TRY_STATEMENT:
+            return visitTryStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

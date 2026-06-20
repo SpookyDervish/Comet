@@ -1,11 +1,13 @@
 import io
 
 func main() -> int {
+    int y = 123
+
     try {
-        int x = 10 / 0
+        double x = 10 / 0
      } except {
         io.println("bruh")
      }
 
-    return 0
+    return y
 }
