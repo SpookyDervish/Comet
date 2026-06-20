@@ -29,7 +29,7 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [ ] String - string handling and management
 - [x] Imports
   - [x] Package system
-  - [ ] Package manager
+  - [x] Package manager
 - [x] Functions
   - [x] Returning
   - [x] Inline functions
