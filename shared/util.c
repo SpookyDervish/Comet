@@ -51,11 +51,11 @@ char* getLibsDir() {
 
     size_t requiredLen = strlen(home) + strlen(seperator) + strlen(cometDir) + 1;
 
-    char* fullPath = malloc(sizeof(requiredLen));
+    char* fullPath = malloc(requiredLen);
     if (!fullPath)
         return NULL;
 
-    snprintf(fullPath, requiredLen, home, seperator, cometDir);
+    snprintf(fullPath, requiredLen, "%s%s%s", home, seperator, cometDir);
 
     return fullPath;
 }

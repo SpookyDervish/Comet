@@ -1,10 +1,9 @@
 #include "error_message.h"
 #include "../lib/ansi.h"
-#include "util.h"
+#include "../include/util.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <math.h>
 
 void printErrorMessage(ErrorMessage errMsg) {
     char* errorLineSource = getLineInString(errMsg.sourceCode, errMsg.lineNumber);
