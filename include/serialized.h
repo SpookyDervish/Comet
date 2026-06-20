@@ -38,6 +38,7 @@ typedef enum {
     INST_JMP_IF_TRUE,
     INST_NOT,
     INST_I2F,
+    INST_F2I,
     INST_DUP,
     INST_NEW,
     INST_GET_FIELD,

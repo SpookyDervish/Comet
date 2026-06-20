@@ -218,6 +218,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&JMP_IF_TRUE,
         &&NOT,
         &&I2F,
+        &&F2I,
         &&DUP,
         &&NEW,
         &&GET_FIELD,
@@ -529,6 +530,17 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&casted, &value, sizeof(int64_t));
 
         pushValue(vm, casted);
+        DISPATCH();
+    }
+    F2I: {
+        int64_t value = popValue(vm);
+
+        double floatVal;
+        memcpy(&floatVal, &value, sizeof(double));
+
+        int64_t intVal = floatVal;
+
+        pushValue(vm, intVal);
         DISPATCH();
     }
     DUP: {

@@ -483,6 +483,14 @@ CometOperand buildI2F(CometCompiler* c) {
 
     return dest;
 }
+CometOperand buildF2I(CometCompiler* c) {
+    pushVal(c);
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_F2I, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
 void buildDup(CometCompiler* c) {
     buildInst(c, INST_DUP, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
@@ -569,11 +577,17 @@ void buildThrow(CometCompiler* c) {
     buildInst(c, INST_THROW, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
-    if (typeIsInt(before) && !typeIsInt(after)) {
+    if (typeIsInt(before) && typeIsFloat(after)) {
         buildI2F(c);
+        before = after;
     }
 
-    return after;
+    if (typeIsFloat(before) && typeIsInt(after)) {
+        buildF2I(c);
+        before = after;
+    }
+
+    return before;
 }
 
 // -- LABELS -- //

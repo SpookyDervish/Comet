@@ -274,26 +274,26 @@ CometType unifyType(CometType a, CometType b) {
     return (rankType(a) > rankType(b)) ? a : b;
 }
 
-bool canCastType(CometType a, CometType b) {
-    if (typeIsInt(a) && typeIsInt(b))
+bool canImplicitCastType(CometType target, CometType type) {
+    if (typeIsInt(target) && typeIsInt(type))
         return true;
 
-    if (typeIsFloat(a) && typeIsFloat(b))
+    if (typeIsFloat(target) && typeIsFloat(type))
         return true;
 
-    if (a.typeKind == COMET_ARRAY && b.typeKind == COMET_ARRAY) {
-        if (a.arrayType->dims != b.arrayType->dims)
+    if (target.typeKind == COMET_ARRAY && type.typeKind == COMET_ARRAY) {
+        if (target.arrayType->dims != type.arrayType->dims)
             return false;
 
-        for (size_t i = 0; i < a.arrayType->dims; i++) {
-            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i])
+        for (size_t i = 0; i < target.arrayType->dims; i++) {
+            if (target.arrayType->isFixedSize[i] != type.arrayType->isFixedSize[i])
                 return false;
 
-            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i])
+            if (target.arrayType->fixedSize[i] != type.arrayType->fixedSize[i])
                 return false;
         }
 
-        return canCastType(*a.arrayType->elem, *b.arrayType->elem);
+        return canImplicitCastType(*target.arrayType->elem, *type.arrayType->elem);
     }
 
     return false;
@@ -1521,31 +1521,35 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
     ResultType(CometType, ErrorMessage) varType = getType(c, node->data.AST_ASSIGN_STATEMENT.type);
     if (varType.error)
         return Error(CometOperand, ErrorMessage, varType.as.error);
-    
-    if (!typesAreEqual(varType.as.success, exprType.as.success) && !canCastType(varType.as.success, exprType.as.success)) {
-
-        Estr help = CREATE_ESTR("Variable is type ");
-        APPEND_ESTR(help, typeToString(varType.as.success));
-        APPEND_ESTR(help, " but expression is type ");
-        APPEND_ESTR(help, typeToString(exprType.as.success));
-
-        ErrorMessage errMsg = createError(
-            c->inputFilePath,
-            c->sourceCode,
-            "TypeMismatch",
-            "Variable type and expression type don't match in assignment.",
-            help.str,
-            node->lineNum,
-            expr->startCol,
-            expr->endCol
-        );
-
-        return Error(CometOperand, ErrorMessage, errMsg);
-    }
 
     ResultType(CometOperand, ErrorMessage) exprResult = visitValue(c, expr);
     if (exprResult.error)
         return exprResult;
+
+    if (!typesAreEqual(varType.as.success, exprType.as.success) && !canImplicitCastType(varType.as.success, exprType.as.success)) {
+
+        CometType castOut = buildCast(c, exprType.as.success, varType.as.success);
+
+        if (typesAreEqual(exprType.as.success, castOut)) { // cast didnt do anything
+            Estr help = CREATE_ESTR("Variable is type ");
+            APPEND_ESTR(help, typeToString(varType.as.success));
+            APPEND_ESTR(help, " but expression is type ");
+            APPEND_ESTR(help, typeToString(exprType.as.success));
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeMismatch",
+                "Variable type and expression type don't match in assignment.",
+                help.str,
+                node->lineNum,
+                expr->startCol,
+                expr->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+    }
 
     uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success, exprType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);

@@ -95,6 +95,7 @@ void buildJumpIfFalse(CometCompiler* c, CometLabel* label);
 void buildJumpIfTrue(CometCompiler* c, CometLabel* label);
 CometOperand buildNot(CometCompiler* c);
 CometOperand buildI2F(CometCompiler* c);
+CometOperand buildF2I(CometCompiler* c);
 void buildDup(CometCompiler* c);
 CometOperand buildNew(CometCompiler* c, uint32_t idx);
 CometOperand buildBuildList(CometCompiler* c);

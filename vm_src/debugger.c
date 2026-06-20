@@ -767,6 +767,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_JMP_IF_TRUE  : return "    JMP_IF_TRUE     ";
         case INST_NOT          : return "    NOT             ";
         case INST_I2F          : return "    I2F             ";
+        case INST_F2I          : return "    F2I             ";
         case INST_DUP          : return "    DUP             ";
         case INST_NEW          : return "    NEW             ";
         case INST_GET_FIELD    : return "    GET_FIELD       ";
@@ -823,6 +824,7 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
         {COMET_INT,  COMET_VOID, COMET_VOID}, // INST_JMP_IF_TRUE
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_NOT
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_I2F
+        {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_F2I
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_DUP
         {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_NEW
         {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_GET_FIELD
