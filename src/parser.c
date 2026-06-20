@@ -1203,6 +1203,7 @@ ResultType(astNodePtr, ErrorMessage) parseBlockStatement(CometParser* parser) {
     }
 
     program->endCol = parser->currentToken->endCol;
+    
 
     return Success(astNodePtr, ErrorMessage, program);
 }
@@ -1250,7 +1251,6 @@ ResultType(astNodePtr, ErrorMessage) parseOptionalBlockStatement(CometParser* pa
             return block;
         }
 
-        
         stmt = block.as.success;
         
     }
@@ -1777,6 +1777,45 @@ ResultType(astNodePtr, ErrorMessage) parseBreakpointStatement(CometParser* parse
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
+ResultType(astNodePtr, ErrorMessage) parseTryStatement(CometParser* parser) {
+    uint32_t lineNumber = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    ResultType(astNodePtr, ErrorMessage) tryBlock = parseOptionalBlockStatement(parser);
+    if (tryBlock.error)
+        return tryBlock;
+
+    ResultType(int, ErrorMessage) expectExcept = expectPeekKeyword(parser, "except");
+    if (expectExcept.error)
+        return Error(astNodePtr, ErrorMessage, expectExcept.as.error);
+
+    ResultType(astNodePtr, ErrorMessage) exceptBlock = parseOptionalBlockStatement(parser);
+    if (tryBlock.error)
+        return tryBlock;
+
+    CometASTNode* stmt = AST_NODE(AST_TRY_STATEMENT, lineNumber, tryBlock.as.success, exceptBlock.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol; 
+
+    return Success(astNodePtr, ErrorMessage, stmt);
+}
+ResultType(astNodePtr, ErrorMessage) parseThrowStatement(CometParser* parser) {
+    uint32_t lineNumber = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    parserNextToken(parser); // skip "throw"
+
+    ResultType(astNodePtr, ErrorMessage) newStmt = parseStructCreateStatement(parser);
+    if (newStmt.error)
+        return newStmt;
+
+    CometASTNode* stmt = AST_NODE(AST_THROW_STATEMENT, lineNumber, newStmt.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
+
+    return Success(astNodePtr, ErrorMessage, stmt);
+}
+
 ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -1813,14 +1852,18 @@ ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttr
         return parseImportStatement(parser);
     } else if (strcmp(keyword, "breakpoint") == 0) {
         return parseBreakpointStatement(parser);
+    } else if (strcmp(keyword, "try") == 0) {
+        return parseTryStatement(parser);
+    } else if (strcmp(keyword, "throw") == 0) {
+        return parseThrowStatement(parser);
     } else {
         char* buffer = malloc(128);
-        sprintf(buffer, "No parse method for keyword \"%s\"", keyword);
+        sprintf(buffer, "Keyword \"%s\" was unexpected.", keyword);
 
         ErrorMessage errMsg = createError(
             parser->fileName,
             parser->sourceCode, 
-            "ParserIssue",
+            "InvalidSyntax",
             buffer,
             NULL,
             parser->currentToken->lineNum,

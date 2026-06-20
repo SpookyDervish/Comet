@@ -1,11 +1,11 @@
 import io
 
 func main() -> int {
-    mut int count = 0
-
-    while count < 1000000 {
-        count = count + 1
-    }
+    try {
+        int x = 10 / 0
+     } except {
+        io.println("bruh")
+     }
 
     return 0
 }

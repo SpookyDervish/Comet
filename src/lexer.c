@@ -29,7 +29,10 @@ const char* KEYWORDS[] = {
     "break",
     "continue",
     "new",
-    "breakpoint"
+    "breakpoint",
+    "try",
+    "except",
+    "throw"
 };
 
 #define TOKEN_LITERAL(tokType, tokValue, lexer) (CometToken){ .literalType = CL_STRING, .type = tokType, .value.literal = tokValue, .lineNum = lexer->lineNum, .startCol = lexer->column - strlen(tokValue), .endCol = lexer->column }

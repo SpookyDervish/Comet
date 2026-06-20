@@ -206,7 +206,7 @@ io.print(new_struct to string) -- "<MyStruct test=123>"
 ```lua
 try {
     float x = 10 / 0
-} except (ZeroDivisionError) {
+} except ZeroDivisionError {
     io.print("Attempt to divide by zero!")
 }
 ```
