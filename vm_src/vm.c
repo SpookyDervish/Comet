@@ -214,7 +214,10 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&BREAKPOINT,
         &&BUILD_LIST,
         &&LIST_AT,
-        &&LIST_SET
+        &&LIST_SET,
+        &&TRY,
+        &&END_TRY,
+        &&THROW,
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -589,6 +592,29 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         array->data[index] = newValue;
         DISPATCH();
     }
+    TRY: {
+        vm->exceptStack[vm->currentExcept++] = (ExceptFrame){
+            .handlerIP = popValue(vm),
+            .restoredSP = vm->sp
+        };
+        DISPATCH();
+    }
+    END_TRY: {
+        vm->currentExcept--;
+        DISPATCH();
+    }
+    THROW: {
+        if (vm->currentExcept == 0) {
+            char* trace = stackTrace(vm);
+            fprintf(stderr, "Unhandled Exception\n%s", trace);
+            assert(vm->currentExcept == 0);
+        }
+
+        ExceptFrame frame = vm->exceptStack[--vm->currentExcept];
+        vm->sp = frame.restoredSP;
+        vm->currentFrame->ip = frame.handlerIP;
+        DISPATCH();
+    }
     BREAKPOINT: {
         createBreakpoint(vm);
         startDebugger(vm, false);
@@ -777,6 +803,8 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
     newVM->instructionsLeftToExec = UINT64_MAX;
     newVM->breakpoints = calloc(newVM->numInstructions, sizeof(uint8_t));
+
+    newVM->currentExcept = 0;
 
     return Success(vmPtr, charptr, newVM);
 }

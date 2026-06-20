@@ -4,6 +4,7 @@
 #define MAX_CALL_FRAMES 1024
 #define MAX_DATA_STACK 65536
 #define MAX_VARIABLES 1024
+#define MAX_EXCEPTIONS 16
 
 #include "comet_operand.h"
 #include "list.h"
@@ -25,6 +26,11 @@ typedef struct {
 
 typedef struct CometVM CometVM;
 typedef int64_t (*externalLibFunc)(int64_t args[], CometVM* vm);
+
+typedef struct {
+    uint64_t handlerIP;
+    uint32_t restoredSP;
+} ExceptFrame;
 
 struct CometVM {
     uint32_t numConstants;
@@ -56,6 +62,9 @@ struct CometVM {
     uint8_t* breakpoints;
     uint8_t nextBreakpointID;
     uint64_t instructionsLeftToExec;
+
+    ExceptFrame exceptStack[MAX_EXCEPTIONS];
+    uint32_t currentExcept;
 
     bool running;
 };
