@@ -1,6 +1,6 @@
 import io
 
 func main() -> int {
-    small[6] str = ['H':0, 'e':0, 'l':0, 'l':0, 'o':0, 0, 'w':0]
+    small[2] str = [1]
     return 0
 }

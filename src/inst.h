@@ -64,6 +64,7 @@ int32_t getSymbolIndex(CometCompiler* c, const char* symbolName);
 CometOperand findConst(CometCompiler* c, CometOperand value);
 
 bool typeIsInt(CometType type);
+bool typeIsFloat(CometType type);
 
 void buildInst(
     CometCompiler* c,

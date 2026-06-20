@@ -862,7 +862,7 @@ ResultType(astNodePtr, ErrorMessage) parseArrayLiteral(CometParser* parser) {
     literal->startCol = parser->currentToken->startCol;
     
 
-    while (true) {
+    while (!peekTokenIs(parser, CT_CLOSE_SQUARE)) {
         parserNextToken(parser);
         ResultType(astNodePtr, ErrorMessage) value = parseExpression(parser, PRECEDENCE_LOWEST);
         if (value.error)

@@ -194,6 +194,12 @@ bool typeIsInt(CometType type) {
     }
 }
 
+inline bool typeIsFloat(CometType type) {
+    if (type.typeKind == COMET_FLOAT || type.typeKind == COMET_DOUBLE)
+        return true;
+    return false;
+}
+
 // -- INSTRUCTIONS -- //
 CometOperand storeConst(CometCompiler* c, CometOperand value) {
     // see if a constant with the same value already exists

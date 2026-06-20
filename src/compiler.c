@@ -274,6 +274,31 @@ CometType unifyType(CometType a, CometType b) {
     return (rankType(a) > rankType(b)) ? a : b;
 }
 
+bool canCastType(CometType a, CometType b) {
+    if (typeIsInt(a) && typeIsInt(b))
+        return true;
+
+    if (typeIsFloat(a) && typeIsFloat(b))
+        return true;
+
+    if (a.typeKind == COMET_ARRAY && b.typeKind == COMET_ARRAY) {
+        if (a.arrayType->dims != b.arrayType->dims)
+            return false;
+
+        for (size_t i = 0; i < a.arrayType->dims; i++) {
+            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i])
+                return false;
+
+            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i])
+                return false;
+        }
+
+        return canCastType(*a.arrayType->elem, *b.arrayType->elem);
+    }
+
+    return false;
+}
+
 ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, CometASTNode* node);
@@ -1497,7 +1522,8 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
     if (varType.error)
         return Error(CometOperand, ErrorMessage, varType.as.error);
     
-    if (!typesAreEqual(varType.as.success, exprType.as.success)) {
+    if (!typesAreEqual(varType.as.success, exprType.as.success) && !canCastType(varType.as.success, exprType.as.success)) {
+
         Estr help = CREATE_ESTR("Variable is type ");
         APPEND_ESTR(help, typeToString(varType.as.success));
         APPEND_ESTR(help, " but expression is type ");
