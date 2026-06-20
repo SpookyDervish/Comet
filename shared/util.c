@@ -1,4 +1,4 @@
-#include "util.h"
+#include "../include/util.h"
 
 char* getFileContents(const char* filename) {
     // https://stackoverflow.com/questions/3747086/reading-the-whole-text-file-into-a-char-array-in-c
@@ -36,6 +36,47 @@ char* getFileContents(const char* filename) {
     return file;
 }
 
+char* getLibsDir() {
+    const char* home = getHomeDir();
+    if (!home)
+        return NULL;
+
+    #ifdef _WIN32
+    char* seperator = "\\";
+    #else
+    char* seperator = "/";
+    #endif
+    
+    char* cometDir = ".comet/libs";
+
+    size_t requiredLen = strlen(home) + strlen(seperator) + strlen(cometDir) + 1;
+
+    char* fullPath = malloc(sizeof(requiredLen));
+    if (!fullPath)
+        return NULL;
+
+    snprintf(fullPath, requiredLen, home, seperator, cometDir);
+
+    return fullPath;
+}
+
+const char* getHomeDir() {
+    const char* homeDir;
+
+    #ifdef _WIN32
+    // Windows home directory path (e.g., C:\Users\Username)
+    homeDir = getenv("USERPROFILE");
+    if (!homeDir) {
+        // Fallback for older or specific Windows configurations
+        homeDir = getenv("HOMEPATH"); 
+    }
+    #else
+        // Linux and macOS home directory path (e.g., /home/username)
+        homeDir = getenv("HOME");
+    #endif
+
+    return homeDir;
+}
 
 // Thank you to https://creativeandcritical.net/str-replace-c for this function :)
 char *repl_str(const char *str, const char *from, const char *to) {

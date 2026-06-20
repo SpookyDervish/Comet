@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 #include "../include/comet_operand.h"
+#include "../include/util.h"
 #include "../lib/estr.h"
 #include "args.h"
 #include "debugger.h"
@@ -17,48 +18,6 @@ Result(voidPtr, charptr);
 
 // For Clang and GCC on macOS
 #define FORCE_INLINE __attribute__((always_inline)) static inline
-
-CometFile* getFileContents(const char* filename) {
-    // https://stackoverflow.com/questions/3747086/reading-the-whole-text-file-into-a-char-array-in-c
-    FILE* fp;
-    size_t lSize;
-    CometFile* file;
-
-    fp = fopen(filename, "rb");
-    if (!fp) {
-        perror(filename);
-        exit(1);
-    }
-
-    fseek(fp, 0L, SEEK_END);
-    lSize = ftell(fp);
-    rewind(fp);
-
-    if (lSize < sizeof(CometFile)) {
-        fclose(fp);
-        fprintf(stderr, "file %s is too small to be a comet file\n", filename);
-        exit(1);
-    }
-
-    file = calloc(1, lSize);
-    if (!file) {
-        fclose(fp);
-        fprintf(stderr, "memory allocation fail when reading file %s\n", filename);
-        exit(1);
-    }
-
-    if (1!=fread(file, lSize, 1, fp)) {
-        fclose(fp);
-        free(file);
-        fputs("couldn't read entire file", stderr);
-        exit(1);
-    }
-
-    // we done
-    fclose(fp);
-
-    return file;
-}
 
 void createBreakpoint(CometVM* vm) {
     vm->breakpoints[vm->currentFrame->ip - 1] = 1;
@@ -668,7 +627,7 @@ ResultType(int, charptr) startVM(CometVM* vm) {
 
 
 ResultType(vmPtr, charptr) newCometVM(char* filePath) {
-    CometFile* loadedFile = getFileContents(filePath);
+    CometFile* loadedFile = (CometFile*)getFileContents(filePath);
 
     // header magic isnt correct
     char magic[5] = {'C','O','M','E','T'};
@@ -742,7 +701,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         char libName[128];
         snprintf(libName, 128, "%s.cometlib", cursor);
 
-        char* cometLibsPath = getenv("COMET_LIBS");
+        char* cometLibsPath = getLibsDir();
         if (!cometLibsPath) {
             cometLibsPath = "";
         }

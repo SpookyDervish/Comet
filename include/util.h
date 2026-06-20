@@ -7,6 +7,10 @@
 #include <string.h>
 #include <stdint.h>
 
+
+const char* getHomeDir();
+char* getLibsDir();
+
 char* getFileContents(const char* filename);
 char *repl_str(const char *str, const char *from, const char *to);
 
