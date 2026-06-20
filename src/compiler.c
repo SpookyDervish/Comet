@@ -2853,15 +2853,11 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
         cometLibsPath = "";
     }
 
-    printf("path = %s\n", path);
-
     // no local file was found, look for it in the system wide libs
     if (!found) { 
         snprintf(path, sizeof(path), "%s/%s.comet", cometLibsPath, libName);
         found = access(path, F_OK) == 0;
     }
-
-    printf("path = %s\n", path);
 
     // comet file was found in system wide libs, try a .cometlib file
     if (!found) { 
@@ -2869,8 +2865,6 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
         found = access(path, F_OK) == 0;
         isExternal = found;
     }
-
-    printf("path = %s\n", path);
 
     // lib doesnt exist, KILL THEM!!!!
     if (!found) {
