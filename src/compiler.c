@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <assert.h>
 #include <dlfcn.h>
 
 
@@ -1210,13 +1211,18 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                 if (siblingResolved.error) return siblingResolved;
 
                 if (!typesAreEqual(firstType, siblingResolved.as.success)) {
+                    Estr helpMsg = CREATE_ESTR("You're trying to mix the types ");
+                    APPEND_ESTR(helpMsg, typeToString(firstType))
+                    APPEND_ESTR(helpMsg, " and ")
+                    APPEND_ESTR(helpMsg, typeToString(siblingResolved.as.success))
+
                     // Free allocated memory here if needed to avoid leaks!
                     ErrorMessage errMsg = createError(
                         c->inputFilePath,
                         c->sourceCode,
                         "TypeError",
                         "Inconsistent element types in array literal",
-                        NULL,
+                        helpMsg.str,
                         node->lineNum,
                         node->startCol,
                         node->endCol
@@ -2342,7 +2348,7 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
     for (size_t argTypeIdx = 0; argTypeIdx < constDef.args.count; argTypeIdx++) {
         CometASTNode* argNode = *get(constDef.args, argTypeIdx);
 
-        ResultType(CometType, ErrorMessage) argType = getType(c, argNode);
+        ResultType(CometType, ErrorMessage) argType = getType(c, argNode->data.AST_ARG_DEF.type);
         if (argType.error)
             return Error(CometOperand, ErrorMessage, argType.as.error);
 
@@ -2777,7 +2783,7 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
 
     // get struct type
-    char* structName = newStmt.structName->data.AST_IDENTIFIER.ident;
+    char* structName = newStmt.structName->data.AST_TYPE.baseType->data.AST_IDENTIFIER.ident;
     int32_t idx = getStructIndex(c, structName);
 
     if (idx == -1) {
@@ -3105,7 +3111,7 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
     CometTypeMapEntry boolType =   { .name = "bool",   .type = (CometType){.typeKind = COMET_BOOL}   };
     CometTypeMapEntry floatType =  { .name = "float",  .type = (CometType){.typeKind = COMET_FLOAT}  };
     CometTypeMapEntry doubleType = { .name = "double", .type = (CometType){.typeKind = COMET_DOUBLE} };
-    CometTypeMapEntry voidType = { .name = "void", .type = (CometType){.typeKind = COMET_VOID} };
+    CometTypeMapEntry voidType =   { .name = "void",   .type = (CometType){.typeKind = COMET_VOID}   };
     append(newCompiler->typeMap, smallType);
     append(newCompiler->typeMap, intType);
     append(newCompiler->typeMap, bigType);
@@ -3129,7 +3135,6 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
 
     CometTypeMapEntry stringTypeEntry = { .name = "string", .type = stringType};
     append(newCompiler->typeMap, stringTypeEntry);
-
 
     // return new compiler
     

@@ -1578,6 +1578,7 @@ ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
     ResultType(argList, ErrorMessage) constructorArgs = parseFunctionDefArgs(parser);
     if (constructorArgs.error)
         return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
+    printf("%s\n", ASTNodeTypeToCStr((*get(constructorArgs.as.success, 0))->data.AST_ARG_DEF.type->nodeType));
 
     ResultType(astNodePtr, ErrorMessage) body = parseBlockStatement(parser);
     if (body.error)
@@ -1708,13 +1709,17 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     structName->startCol = parser->currentToken->startCol;
     structName->endCol = parser->currentToken->endCol;
 
+    CometASTNode* structType = AST_NODE(AST_TYPE, structName->lineNum, structName, NULL, 0);
+    structType->startCol = structName->startCol;
+    structType->endCol = structName->endCol;
+
     parserNextToken(parser);
 
     ResultType(argList, ErrorMessage) constructorArgs = parseFunctionCallArgs(parser);
     if (constructorArgs.error)
         return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
 
-    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structName, constructorArgs.as.success);
+    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType, constructorArgs.as.success);
     stmt->startCol = startCol;
     stmt->endCol = parser->currentToken->endCol;
 

@@ -1,13 +1,6 @@
 import io
 
 func main() -> int {
-    int y = 123
-
-    try {
-        double x = 10 / 0
-     } except {
-        io.println("bruh")
-     }
-
-    return y
+    small[6] str = ['H':0, 'e':0, 'l':0, 'l':0, 'o':0, 0, 'w':0]
+    return 0
 }
