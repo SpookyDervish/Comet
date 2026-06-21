@@ -111,6 +111,31 @@ char* typeToString(CometType type) {
             return buffer;
         }
 
+        case COMET_STRUCT: {
+            /*size_t buffSize = 256;
+            char* buffer = malloc(buffSize);
+            if (!buffer)
+                return NULL;
+
+            CometType* fieldTypes = type.structType->fieldTypes;
+            uint32_t fieldCount = type.structType->fieldCount;
+
+            int written = 0;
+            int remaining = buffSize - written;
+
+            written += snprintf(buffer + written, remaining, "%s - { ", type.structType->name);
+
+            for (uint32_t i = 0; i < fieldCount; i++) {
+                if (i < fieldCount - 1) {
+                    written += snprintf(buffer + written, remaining, "%s, ", typeToString(fieldTypes[i]));
+                } else {
+                    written += snprintf(buffer + written, remaining, "%s }", typeToString(fieldTypes[i]));
+                }
+            }*/
+
+            return type.structType->name;
+        }
+
         default: return "unkown";
     }
 }
@@ -637,7 +662,7 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
 
     // get base type
     CometType* baseType = malloc(sizeof(CometType));
-
+    
     List(CometTypeMapEntry) typeMap = c->typeMap;
     char* baseTypeName = type.baseType->data.AST_IDENTIFIER.ident;
 
@@ -1243,7 +1268,7 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                 ResultType(CometType, ErrorMessage) siblingResolved = resolveType(c, siblingElem);
                 if (siblingResolved.error) return siblingResolved;
 
-                if (!typesAreEqual(firstType, siblingResolved.as.success)) {
+                if (!typesAreEqual(siblingResolved.as.success, firstType)) {
                     Estr helpMsg = CREATE_ESTR("You're trying to mix the types ");
                     APPEND_ESTR(helpMsg, typeToString(firstType))
                     APPEND_ESTR(helpMsg, " and ")
@@ -1571,7 +1596,7 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
     if (exprResult.error)
         return exprResult;
 
-    if (!typesAreEqual(varType.as.success, exprType.as.success) && !canImplicitCastType(varType.as.success, exprType.as.success)) {
+    if (!typesAreEqual(exprType.as.success, varType.as.success) && !canImplicitCastType(varType.as.success, exprType.as.success)) {
 
         CometType castOut = buildCast(c, exprType.as.success, varType.as.success);
 
@@ -2536,6 +2561,7 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
 
         argTypes[argTypeIdx+1] = argType.as.success;
     }
+    argTypes[0] = structType;
 
     buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, false, true, false, -1); // add 1 arg for self
 
@@ -2708,6 +2734,7 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
 
     structType->name = structName;
+    structType->parent = NULL;
 
     
 
@@ -2750,6 +2777,8 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         // add parent field count
         parentFieldCount = parentStruct->fieldCount;
         parentMethodCount = parentStruct->numMethods;
+
+        structType->parent = parentStruct;
     }
 
     // fill in fieldDefs
@@ -3157,7 +3186,29 @@ ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, Comet
     if (exceptionType.error)
         return Error(CometOperand, ErrorMessage, exceptionType.as.error);
 
-    uint32_t idx = defineVar(c->env, "e", RECORD_LOCAL, NO_OPERAND, exceptionType.as.success, false);
+    CometASTNode* exceptionVarNameNode = node->data.AST_TRY_STATEMENT.exceptionVarName;
+    char* exceptionVarName = exceptionVarNameNode->data.AST_IDENTIFIER.ident;
+    Record* existingVar = lookup(c->env, exceptionVarName);
+    if (existingVar) {
+        Estr buffer = CREATE_ESTR("Redefinition of \"");
+        APPEND_ESTR(buffer, exceptionVarName);
+        APPEND_ESTR(buffer, "\"")
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "VariableRedefinition",
+            buffer.str,
+            NULL,
+            exceptionVarNameNode->lineNum,
+            exceptionVarNameNode->startCol,
+            exceptionVarNameNode->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
+    uint32_t idx = defineVar(c->env, exceptionVarName, RECORD_LOCAL, NO_OPERAND, exceptionType.as.success, false);
     buildStore(c, idx);
 
     ResultType(CometOperand, ErrorMessage) exceptBody = compile(c, node->data.AST_TRY_STATEMENT.exceptBlock);

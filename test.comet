@@ -10,11 +10,17 @@ struct Exception {
     }
 }
 
+struct EpicFail : Exception {
+    init() {
+        super(self, "EpicFail", "you did an epic fail")
+    }
+}
+
 func main() -> int {
     try {
-        throw new Exception("Exception", "If you see this, we threw an exception!!")
-    } except Exception {
-        io.println("error: %s", e.message)
+        throw new EpicFail()
+    } except Exception e {
+        io.println("%s: %s", e.type, e.message)
     }
     
     return 0

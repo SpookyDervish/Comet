@@ -12,6 +12,15 @@ bool typesAreEqual(CometType a, CometType b) {
     }
 
     if (a.typeKind == COMET_STRUCT) {
+        if (a.structType->parent != NULL) {
+            CometType parentType = {
+                .typeKind = COMET_STRUCT,
+                .structType = a.structType->parent
+            };
+
+            return typesAreEqual(parentType, b);
+        }
+
         return a.structType == b.structType;
     }
 

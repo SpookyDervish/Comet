@@ -20,6 +20,7 @@ struct CometStruct {
     char** fieldNames;
     CometType* fieldTypes;
     char* name;
+    CometStruct* parent;
 };
 
 // an instance of a struct

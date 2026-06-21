@@ -1630,9 +1630,11 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
         if (expectParentName.error)
             return Error(astNodePtr, ErrorMessage, expectParentName.as.error);
 
-        parentName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
-        parentName->startCol = parser->currentToken->startCol;
-        parentName->endCol = parser->currentToken->endCol;
+        ResultType(astNodePtr, ErrorMessage) parentNameResult = parseType(parser);
+        if (parentNameResult.error)
+            return parentNameResult;
+
+        parentName = parentNameResult.as.success;
     }
 
     List(astNodePtr) fieldDefs = newList(astNodePtr);
@@ -1801,11 +1803,19 @@ ResultType(astNodePtr, ErrorMessage) parseTryStatement(CometParser* parser) {
     if (exceptionType.error)
         return exceptionType;
 
+    ResultType(int, ErrorMessage) expectVarName = expectPeek(parser, CT_IDENT);
+    if (expectVarName.error)
+        return Error(astNodePtr, ErrorMessage, expectVarName.as.error);
+
+    ResultType(astNodePtr, ErrorMessage) exceptionVarName = parseIdentifier(parser);
+    if (exceptionVarName.error)
+        return exceptionVarName;
+
     ResultType(astNodePtr, ErrorMessage) exceptBlock = parseOptionalBlockStatement(parser);
     if (tryBlock.error)
         return tryBlock;
 
-    CometASTNode* stmt = AST_NODE(AST_TRY_STATEMENT, lineNumber, tryBlock.as.success, exceptBlock.as.success, exceptionType.as.success);
+    CometASTNode* stmt = AST_NODE(AST_TRY_STATEMENT, lineNumber, tryBlock.as.success, exceptBlock.as.success, exceptionType.as.success, exceptionVarName.as.success);
     stmt->startCol = startCol;
     stmt->endCol = parser->currentToken->endCol; 
 
