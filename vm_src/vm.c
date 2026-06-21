@@ -9,6 +9,7 @@
 #include <dlfcn.h>
 #include "../include/comet_operand.h"
 #include "../include/util.h"
+#include "../include/error_message.h"
 #include "../lib/estr.h"
 #include "args.h"
 #include "debugger.h"
@@ -31,7 +32,7 @@ FORCE_INLINE int64_t getTop(CometVM* vm) {
     if (vm->sp <= 0) {
         fprintf(stderr, "Attempted to popValue top of stack while stack was empty, this is a compiler bug! Please report this at https://chookspace.com/Comet/Comet/issues with your code.\n");
         fprintf(stderr, "%s\n", stackTrace(vm));
-        assert(false);
+        exit(1);
     }
 
     return vm->stack[vm->sp-1];
@@ -170,11 +171,39 @@ ResultType(voidPtr, charptr) invalidInstruction(CometSerializedInst inst) {
     return Error(voidPtr, charptr, buffer);
 }
 
-void throw(CometVM* vm) {
+void throw(CometVM* vm, char* errName, char* msg) {
     if (vm->currentExcept == 0) {
         char* trace = stackTrace(vm);
-        fprintf(stderr, "Unhandled Exception\n%s", trace);
-        assert(vm->currentExcept == 0);
+
+        if (!vm->debugInfo) {
+            ErrorMessage errMsg = createError(
+                "<empty>",
+                "<bytecode>",
+                errName,
+                msg,
+                "No debug info was compiled with program. Add -d to your compiler flags to include debug symbols.",
+                0,
+                0,
+                0
+            );
+
+            printErrorMessage(errMsg);
+        } else {
+            ErrorMessage errMsg = createError(
+                vm->debugInfo->fileName,
+                vm->debugInfo->sourceCode,
+                errName,
+                msg,
+                NULL,
+                vm->debugInfo->instructions[vm->currentFrame->ip],
+                0,
+                0
+            );
+            printErrorMessage(errMsg);
+        }
+
+        
+        exit(1);
     }
 
     ExceptFrame frame = vm->exceptStack[--vm->currentExcept];
@@ -334,7 +363,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t b = popValue(vm);
 
         if (b == 0) {
-            throw(vm);
+            throw(vm, "DivisionByZero", "Division by zero");
             DISPATCH();
         }
 
@@ -354,7 +383,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&bDouble, &b, sizeof(double));
 
         if (bDouble == 0) {
-            throw(vm);
+            throw(vm, "DivisionByZero", "Division by zero");
             DISPATCH();
         }
 
@@ -631,7 +660,21 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         DISPATCH();
     }
     THROW: {
-        throw(vm);
+        CometObject* exception = (CometObject*)popValue(vm);
+
+        CometSerializedArray* exceptNameArr = (CometSerializedArray*)exception->fields[0];
+        char* exceptName = malloc(exceptNameArr->capacity);
+        for (size_t i = 0; i < exceptNameArr->capacity; i++) {
+            exceptName[i] = exceptNameArr->data[i];
+        }
+
+        CometSerializedArray* exceptMsgArr = (CometSerializedArray*)exception->fields[1];
+        char* exceptMsg = malloc(exceptMsgArr->capacity);
+        for (size_t i = 0; i < exceptMsgArr->capacity; i++) {
+            exceptMsg[i] = exceptMsgArr->data[i];
+        }
+
+        throw(vm, exceptName, exceptMsg);
         DISPATCH();
     }
     LIST_LENGTH: {
@@ -674,8 +717,6 @@ ResultType(int, charptr) startVM(CometVM* vm) {
 
     return Success(int, charptr, getTop(vm));
 }
-
-
 
 ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     CometFile* loadedFile = (CometFile*)getFileContents(filePath);
@@ -822,9 +863,35 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     memcpy(newVM->instructions,
        cursor,
        sizeof(CometSerializedInst) * loadedFile->numInstructions);    
+    cursor += sizeof(CometSerializedInst) * loadedFile->numInstructions;
 
     newVM->currentFrame = NULL,
     newVM->callIdx = 0;
+
+    // debug symbols
+    bool hasDebugInfo = *cursor;
+    cursor++;
+
+    if (hasDebugInfo) {
+        DebugInfo* dbgInfo = malloc(sizeof(DebugInfo));
+        memcpy(dbgInfo->fileName, cursor, 32);
+        cursor += 32;
+
+        size_t sourceLen;
+        memcpy(&sourceLen, cursor, sizeof(size_t));
+        cursor += sizeof(size_t);
+
+        dbgInfo->sourceCode = cursor;
+        memcpy(dbgInfo->sourceCode, cursor, sourceLen);
+        cursor += sourceLen;
+
+        dbgInfo->instructions = malloc(sizeof(uint64_t) * newVM->numInstructions);
+
+        memcpy(dbgInfo->instructions, cursor, sizeof(uint64_t) * newVM->numInstructions);
+        newVM->debugInfo = dbgInfo;
+    } else {
+        newVM->debugInfo = NULL;
+    }
 
     newVM->instructionsLeftToExec = UINT64_MAX;
     newVM->breakpoints = calloc(newVM->numInstructions, sizeof(uint8_t));

@@ -7,10 +7,11 @@
 #include "../include/struct.h"
 #include "../include/serialized.h"
 #include "../include/function.h"
+#include "../include/debug.h"
+#include "../include/error_message.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "error_message.h"
 
 #define NO_OPERAND ((CometOperand){0})
 
@@ -24,6 +25,7 @@ typedef CometStruct* cometStructPtr;
 UseList(CometTypeMapEntry);
 UseList(cometStructPtr);
 UseList(charptr);
+UseList(uint64_t);
 
 typedef struct {
     uint32_t programIdx;
@@ -31,6 +33,10 @@ typedef struct {
     uint32_t constIdx;
     uint32_t functionCount;
     uint32_t labelCount;
+
+    bool includeDebugSymbols;
+    uint64_t currentLine;
+    List(uint64_t) debugInstInfo;
 
     char* inputFilePath;
     char* sourceCode;

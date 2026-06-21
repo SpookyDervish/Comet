@@ -6,8 +6,8 @@ const struct argp_option options[] = {
     { "file", 'f', "FILE", 0, "input file to compile", 0 },
     { "output", 'o', "OUTPUT", 0, "output path", 0 },
     { "version", 'v', 0, 0, "display version number and quit", 0 },
-    { "llvm", 'l', 0, 0, "output llvm IR instead of an object file", 0 },
-    { "asm", 'a', 0, 0, "output assembly instead of an object file", 0 },
+    { "debug", 'd', 0, 0, "include debug symbols in outputted file", 0 },
+    { "asm", 'a', 0, 0, "output assembly instead of an executable file", 0 },
     { "optimisation", 'O', "OPTIMISATION", 0, "the level of optimisation (0 - 3, default is 2)", 0 },
     { 0 }
 };
@@ -24,8 +24,8 @@ int parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
             args->optimisation = atoi(arg);
             break;
 
-        case 'l':
-            args->outputLLVMIr = true;
+        case 'd':
+            args->debugSymbols = true;
             break;
 
         case 'a':
@@ -64,7 +64,7 @@ ResultType(CometArgs, charptr) parseArgs(int argc, char** argv) {
         .filePath = NULL,
         .outputPath = NULL,
         .outputASM = false,
-        .outputLLVMIr = false,
+        .debugSymbols = false,
         .optimisation = 2
     };
     argp_parse(&argp, argc, argv, 0, 0, &args);
@@ -74,10 +74,6 @@ ResultType(CometArgs, charptr) parseArgs(int argc, char** argv) {
     }
 
     // check args
-    if (args.outputASM && args.outputLLVMIr) {
-        return Error(CometArgs, charptr, "can't output both LLVM IR and assembly!\n");
-    }
-
     if (args.optimisation < 0) {
         return Error(CometArgs, charptr, "optimisation level can't be less than 0\n");
     } else if (args.optimisation > 3) {

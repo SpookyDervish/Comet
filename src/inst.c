@@ -86,6 +86,8 @@ void buildInst(
     CometOperand b,
     CometOperand c
 ) {
+    append(compiler->debugInstInfo, compiler->currentLine);
+
     compiler->outputProgram[compiler->programIdx] = (CometInst){
         .opcode = opcode,
         .a = a,

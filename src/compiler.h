@@ -13,6 +13,7 @@
 #include "../include/comet_operand.h"
 #include "../include/environment.h"
 #include "../include/util.h"
+#include "../include/debug.h"
 
 typedef void* voidPtr;
 
@@ -27,8 +28,8 @@ Result(cometCompilerPtr, ErrorMessage);
 
 
 ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* node);
-ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode);
-ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath);
+ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols);
+ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols);
 CometOperand createOperand(CometOperandKind type);
 
 

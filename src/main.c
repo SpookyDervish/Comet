@@ -4,7 +4,7 @@
 #include "parser.h"
 #include "args.h"
 #include "../include/util.h"
-#include "error_message.h"
+#include "../include/error_message.h"
 #include <stddef.h>
 #include <stdio.h>
 #include "../lib/ansi.h"
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(filePath, source);
+    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(filePath, source, args.as.success.debugSymbols);
     if (compiler.error) {
         freeNode(ast.as.success);
         printErrorMessage(compiler.as.error);
@@ -67,7 +67,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ResultType(voidPtr, ErrorMessage) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath);
+    ResultType(voidPtr, ErrorMessage) writeSuccess = outputToFile(compiler.as.success, args.as.success.outputPath, args.as.success.debugSymbols);
     if (writeSuccess.error) {
         freeNode(ast.as.success);
         printErrorMessage(writeSuccess.as.error);

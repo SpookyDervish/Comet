@@ -10,6 +10,7 @@
 #include "list.h"
 #include "error.h"
 #include "serialized.h"
+#include "debug.h"
 #include <stdint.h>
 
 Result(int, charptr);
@@ -65,6 +66,8 @@ struct CometVM {
 
     ExceptFrame exceptStack[MAX_EXCEPTIONS];
     uint32_t currentExcept;
+
+    DebugInfo* debugInfo;
 
     bool running;
 };

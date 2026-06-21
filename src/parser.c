@@ -1,6 +1,6 @@
 #include "parser.h"
 #include "ast.h"
-#include "error_message.h"
+#include "../include/error_message.h"
 #include "lexer.h"
 #include "token.h"
 #include <stdbool.h>
@@ -1580,7 +1580,6 @@ ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
     ResultType(argList, ErrorMessage) constructorArgs = parseFunctionDefArgs(parser);
     if (constructorArgs.error)
         return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
-    printf("%s\n", ASTNodeTypeToCStr((*get(constructorArgs.as.success, 0))->data.AST_ARG_DEF.type->nodeType));
 
     ResultType(astNodePtr, ErrorMessage) body = parseBlockStatement(parser);
     if (body.error)
@@ -1812,7 +1811,7 @@ ResultType(astNodePtr, ErrorMessage) parseThrowStatement(CometParser* parser) {
 
     parserNextToken(parser); // skip "throw"
 
-    ResultType(astNodePtr, ErrorMessage) newStmt = parseStructCreateStatement(parser);
+    ResultType(astNodePtr, ErrorMessage) newStmt = parseExpression(parser, PRECEDENCE_LOWEST);
     if (newStmt.error)
         return newStmt;
 

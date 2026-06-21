@@ -10,7 +10,7 @@
 #include "../lib/estr.h"
 #include "../include/list.h"
 #include "token.h"
-#include "error_message.h"
+#include "../include/error_message.h"
 
 typedef CometToken* cometTokPtr;
 

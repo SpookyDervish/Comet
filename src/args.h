@@ -9,8 +9,8 @@
 typedef struct {
     char* filePath;
     char* outputPath;
-    bool outputLLVMIr;
     bool outputASM;
+    bool debugSymbols;
     int optimisation;
     bool showVersion;
 } CometArgs;

@@ -304,6 +304,8 @@ ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, C
 ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitValue(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
+
     switch (node->nodeType) {
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(c, node);
@@ -722,6 +724,8 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
 }
 
 ResultType(voidPtr, ErrorMessage) visitLValue(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
+
     switch (node->nodeType) {
         case AST_IDENTIFIER: {
             char* varName = node->data.AST_IDENTIFIER.ident;
@@ -1514,6 +1518,8 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
     CometASTNode* expr = node->data.AST_ASSIGN_STATEMENT.expression;
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
+    c->currentLine = node->lineNum;
+
     if (!expr) {
         Estr buffer = CREATE_ESTR("Variable \"");
         APPEND_ESTR(buffer, ident);
@@ -1596,6 +1602,7 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitFieldReassignStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_INFIX_EXPRESSION expr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
 
     ResultType(voidPtr, ErrorMessage) structResult = visitLValue(c, expr.left);
@@ -1705,6 +1712,7 @@ ResultType(CometOperand, ErrorMessage) visitFieldReassignStatement(CometCompiler
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitArrayReassignStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_INFIX_EXPRESSION expr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
 
     ResultType(voidPtr, ErrorMessage) arrayResult = visitLValue(c, node->data.AST_REASSIGN_STATEMENT.ident);
@@ -1807,6 +1815,7 @@ ResultType(CometOperand, ErrorMessage) visitArrayReassignStatement(CometCompiler
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     ResultType(CometOperand, ErrorMessage) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
@@ -1963,6 +1972,7 @@ ResultType(CometOperand, ErrorMessage) visitReassignStatement(CometCompiler* c, 
 }
 
 ResultType(CometOperand, ErrorMessage) getField(CometCompiler* c, CometASTNode* structToGet, CometASTNode* field) {
+    c->currentLine = structToGet->lineNum;
     char* fieldName = field->data.AST_IDENTIFIER.ident;
 
     ResultType(CometType, ErrorMessage) structType = resolveType(c, structToGet);
@@ -1979,6 +1989,7 @@ ResultType(CometOperand, ErrorMessage) getField(CometCompiler* c, CometASTNode* 
     return Success(CometOperand, ErrorMessage, dest);
 }
 ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
     ResultType(CometType, ErrorMessage) leftType = resolveType(c, expr.left);
@@ -2094,6 +2105,7 @@ ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, Co
 }
 
 ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_PREFIX_EXPRESSION expr = node->data.AST_PREFIX_EXPRESSION;
 
     ResultType(CometType, ErrorMessage) rightType = resolveType(c, expr.right);
@@ -2155,6 +2167,7 @@ ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, C
 }
 
 ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
@@ -2239,6 +2252,7 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     if (c->currentFunction->returnType.typeKind != COMET_VOID) {
         ResultType(CometOperand, ErrorMessage) returnValue = visitValue(c, node->data.AST_RETURN_STATEMENT.expression);
         if (returnValue.error)
@@ -2250,6 +2264,7 @@ ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, Co
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
 
     ResultType(CometType, ErrorMessage) funcParentType = resolveType(c, funcCall.ident);
@@ -2331,9 +2346,9 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
                 "TypeMismatch",
                 buffer,
                 help,
-                node->lineNum,
-                node->startCol,
-                node->endCol
+                argNode->lineNum,
+                argNode->startCol,
+                argNode->endCol
             );
 
             return Error(CometOperand, ErrorMessage, errMsg);
@@ -2354,6 +2369,7 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
     return Success(CometOperand, ErrorMessage, returnValue);
 }
 ResultType(CometOperand, ErrorMessage) visitIfStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_IF_STATEMENT ifStmt = node->data.AST_IF_STATEMENT;
     CometASTNode* elseBody = ifStmt.elseProgram;
 
@@ -2399,6 +2415,7 @@ ResultType(CometOperand, ErrorMessage) visitIfStatement(CometCompiler* c, CometA
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitWhileStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_WHILE_STATEMENT whileStmt = node->data.AST_WHILE_STATEMENT;
     
     CometLabel* startLabel = buildLabel(c);
@@ -2426,6 +2443,7 @@ ResultType(CometOperand, ErrorMessage) visitWhileStatement(CometCompiler* c, Com
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_FOR_STATEMENT forStmt = node->data.AST_FOR_STATEMENT;
 
     CometLabel* mainLabel = buildLabel(c);
@@ -2504,6 +2522,7 @@ ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, Comet
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct) {
+    c->currentLine = node->lineNum;
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
     // get arg types
@@ -2601,6 +2620,7 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType) {
+    c->currentLine = node->lineNum;
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
 
@@ -2681,6 +2701,7 @@ ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c,
     return Success(CometOperand, ErrorMessage, funcValue);
 }
 ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
 
     CometStruct* structType = malloc(sizeof(CometStruct));
@@ -2943,6 +2964,7 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
 
     // get struct type
@@ -2997,6 +3019,7 @@ ResultType(CometOperand, ErrorMessage) visitBreakpointStatement(CometCompiler* c
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     size_t filePathMaxLen = 1024;
     char libName[filePathMaxLen] = {};
 
@@ -3085,7 +3108,7 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
         return Error(CometOperand, ErrorMessage, ast.as.error);
     }
 
-    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(path, fileContents);
+    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(path, fileContents, c->includeDebugSymbols);
     if (compiler.error) {
         freeNode(ast.as.success);
         return Error(CometOperand, ErrorMessage, compiler.as.error);
@@ -3118,6 +3141,7 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, CometASTNode* node) {
+    c->currentLine = node->lineNum;
     CometLabel* tryLabel = buildLabel(c);
     CometLabel* exceptLabel = buildLabel(c);
     CometLabel* endLabel = buildLabel(c);
@@ -3159,10 +3183,20 @@ ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, Comet
     
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
+ResultType(CometOperand, ErrorMessage) visitThrowStatement(CometCompiler* c, CometASTNode* node) {
+    
+    ResultType(CometOperand, ErrorMessage) execption = visitValue(c, node->data.AST_THROW_STATEMENT.newStmt);
+    if (execption.error)
+        return execption;
 
+    c->currentLine = node->lineNum;
+
+    buildThrow(c);
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
 
 // -- MAIN -- //
-ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath) {
+ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols) {
     FILE* file = fopen(filePath, "wb");
     if (file == NULL) {
         ErrorMessage errMsg = createError(
@@ -3235,12 +3269,27 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         
     }
 
+    fwrite(&debugSymbols, sizeof(bool), 1, file);
+
+    if (debugSymbols) {
+        char buffer[32] = {};
+        snprintf(buffer, 32, "%s", c->inputFilePath);
+
+        fwrite(buffer, 1, 32, file);
+        
+        size_t sourceLen = strlen(c->sourceCode) + 1;
+        fwrite(&sourceLen, sizeof(size_t), 1, file);
+        fwrite(c->sourceCode, 1, sourceLen, file);
+
+        fwrite(c->debugInstInfo.pointer, sizeof(uint64_t), c->programIdx, file);
+    }
+
     fclose(file);
 
     return Success(voidPtr, ErrorMessage, NULL);
 }
 
-ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode) {
+ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {
     CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
     if (newCompiler == NULL) {
         ErrorMessage errMsg = createError(
@@ -3266,7 +3315,10 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
     newCompiler->currentFunction = NULL;
     newCompiler->inputFilePath = inputFilePath;
     newCompiler->sourceCode = sourceCode;
- 
+    newCompiler->currentLine = 0;
+    newCompiler->includeDebugSymbols = debugSymbols;
+    newCompiler->debugInstInfo = newList(uint64_t);
+
     // fill in type map
     CometTypeMapEntry smallType =  { .name = "small",  .type = (CometType){.typeKind = COMET_SMALL}  };
     CometTypeMapEntry intType =    { .name = "int",    .type = (CometType){.typeKind = COMET_INT}    };
@@ -3336,6 +3388,8 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitImportStatement(c, node);
         case AST_TRY_STATEMENT:
             return visitTryStatement(c, node);
+        case AST_THROW_STATEMENT:
+            return visitThrowStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

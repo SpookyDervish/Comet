@@ -1,6 +1,18 @@
 import io
 
+struct Exception {
+    string type
+    string message
+
+    init(string type, string message) {
+        self.type = type
+        self.message = message
+    }
+}
+
 func main() -> int {
-    io.println(123)
+    io.println("%f", 10 / 0)
+
+    throw new Exception("Exception", "If you see this, we threw an exception!!")
     return 0
 }
