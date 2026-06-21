@@ -2307,6 +2307,38 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
         if (argValue.error)
             return argValue;
 
+        ResultType(CometType, ErrorMessage) argType = resolveType(c, argNode);
+        if (argType.error)
+            return Error(CometOperand, ErrorMessage, argType.as.error);
+
+        if (argIdx < neededArgCount && !typesAreEqual(argType.as.success, func->argTypes[argIdx])) {
+            char* buffer = malloc(128);
+            snprintf(buffer, 128, "Argument %zu of function \"%s\" is the wrong type", argIdx, func->name);
+
+            char* help = malloc(256);
+            snprintf(
+                help,
+                256,
+                "Expected %s but got %s. Full function signature is %s",
+                typeToString(func->argTypes[argIdx]),
+                typeToString(argType.as.success),
+                typeToString((CometType){ .typeKind = COMET_FUNCTION, .functionType = func })
+            );
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeMismatch",
+                buffer,
+                help,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+
         append(funcCallArgs, argValue.as.success);
     }
 

@@ -1,15 +1,6 @@
 import io
 
 func main() -> int {
-
-
-    io.print("Type something: ")
-    string input = io.getline()
-
-    for int i in 0 .. #input {
-        io.print("%c", input : i)
-    }
-    io.println("")
-
+    io.println(123)
     return 0
 }
