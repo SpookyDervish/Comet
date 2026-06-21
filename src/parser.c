@@ -33,6 +33,7 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_EQ_EQ, PRECEDENCE_EQUALS},
     {CT_NOT_EQ, PRECEDENCE_EQUALS},
     {CT_DOT, PRECEDENCE_INDEX},
+    {CT_HASH, PRECEDENCE_INDEX},
     {CT_EQ, PRECEDENCE_SET},
     {CT_OPEN_PAREN, PRECEDENCE_CALL},
     {CT_COLON, PRECEDENCE_INDEX},
@@ -916,7 +917,7 @@ ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) 
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, ErrorMessage) rightSide = parseExpression(parser, PRECEDENCE_LOWEST);
+    ResultType(astNodePtr, ErrorMessage) rightSide = parseExpression(parser, PRECEDENCE_INDEX);
     if (rightSide.error)
         return rightSide;
 
