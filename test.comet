@@ -11,8 +11,11 @@ struct Exception {
 }
 
 func main() -> int {
-    io.println("%f", 10 / 0)
-
-    throw new Exception("Exception", "If you see this, we threw an exception!!")
+    try {
+        throw new Exception("Exception", "If you see this, we threw an exception!!")
+    } except Exception {
+        io.println("error: %s", e.message)
+    }
+    
     return 0
 }

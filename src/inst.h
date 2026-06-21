@@ -115,6 +115,7 @@ void buildTry(CometCompiler* c);
 void buildEndTry(CometCompiler* c);
 void buildThrow(CometCompiler* c);
 CometOperand buildListLength(CometCompiler* c);
+CometOperand buildGetExcept(CometCompiler* c);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, CometType* argTypes, bool isVarArgs, bool isMethod, bool isExternal, int8_t libIdx);

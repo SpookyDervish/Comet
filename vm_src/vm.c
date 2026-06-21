@@ -171,7 +171,7 @@ ResultType(voidPtr, charptr) invalidInstruction(CometSerializedInst inst) {
     return Error(voidPtr, charptr, buffer);
 }
 
-void throw(CometVM* vm, char* errName, char* msg) {
+void throw(CometVM* vm, char* errName, char* msg, CometObject* errPtr) {
     if (vm->currentExcept == 0) {
         char* trace = stackTrace(vm);
 
@@ -209,6 +209,8 @@ void throw(CometVM* vm, char* errName, char* msg) {
     ExceptFrame frame = vm->exceptStack[--vm->currentExcept];
     vm->sp = frame.restoredSP;
     vm->currentFrame->ip = frame.handlerIP;
+
+    pushValue(vm, (int64_t)errPtr);
 }
 
 ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
@@ -363,7 +365,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t b = popValue(vm);
 
         if (b == 0) {
-            throw(vm, "DivisionByZero", "Division by zero");
+            throw(vm, "DivisionByZero", "Division by zero", NULL);
             DISPATCH();
         }
 
@@ -383,7 +385,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&bDouble, &b, sizeof(double));
 
         if (bDouble == 0) {
-            throw(vm, "DivisionByZero", "Division by zero");
+            throw(vm, "DivisionByZero", "Division by zero", NULL);
             DISPATCH();
         }
 
@@ -674,7 +676,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
             exceptMsg[i] = exceptMsgArr->data[i];
         }
 
-        throw(vm, exceptName, exceptMsg);
+        throw(vm, exceptName, exceptMsg, exception);
         DISPATCH();
     }
     LIST_LENGTH: {

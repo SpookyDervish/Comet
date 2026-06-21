@@ -3151,7 +3151,15 @@ ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, Comet
     // build except block
     c->env = newEnvironment("except", c->env, false);
     resolveLabel(c, exceptLabel);
-    
+
+    // define exception
+    ResultType(CometType, ErrorMessage) exceptionType = getType(c, node->data.AST_TRY_STATEMENT.exceptionType);
+    if (exceptionType.error)
+        return Error(CometOperand, ErrorMessage, exceptionType.as.error);
+
+    uint32_t idx = defineVar(c->env, "e", RECORD_LOCAL, NO_OPERAND, exceptionType.as.success, false);
+    buildStore(c, idx);
+
     ResultType(CometOperand, ErrorMessage) exceptBody = compile(c, node->data.AST_TRY_STATEMENT.exceptBlock);
     if (exceptBody.error)
         return exceptBody;

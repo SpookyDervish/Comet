@@ -1795,11 +1795,17 @@ ResultType(astNodePtr, ErrorMessage) parseTryStatement(CometParser* parser) {
     if (expectExcept.error)
         return Error(astNodePtr, ErrorMessage, expectExcept.as.error);
 
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, ErrorMessage) exceptionType = parseType(parser);
+    if (exceptionType.error)
+        return exceptionType;
+
     ResultType(astNodePtr, ErrorMessage) exceptBlock = parseOptionalBlockStatement(parser);
     if (tryBlock.error)
         return tryBlock;
 
-    CometASTNode* stmt = AST_NODE(AST_TRY_STATEMENT, lineNumber, tryBlock.as.success, exceptBlock.as.success);
+    CometASTNode* stmt = AST_NODE(AST_TRY_STATEMENT, lineNumber, tryBlock.as.success, exceptBlock.as.success, exceptionType.as.success);
     stmt->startCol = startCol;
     stmt->endCol = parser->currentToken->endCol; 
 

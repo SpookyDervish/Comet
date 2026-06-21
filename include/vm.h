@@ -68,6 +68,7 @@ struct CometVM {
     uint32_t currentExcept;
 
     DebugInfo* debugInfo;
+    int64_t* lastExceptPtr;
 
     bool running;
 };

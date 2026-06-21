@@ -779,6 +779,7 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_TRY          : return "    TRY             ";
         case INST_END_TRY      : return "    END_TRY         ";
         case INST_THROW        : return "    THROW           ";
+        case INST_LIST_LENGTH  : return "    LIST_LENGTH     ";
         case INST_BREAKPOINT   : return "    BREAKPOINT      ";
         default                : return "    FIXME           ";
     }
@@ -837,6 +838,7 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_TRY
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_END_TRY
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_THROW
+        {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_LIST_LENGTH
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_MAX
     };
 

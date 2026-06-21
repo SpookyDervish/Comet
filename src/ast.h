@@ -146,6 +146,7 @@ struct CometASTNode {
         struct AST_TRY_STATEMENT {
             CometASTNode* tryBlock;
             CometASTNode* exceptBlock;
+            CometASTNode* exceptionType;
         } AST_TRY_STATEMENT;
         struct AST_THROW_STATEMENT {
             CometASTNode* newStmt;
