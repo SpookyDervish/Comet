@@ -52,9 +52,9 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [x] Creation
   - [x] Access
   - [x] Changing values
-- [ ] Exceptions
-  - [ ] Throw exceptions
-  - [ ] Catch exceptions
+- [x] Exceptions
+  - [x] Throw exceptions
+  - [x] Catch exceptions
 
 ## Compiling
 Just run `make` in the root of the repo. This will create the `cometc` and `comet` executables. If you want a debug build, run `make debug`. Debug builds include the address sanitizer for tracking down segfaults. 
