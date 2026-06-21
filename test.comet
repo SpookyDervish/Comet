@@ -1,27 +1,8 @@
 import io
 
-struct Exception {
-    string type
-    string message
-
-    init(string type, string message) {
-        self.type = type
-        self.message = message
-    }
-}
-
-struct EpicFail : Exception {
-    init() {
-        super(self, "EpicFail", "you did an epic fail")
-    }
-}
-
 func main() -> int {
-    try {
-        throw new EpicFail()
-    } except Exception e {
-        io.println("%s: %s", e.type, e.message)
-    }
-    
+    int x = 10 / 0
+    throw 123
+
     return 0
 }

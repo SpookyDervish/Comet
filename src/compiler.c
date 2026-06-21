@@ -3243,10 +3243,31 @@ ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, Comet
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitThrowStatement(CometCompiler* c, CometASTNode* node) {
+
+    CometASTNode* exceptNode = node->data.AST_THROW_STATEMENT.newStmt;
     
-    ResultType(CometOperand, ErrorMessage) execption = visitValue(c, node->data.AST_THROW_STATEMENT.newStmt);
+    ResultType(CometOperand, ErrorMessage) execption = visitValue(c, exceptNode);
     if (execption.error)
         return execption;
+
+    ResultType(CometType, ErrorMessage) exceptType = resolveType(c, exceptNode);
+    if (exceptType.error)
+        return Error(CometOperand, ErrorMessage, exceptType.as.error);
+
+    if (exceptType.as.success.typeKind != COMET_STRUCT) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "TypeMismatch",
+            "You can't throw something that isn't a struct.",
+            NULL,
+            exceptNode->lineNum,
+            exceptNode->startCol,
+            exceptNode->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
 
     c->currentLine = node->lineNum;
 
