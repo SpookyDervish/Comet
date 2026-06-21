@@ -300,12 +300,16 @@ bool canImplicitCastType(CometType target, CometType type) {
 }
 
 ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, CometASTNode* node);
+ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitValue(CometCompiler* c, CometASTNode* node) {
     switch (node->nodeType) {
         case AST_INFIX_EXPRESSION:
             return visitInfixExpression(c, node);
+
+        case AST_PREFIX_EXPRESSION:
+            return visitPrefixExpression(c, node);
 
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);
@@ -1303,6 +1307,41 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
 
             return Success(CometType, ErrorMessage, structType);
         }
+
+        case AST_PREFIX_EXPRESSION: {
+            struct AST_PREFIX_EXPRESSION expr = node->data.AST_PREFIX_EXPRESSION;
+
+            ResultType(CometType, ErrorMessage) right = resolveType(c, expr.right);
+            if (right.error)
+                return right;
+
+            switch (expr.op.type) {
+                case CT_NOT:
+                    return Success(CometType, ErrorMessage, {.typeKind = COMET_BOOL});
+                case CT_HASH:
+                    return Success(CometType, ErrorMessage, {.typeKind = COMET_INT});
+                
+                default: {
+                    Estr buffer = CREATE_ESTR("Invalid prefix operator: \"");
+                    APPEND_ESTR(buffer, tokenTypeToCStr(expr.op.type));
+                    APPEND_ESTR(buffer, "\"");
+
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "InvalidOperator",
+                        buffer.str,
+                        NULL,
+                        node->lineNum,
+                        node->startCol,
+                        node->endCol
+                    );
+
+                    return Error(CometType, ErrorMessage, errMsg);
+                }
+            }
+        }
+
         case AST_INFIX_EXPRESSION: {
             struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
@@ -2053,6 +2092,68 @@ ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, Co
 
     return Success(CometOperand, ErrorMessage, out);
 }
+
+ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, CometASTNode* node) {
+    struct AST_PREFIX_EXPRESSION expr = node->data.AST_PREFIX_EXPRESSION;
+
+    ResultType(CometType, ErrorMessage) rightType = resolveType(c, expr.right);
+    if (rightType.error)
+        return Error(CometOperand, ErrorMessage, rightType.as.error);
+
+    ResultType(CometOperand, ErrorMessage) rightVal = visitValue(c, expr.right);
+    if (rightVal.error)
+        return rightVal;
+
+    switch (expr.op.type) {
+        case CT_NOT:
+            buildNot(c);
+            break;
+
+        case CT_HASH:
+            if (rightType.as.success.typeKind != COMET_ARRAY) {
+                Estr buffer = CREATE_ESTR("Cannot get length of type ");
+                APPEND_ESTR(buffer, typeToString(rightType.as.success));
+
+                ErrorMessage errMsg = createError(
+                    c->inputFilePath,
+                    c->sourceCode,
+                    "TypeMismatch",
+                    buffer.str,
+                    NULL,
+                    node->lineNum,
+                    node->startCol,
+                    node->endCol
+                );
+
+                return Error(CometOperand, ErrorMessage, errMsg);
+            }
+
+            buildListLength(c);
+            break;
+        
+        default: {
+            Estr buffer = CREATE_ESTR("Invalid prefix operator: \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(expr.op.type));
+            APPEND_ESTR(buffer, "\"");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "InvalidOperator",
+                buffer.str,
+                NULL,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+    }
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
@@ -3208,6 +3309,8 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitFuncCall(c, node);
         case AST_INFIX_EXPRESSION: 
             return visitInfixExpression(c, node);
+        case AST_PREFIX_EXPRESSION:
+            return visitPrefixExpression(c, node);
         
         default: {
             Estr buffer = CREATE_ESTR("No compiler visit method for \"");

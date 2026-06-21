@@ -453,7 +453,7 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
             case ')': append(tokens, TOKEN_CHAR(CT_CLOSE_PAREN, ")", lexer)); break;
             case '[': append(tokens, TOKEN_CHAR(CT_OPEN_SQUARE, "[", lexer)); break;
             case ']': append(tokens, TOKEN_CHAR(CT_CLOSE_SQUARE, "]", lexer)); break;
-            case '@': append(tokens, TOKEN_CHAR(CT_AT, "@", lexer)); break;
+            case '#': append(tokens, TOKEN_CHAR(CT_HASH, "#", lexer)); break;
             case ':': append(tokens, TOKEN_CHAR(CT_COLON, ":", lexer)); break;
             
             case '.': {

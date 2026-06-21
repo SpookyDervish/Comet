@@ -231,6 +231,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&TRY,
         &&END_TRY,
         &&THROW,
+        &&LIST_LENGTH
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -631,6 +632,12 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     }
     THROW: {
         throw(vm);
+        DISPATCH();
+    }
+    LIST_LENGTH: {
+        CometSerializedArray* array = (CometSerializedArray*)popValue(vm);
+        pushValue(vm, (int64_t)array->capacity);
+
         DISPATCH();
     }
     BREAKPOINT: {

@@ -1,8 +1,9 @@
 import io
 
 func main() -> int {
-    int a = 123.0
-    io.println("%n", a)
+    io.print("Type something: ")
+    string input = io.getline()
 
-    return a
+    io.println("You typed %n characters.", #input)
+    return 0
 }
