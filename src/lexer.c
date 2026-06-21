@@ -316,14 +316,10 @@ ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char st
     uint32_t bufferPos = 0;
     char* buffer = malloc(bufferSize);
 
-    lexerConsume(lexer); // consume first quote
+    lexerConsume(lexer);
 
-    while (lexer->pos < lexer->sourceLen) {
+    while (lexer->currentChar != startingQuote && lexer->pos < lexer->sourceLen) {
         char current = lexer->currentChar;
-
-        if (current == startingQuote) {
-            break;
-        }
 
         buffer[bufferPos] = current;
         bufferPos++;
@@ -351,15 +347,16 @@ ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char st
         }
 
         char peek = lexer->source[lexer->pos+1];
-        if (peek != startingQuote) {
-            lexerConsume(lexer);
-        } else {
+
+        lexerConsume(lexer);
+
+        if (peek == startingQuote) {
             break;
         }
+
+        
     }
     buffer[bufferPos] = 0;
-
-    lexerConsume(lexer); // consume last quote
 
     tok.value.literal = buffer;
     tok.endCol = lexer->column;
