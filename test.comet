@@ -1,21 +1,7 @@
-import io
-
-struct Exception {
-    string type
-    string msg
-
-    init(string type, string msg) {
-        self.type = type
-        self.msg = msg
-    }
-}
+import testlib
 
 func main() -> int {
-    try {
-        throw new Exception("hi", "hi2")
-    } except Exception e {
-        io.println("%s: %s", e.type, e.msg)
-    }
+    testlib.Foo hi = 123
 
     return 0
 }

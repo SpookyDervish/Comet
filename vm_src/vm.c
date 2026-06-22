@@ -790,7 +790,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     newVM->loadedLibs = calloc(loadedFile->numLibs, sizeof(void*));
     newVM->externalFuncs = calloc(loadedFile->numFunctions, sizeof(void*));
 
-    size_t externalFuncIndex = 0;
+    newVM->numExternalFuncs = 0;
     for (size_t i = 0; i < loadedFile->numLibs; i++) {
         char libName[128];
         snprintf(libName, 128, "%s.cometlib", cursor);
@@ -850,9 +850,9 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
             DESTROY_ESTR(funcSymbolName);
 
-            externalFunc->externFuncIndex = externalFuncIndex;
-            newVM->externalFuncs[externalFuncIndex] = loadedFunc;
-            externalFuncIndex++;
+            externalFunc->externFuncIndex = newVM->numExternalFuncs;
+            newVM->externalFuncs[newVM->numExternalFuncs] = loadedFunc;
+            newVM->numExternalFuncs++;
             
 
             

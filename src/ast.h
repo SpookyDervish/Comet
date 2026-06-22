@@ -78,7 +78,7 @@ struct CometASTNode {
         struct AST_ARG_DEF { CometASTNode* type; CometASTNode* ident; } AST_ARG_DEF;
 
         struct AST_TYPE {
-            CometASTNode* baseType;
+            List(astNodePtr) baseType;
             List(astNodePtr) shape;
             int dimensions;
         } AST_TYPE;

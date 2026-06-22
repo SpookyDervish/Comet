@@ -41,6 +41,7 @@ struct CometVM {
 
     void** loadedLibs;
     externalLibFunc* externalFuncs;
+    size_t numExternalFuncs;
 
     uint32_t numFunctions;
 

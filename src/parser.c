@@ -407,7 +407,11 @@ void printNode(CometASTNode* node) {
             break;
             
         case AST_TYPE: {
-            printNode(node->data.AST_TYPE.baseType);
+            for (size_t i = 0; i < node->data.AST_TYPE.baseType.count; i++) {
+                printNode(*get(node->data.AST_TYPE.baseType, i));
+                if (i < node->data.AST_TYPE.baseType.count - 1)
+                    putchar(',');
+            }
 
             if (node->data.AST_TYPE.dimensions > 0) {
                 printf("[");
@@ -929,15 +933,37 @@ ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) 
 }
 
 // -- TYPE PARSING -- //
-ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
-    
-    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
-    baseType->startCol = parser->currentToken->startCol;
-    baseType->endCol = parser->currentToken->endCol;
-    parserNextToken(parser); // consume base type
+ResultType(nodeList, ErrorMessage) parseBaseType(CometParser* parser) {
+    List(astNodePtr) typeChain = newList(astNodePtr);
 
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType->lineNum, baseType, newList(astNodePtr), 0);
-    typeNode->startCol = baseType->startCol;
+    while (true) {
+        CometASTNode* current = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+        current->startCol = parser->currentToken->startCol;
+        current->endCol = parser->currentToken->endCol;
+
+        append(typeChain, current);
+
+        if (!peekTokenIs(parser, CT_DOT))
+            break;
+
+        parserNextToken(parser); // consume type name
+        parserNextToken(parser); // consume dot
+    }
+
+    return Success(nodeList, ErrorMessage, typeChain);
+}
+
+ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
+
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+    
+    ResultType(nodeList, ErrorMessage) baseType = parseBaseType(parser);
+    if (baseType.error)
+        return Error(astNodePtr, ErrorMessage, baseType.as.error);
+
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.as.success, newList(astNodePtr), 0);
+    typeNode->startCol = startCol;
 
     parserNextToken(parser); // consume '['
 
@@ -1003,6 +1029,9 @@ ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
 }
 
 ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
     if (!currentTokenIs(parser, CT_IDENT)) {
         Estr buffer = CREATE_ESTR("Expected type name, got ");
         APPEND_ESTR(buffer, tokenTypeToCStr(parser->currentToken->type));
@@ -1022,13 +1051,13 @@ ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
         return Error(astNodePtr, ErrorMessage, errMsg);
     }
 
-    CometASTNode* baseType = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
-    baseType->startCol = parser->currentToken->startCol;
-    baseType->endCol = parser->currentToken->endCol;
+    ResultType(nodeList, ErrorMessage) baseType = parseBaseType(parser);
+    if (baseType.error)
+        return Error(astNodePtr, ErrorMessage, baseType.as.error);
 
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, baseType->lineNum, baseType, NULL, 0);
-    typeNode->startCol = baseType->startCol;
-    typeNode->endCol = baseType->endCol;
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.as.success, NULL, 0);
+    typeNode->startCol = startCol;
+    typeNode->endCol = parser->currentToken->endCol;
 
     return Success(astNodePtr, ErrorMessage, typeNode);
 }
@@ -1712,7 +1741,11 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     structName->startCol = parser->currentToken->startCol;
     structName->endCol = parser->currentToken->endCol;
 
-    CometASTNode* structType = AST_NODE(AST_TYPE, structName->lineNum, structName, NULL, 0);
+
+    nodeList baseType = newList(astNodePtr);
+    append(baseType, structName);
+
+    CometASTNode* structType = AST_NODE(AST_TYPE, structName->lineNum, baseType, NULL, 0);
     structType->startCol = structName->startCol;
     structType->endCol = structName->endCol;
 

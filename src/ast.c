@@ -138,7 +138,10 @@ void freeNode(CometASTNode* node) {
         }   
 
         case AST_TYPE: {
-            freeNode(node->data.AST_TYPE.baseType);
+            for (size_t i = 0; i < node->data.AST_TYPE.baseType.count; i++) {
+                freeNode(*get(node->data.AST_TYPE.baseType, i));
+            }
+            destroy(node->data.AST_TYPE.baseType);
             for (size_t i = 0; i < node->data.AST_TYPE.shape.count; i++) {
                 freeNode(*get(node->data.AST_TYPE.shape, i));
             }

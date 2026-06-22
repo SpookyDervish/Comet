@@ -23,8 +23,10 @@ typedef struct {
 typedef CometParser* parserPtr;
 
 typedef List(astNodePtr) argList;
+typedef List(astNodePtr) nodeList;
 
 Result(astNodePtr, ErrorMessage);
+Result(nodeList, ErrorMessage);
 
 typedef ResultType(astNodePtr, ErrorMessage) (*prefixFuncType)(CometParser*);
 typedef ResultType(astNodePtr, ErrorMessage) (*infixFuncType)(CometParser*, CometASTNode* left);

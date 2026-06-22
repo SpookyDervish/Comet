@@ -8,18 +8,19 @@
 #include <string.h>
 #include <sys/types.h>
 
-void cometDefineFunc(
+CometFunction* cometDefineFunc(
     CometEnvironment* env,
     char* name,
     CometType returnType,
     uint32_t numArgs,
     bool isVarArgs,
+    bool isMethod,
     ...
 ) {
     CometFunction* func = malloc(sizeof(CometFunction));
     memcpy(func->name, name, 32);
     func->argCount = numArgs;
-    func->isMethod = false;
+    func->isMethod = isMethod;
     func->returnType = returnType;
     func->startIdx = 0;
     func->isExternal = true;
@@ -39,7 +40,7 @@ void cometDefineFunc(
     };
 
     va_list args;
-    va_start(args, isVarArgs);
+    va_start(args, isMethod);
 
     CometType* argTypes = numArgs > 0 ? calloc(numArgs, sizeof(CometType)) : NULL;
     for (size_t i = 0; i < numArgs; i++) {
@@ -50,7 +51,34 @@ void cometDefineFunc(
 
     va_end(args);
 
-    defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
+    if (env) {
+        defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
+    }
+    
+    return func;
+}
+
+CometSerializedFunc cometSerializeFunction(
+    CometVM* vm,
+    CometFunction* func,
+    externalLibFunc funcPtr
+) {
+    CometSerializedFunc serializedFunc = {
+        .isExternal = func->isExternal,
+        .isVarArgs = func->isVarArgs,
+        .startIdx = func->startIdx,
+        .libIdx = 0,
+        .externFuncIndex = vm->numExternalFuncs
+    };
+    memcpy(serializedFunc.name, func->name, 32);
+
+    vm->externalFuncs[vm->numExternalFuncs] = funcPtr;
+    vm->numExternalFuncs++;
+
+    vm->functions[vm->numFunctions] = serializedFunc;
+    vm->numFunctions++;
+
+    return serializedFunc;
 }
 
 int64_t serializeValue(CometOperand value) {
@@ -207,6 +235,50 @@ API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType)
     }
 
     return cArray;
+}
+
+CometType cometDefineStruct(CometEnvironment* env, char* name, List(StructField) fields, List(cometFuncPtr) methods) {
+    CometStruct* newStruct = malloc(sizeof(CometStruct)); 
+
+    char** fieldNames = calloc(fields.count, sizeof(char*));
+    CometType* fieldTypes = calloc(fields.count, sizeof(CometType));
+
+    for (size_t i = 0; i < fields.count; i++) {
+        StructField field = *get(fields, i);
+        fieldNames[i] = field.name;
+        fieldTypes[i] = field.type;
+    }
+
+    name = strdup(name);
+    
+    *newStruct = (CometStruct){
+        .name = name,
+        .fieldNames = fieldNames,
+        .fieldTypes = fieldTypes,
+        .fieldCount = fields.count,
+        .numMethods = methods.count,
+        .vtable = (CometMethod**)methods.pointer,
+        .parent = NULL
+    };
+
+    CometType structType = {
+        .typeKind = COMET_STRUCT,
+        .structType = newStruct
+    };
+
+    CometOperand a = {
+        .type = CO_IMMEDIATE,
+        .imm.typeKind = COMET_TYPE,
+        .imm.typeVal = structType
+    };
+
+    CometType typeVal = {
+        .typeKind = COMET_TYPE,
+    };
+
+    defineVar(env, name, RECORD_LOCAL, a, typeVal, false);
+
+    return structType;
 }
 
 CometSerializedStruct* cometCreateStruct(List(CometSerializedFunc) methods, uint32_t numFields) {

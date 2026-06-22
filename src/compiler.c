@@ -241,21 +241,32 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
     HASH_ITER(hh, libEnv->records, current, tmp) {
         if (current->type.typeKind != COMET_FUNCTION) continue;
 
-        CometFunction* funcVal = (CometFunction*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
+        switch (current->type.typeKind) {
+            case COMET_FUNCTION: {
+                CometFunction* funcVal = (CometFunction*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
+                if (funcVal->isMethod)
+                    continue;
 
-        CometOperand funcOperand = buildFunction(
-            c,
-            funcVal->name,
-            funcVal->argCount,
-            funcVal->returnType,
-            funcVal->argTypes,
-            funcVal->isVarArgs,
-            funcVal->isMethod,
-            true,
-            libIdx
-        );
+                CometOperand funcOperand = buildFunction(
+                    c,
+                    funcVal->name,
+                    funcVal->argCount,
+                    funcVal->returnType,
+                    funcVal->argTypes,
+                    funcVal->isVarArgs,
+                    funcVal->isMethod,
+                    true,
+                    libIdx
+                );
 
-        current->value = funcOperand;
+                current->value = funcOperand;
+            }
+
+            default:
+                continue;
+        }
+
+        
     }
 
     CometOperand libValue = createOperand(CO_IMMEDIATE);
@@ -657,50 +668,215 @@ CometType flattenArrayType(CometType type) {
     return out;
 }
 
+ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometASTNode* node) {
+    List(CometTypeMapEntry) typeMap = c->typeMap;
+
+    char* baseTypeName = node->data.AST_IDENTIFIER.ident;
+
+    bool found = false;
+    for (size_t i = 0; i < typeMap.count; i++) {
+        CometTypeMapEntry* type = get(typeMap, i);
+
+        if (strcmp(type->name, baseTypeName) == 0) {
+            return Success(cometTypePtr, ErrorMessage, &type->type);
+        }
+    }
+
+    Estr buffer = CREATE_ESTR("Unkown type \"");
+    APPEND_ESTR(buffer, baseTypeName);
+    APPEND_ESTR(buffer, "\"");
+
+    ErrorMessage errMsg = createError(
+        c->inputFilePath,
+        c->sourceCode,
+        "UnkownType",
+        buffer.str,
+        NULL,
+        node->lineNum,
+        node->startCol,
+        node->endCol
+    );
+
+    return Error(cometTypePtr, ErrorMessage, errMsg);
+}
+
+ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList chain) {
+    
+    ResultType(cometTypePtr, ErrorMessage) builtinType = findBuiltinType(c, *get(chain, 0));
+    if (!builtinType.error)
+        return builtinType;
+
+    for (size_t i = 0; i < chain.count; i++) {
+        CometASTNode* currentNode = *get(chain, 0);
+
+        ResultType(CometType, ErrorMessage) currentType = resolveType(c, currentNode);
+        if (currentType.error)
+            return Error(cometTypePtr, ErrorMessage, currentType.as.error);
+
+        CometType current = currentType.as.success;
+        char* currentName = currentNode->data.AST_IDENTIFIER.ident;
+
+        switch (current.typeKind) {
+            case COMET_MODULE: {
+                Record* moduleRecord = lookup(c->env, currentName);
+                if (!moduleRecord) {
+                    Estr buffer = CREATE_ESTR("Undefined module \"");
+                    APPEND_ESTR(buffer, currentName);
+                    APPEND_ESTR(buffer, "\"");
+
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "UndefinedModule",
+                        buffer.str,
+                        NULL,
+                        currentNode->lineNum,
+                        currentNode->startCol,
+                        currentNode->endCol
+                    );
+
+                    return Error(cometTypePtr, ErrorMessage, errMsg);
+                }
+
+                CometOperand module = moduleRecord->value;
+
+                if (module.imm.typeKind != COMET_MODULE) {
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "TypeError",
+                        "Attempted to get an attribute from something that isn't a module!",
+                        NULL,
+                        currentNode->lineNum,
+                        currentNode->startCol,
+                        currentNode->endCol
+                    );
+
+                    return Error(cometTypePtr, ErrorMessage, errMsg);
+                }
+
+                if (i == chain.count - 1) {
+                    Estr buffer = CREATE_ESTR("Module \"");
+                    APPEND_ESTR(buffer, currentName);
+                    APPEND_ESTR(buffer, "\" is not a type.");
+
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "NotAType",
+                        buffer.str,
+                        NULL,
+                        currentNode->lineNum,
+                        currentNode->startCol,
+                        currentNode->endCol
+                    );
+
+                    return Error(cometTypePtr, ErrorMessage, errMsg);
+                }
+
+                CometASTNode* next = *get(chain, i+1);
+                char* attribName = next->data.AST_IDENTIFIER.ident;
+
+                Record* attribRecord = lookup(module.imm.moduleVal, attribName);
+                if (!attribRecord) {
+                    Estr buffer = CREATE_ESTR("Can't find attribute \"");
+                    APPEND_ESTR(buffer, attribName);
+                    APPEND_ESTR(buffer, "\" in module \"");
+                    APPEND_ESTR(buffer, currentName);
+                    APPEND_ESTR(buffer, "\"");
+
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "UnkownAttribute",
+                        buffer.str,
+                        NULL,
+                        next->lineNum,
+                        next->startCol,
+                        next->endCol
+                    );
+
+                    return Error(cometTypePtr, ErrorMessage, errMsg);
+                }
+
+                if (attribRecord->type.typeKind != COMET_TYPE) {
+                    Estr buffer = CREATE_ESTR("Attribute \"");
+                    APPEND_ESTR(buffer, attribName);
+                    APPEND_ESTR(buffer, "\" in module \"");
+                    APPEND_ESTR(buffer, currentName);
+                    APPEND_ESTR(buffer, "\" is not a type");
+
+                    char* typeStr = typeToString(attribRecord->type);
+                    printf("%d\n", attribRecord->type.typeKind);
+                    Estr help = CREATE_ESTR("It is of type ");
+                    APPEND_ESTR(help, typeStr);
+
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "NotAType",
+                        buffer.str,
+                        help.str,
+                        next->lineNum,
+                        next->startCol,
+                        next->endCol
+                    );
+
+                    return Error(cometTypePtr, ErrorMessage, errMsg);
+                }
+
+                return Success(cometTypePtr, ErrorMessage, &attribRecord->value.imm.typeVal);
+            }
+
+            default: {
+                Estr buffer = CREATE_ESTR("Cannot get type from \"");
+                APPEND_ESTR(buffer, currentName);
+                APPEND_ESTR(buffer, "\" because it's not a module.");
+
+                ErrorMessage errMsg = createError(
+                    c->inputFilePath,
+                    c->sourceCode,
+                    "TypeMismatch",
+                    buffer.str,
+                    NULL,
+                    currentNode->lineNum,
+                    currentNode->startCol,
+                    currentNode->endCol
+                );
+
+                return Error(cometTypePtr, ErrorMessage, errMsg);
+            }
+        }
+    }
+
+    ErrorMessage errMsg = createError(
+        c->inputFilePath,
+        c->sourceCode,
+        "CompilerIssue",
+        "This error should never happen, please report this as a bug! (getBaseType)",
+        NULL,
+        chain.pointer[0]->lineNum,
+        chain.pointer[0]->startCol,
+        chain.pointer[chain.count]->endCol
+    );
+
+    return Error(cometTypePtr, ErrorMessage, errMsg);
+}
+
 ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* typeNode) {
     struct AST_TYPE type = typeNode->data.AST_TYPE;
 
     // get base type
-    CometType* baseType = malloc(sizeof(CometType));
-    
-    List(CometTypeMapEntry) typeMap = c->typeMap;
-    char* baseTypeName = type.baseType->data.AST_IDENTIFIER.ident;
-
-    bool found = false;
-    for (size_t i = 0; i < typeMap.count; i++) {
-        CometTypeMapEntry type = *get(typeMap, i);
-
-        if (strcmp(type.name, baseTypeName) == 0) {
-            found = true;
-            *baseType = type.type;
-        }
-    }
-
-    if (!found) {
-        Estr buffer = CREATE_ESTR("Unkown type \"");
-        APPEND_ESTR(buffer, baseTypeName);
-        APPEND_ESTR(buffer, "\"");
-
-        ErrorMessage errMsg = createError(
-            c->inputFilePath,
-            c->sourceCode,
-            "UnkownType",
-            buffer.str,
-            NULL,
-            typeNode->lineNum,
-            typeNode->data.AST_TYPE.baseType->startCol,
-            typeNode->data.AST_TYPE.baseType->endCol
-        );
-
-        return Error(CometType, ErrorMessage, errMsg);
-    }
+    ResultType(cometTypePtr, ErrorMessage) baseType = getBaseType(c, type.baseType);
+    if (baseType.error)
+        return Error(CometType, ErrorMessage, baseType.as.error);
 
     CometType finalType;    
     if (type.dimensions > 0) {
         finalType.typeKind = COMET_ARRAY;
 
         CometArrayType* arrayType = malloc(sizeof(CometArrayType));
-        arrayType->elem = baseType;
+        arrayType->elem = baseType.as.success;
 
         if (type.shape.count > MAX_ARRAY_DEPTH) {
             ErrorMessage errMsg = createError(
@@ -737,8 +913,7 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
 
         finalType.arrayType = arrayType;
     } else {
-        finalType = *baseType;
-        free(baseType);
+        finalType = *baseType.as.success;
     }
 
     if (finalType.typeKind == COMET_ARRAY && finalType.arrayType->elem->typeKind == COMET_ARRAY) {
@@ -2997,7 +3172,7 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
 
     // get struct type
-    char* structName = newStmt.structName->data.AST_TYPE.baseType->data.AST_IDENTIFIER.ident;
+    char* structName = newStmt.structName->data.AST_TYPE.baseType.pointer[0]->data.AST_IDENTIFIER.ident;
     int32_t idx = getStructIndex(c, structName);
 
     if (idx == -1) {

@@ -26,25 +26,34 @@
 
 #define on_import void onImport(CometEnvironment* env)
 
+typedef CometFunction* cometFuncPtr;
+
+typedef struct {
+    char* name;
+    CometType type;
+} StructField;
+
 UseList(CometSerializedFunc);
+UseList(cometFuncPtr);
+UseList(charptr);
+UseList(StructField);
 
 CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
 
-API_EXPORT void cometDefineFunc(
+API_EXPORT CometFunction* cometDefineFunc(
     CometEnvironment* env,
     char* name,
     CometType returnType,
     uint32_t numArgs,
     bool isVarArgs,
+    bool isMethod,
     ...
 );
-API_EXPORT CometSerializedFunc* cometDefineMethod(
-    CometEnvironment* env,
-    char* name,
-    CometType returnType,
-    uint32_t numArgs,
-    bool isVarArgs,
-    ...
+
+API_EXPORT CometSerializedFunc cometSerializeFunction(
+    CometVM* vm,
+    CometFunction* func,
+    externalLibFunc funcPtr
 );
 
 API_EXPORT CometSerializedStruct* cometCreateStruct(List(CometSerializedFunc) methods, uint32_t numFields);
@@ -56,5 +65,6 @@ API_EXPORT int64_t serializeValue(CometOperand value);
 API_EXPORT CometOperand deserializeValue(int64_t value, CometType type);
 API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType);
 API_EXPORT CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType);
+API_EXPORT CometType cometDefineStruct(CometEnvironment* env, char* name, List(StructField) fields, List(cometFuncPtr) methods);
 
 #endif
