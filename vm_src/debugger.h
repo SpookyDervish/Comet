@@ -38,7 +38,7 @@ typedef struct {
 
 extern const CometDebugCommand DBGR_COMMANDS[];
 
-char* cometImmediateToCStr(CometImmediate immediate);
+char* cometImmediateToCStr(CometVM* vm, CometImmediate immediate);
 char* cometOperandToCStr(CometVM* vm ,CometOperand operand);
 char* cometInstructionToCStr(CometVM* vm, CometSerializedInst inst, uint64_t instPos);
 char* cometInstOpcodeToCStr(CometInstType instType);

@@ -237,7 +237,7 @@ API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType)
     return cArray;
 }
 
-CometType cometDefineStruct(CometEnvironment* env, char* name, List(StructField) fields, List(cometFuncPtr) methods) {
+CometStruct* cometDefineStruct(CometEnvironment* env, char* name, List(StructField) fields, List(cometFuncPtr) methods) {
     CometStruct* newStruct = malloc(sizeof(CometStruct)); 
 
     char** fieldNames = calloc(fields.count, sizeof(char*));
@@ -245,11 +245,16 @@ CometType cometDefineStruct(CometEnvironment* env, char* name, List(StructField)
 
     for (size_t i = 0; i < fields.count; i++) {
         StructField field = *get(fields, i);
-        fieldNames[i] = field.name;
+        fieldNames[i] = strdup(field.name); // we strdup it or else it might go out of scope and become invalid
         fieldTypes[i] = field.type;
     }
 
     name = strdup(name);
+
+    CometFunction** methodsArr = malloc(sizeof(CometFunction*) * methods.count);
+    for (size_t i = 0; i < methods.count; i++) {
+        methodsArr[i] = *get(methods, i);
+    }
     
     *newStruct = (CometStruct){
         .name = name,
@@ -257,7 +262,7 @@ CometType cometDefineStruct(CometEnvironment* env, char* name, List(StructField)
         .fieldTypes = fieldTypes,
         .fieldCount = fields.count,
         .numMethods = methods.count,
-        .vtable = (CometMethod**)methods.pointer,
+        .vtable = (CometMethod**)methodsArr,
         .parent = NULL
     };
 
@@ -266,32 +271,72 @@ CometType cometDefineStruct(CometEnvironment* env, char* name, List(StructField)
         .structType = newStruct
     };
 
-    CometOperand a = {
+    CometOperand structVal = {
         .type = CO_IMMEDIATE,
         .imm.typeKind = COMET_TYPE,
         .imm.typeVal = structType
     };
 
-    CometType typeVal = {
+    CometType typeType = { // bru
         .typeKind = COMET_TYPE,
     };
 
-    defineVar(env, name, RECORD_LOCAL, a, typeVal, false);
+    defineVar(env, name, RECORD_LOCAL, structVal, typeType, false);
 
-    return structType;
+    return newStruct;
 }
 
-CometSerializedStruct* cometCreateStruct(List(CometSerializedFunc) methods, uint32_t numFields) {
-    CometSerializedStruct* newStruct = malloc(sizeof(CometSerializedStruct));
-    newStruct->numFields = numFields;
-    newStruct->numMethods = methods.count;
+void cometDefineConstructor(
+    CometEnvironment* env,
+    CometStruct* cometStruct,
+    uint32_t numArgs,
+    bool isVarArgs,
+    ...
+) {
+    CometType structType = {
+        .typeKind = COMET_STRUCT,
+        .structType = cometStruct
+    };
 
-    newStruct->vtable = malloc(sizeof(uint32_t) * newStruct->numMethods);
-    for (size_t i = 0; i < newStruct->numMethods; i++) {
-        newStruct->vtable[i] = *get(methods, i);
-    }
+    char* constructorName = malloc(32);
+    snprintf(constructorName, 32, "%s_INIT", cometStruct->name);
+
+    CometFunction* func = malloc(sizeof(CometFunction));
+    memcpy(func->name, constructorName, 32);
+    func->argCount = numArgs + 1;
+    func->isMethod = false;
+    func->returnType = structType;
+    func->startIdx = 0;
+    func->isExternal = true;
+    func->isVarArgs = isVarArgs;
     
-    return newStruct;
+    CometType type = {
+        .typeKind = COMET_FUNCTION,
+        .functionType = func
+    };
+
+    CometOperand funcVal = {
+        .type = CO_IMMEDIATE,
+        .imm = {
+            .typeKind = COMET_FUNCTION,
+            .bigVal = (int64_t)func
+        }
+    };
+
+    va_list args;
+    va_start(args, isVarArgs);
+
+    CometType* argTypes = calloc(numArgs + 1, sizeof(CometType));
+    argTypes[0] = structType;
+    for (size_t i = 0; i < numArgs; i++) {
+        argTypes[i + 1] = va_arg(args, CometType);
+    }
+
+    func->argTypes = argTypes;
+
+    va_end(args);
+
+    defineVar(env, constructorName, RECORD_LOCAL, funcVal, type, false);
 }
 
 CometOperand cometValue(CometValueTypeKind valueType, ...) {
@@ -455,4 +500,8 @@ CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[]
         .typeKind = COMET_ARRAY,
         .arrayType = arrayType
     };
+}
+
+void cometSetField(CometObject* object, uint32_t index, int64_t value) {
+    object->fields[index] = value;
 }

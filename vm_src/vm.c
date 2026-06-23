@@ -603,7 +603,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         CometObject* obj = (CometObject*)getTop(vm);
 
         uint32_t methodIdx = inst.a;
-        CometSerializedFunc func = obj->vtable[methodIdx];
+        CometSerializedFunc func = vm->functions[obj->vtable[methodIdx]];
 
         callFunction(vm, &func, inst.b);
 

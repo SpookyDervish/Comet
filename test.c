@@ -8,6 +8,11 @@ int64_t impl_Foo_add(int64_t* args, CometVM* vm) {
     return result;
 }
 
+int64_t impl_Foo_INIT(int64_t* args, CometVM* vm) {
+    cometSetField((CometObject*)args[0], 0, args[1]);
+    return args[0];
+}
+
 on_import {
 
     List(StructField) fields = newList(StructField);
@@ -15,8 +20,10 @@ on_import {
     append(fields, field);
 
     List(cometFuncPtr) methods = newList(cometFuncPtr);
-    CometFunction* firstFunc = cometDefineFunc(env, "add", cometTypeInt, 2, false, true, cometTypeInt, cometTypeInt);
+    CometFunction* firstFunc = cometDefineFunc(env, "Foo_add", cometTypeInt, 2, false, true, cometTypeInt, cometTypeInt);
     append(methods, firstFunc);
 
-    cometDefineStruct(env, "Foo", fields, methods);
+    CometStruct* fooStruct = cometDefineStruct(env, "Foo", fields, methods);
+
+    cometDefineConstructor(env, fooStruct, 1, false, cometTypeInt);
 }

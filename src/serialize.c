@@ -26,7 +26,7 @@ uint32_t serializeOperand(CometOperand operand) {
     }
 }
 
-CometSerializedStruct* serializeStruct(CometStruct* structType) {
+CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType) {
     CometSerializedStruct* serialized = calloc(1, sizeof(CometSerializedStruct));
     
     *serialized = (CometSerializedStruct){
@@ -37,15 +37,7 @@ CometSerializedStruct* serializeStruct(CometStruct* structType) {
 
     for (size_t i = 0; i < structType->numMethods; i++) {
         CometMethod* method = structType->vtable[i];
-
-        CometSerializedFunc func = {};
-        memcpy(func.name, method->name, sizeof(func.name));
-        func.numArgs = method->argCount;
-        func.startIdx = method->startIdx;
-        func.isExternal = false;
-        func.libIdx = 0;
-
-        serialized->vtable[i] = func;
+        serialized->vtable[i] = method->symbolIdx;
     }
 
     return serialized;

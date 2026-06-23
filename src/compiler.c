@@ -159,11 +159,11 @@ bool isAssignmentOperator(CometASTNode* expr) {
     return false;
 }
 
-int32_t getStructIndex(CometCompiler* c, char* structName) {
+int32_t getStructIndex(CometCompiler* c, CometStruct* needle) {
     for (size_t i = 0; i < c->structs.count; i++) {
         CometStruct* structType = *get(c->structs, i);
 
-        if (strcmp(structType->name, structName) == 0) {
+        if (structType == needle) {
             return i;
         }
     }
@@ -239,31 +239,76 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
 
     Record* current, *tmp;
     HASH_ITER(hh, libEnv->records, current, tmp) {
-        if (current->type.typeKind != COMET_FUNCTION) continue;
 
         switch (current->type.typeKind) {
             case COMET_FUNCTION: {
                 CometFunction* funcVal = (CometFunction*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
-                if (funcVal->isMethod)
-                    continue;
 
-                CometOperand funcOperand = buildFunction(
-                    c,
-                    funcVal->name,
-                    funcVal->argCount,
-                    funcVal->returnType,
-                    funcVal->argTypes,
-                    funcVal->isVarArgs,
-                    funcVal->isMethod,
-                    true,
-                    libIdx
-                );
+                // doin it manually lo-
+                c->functions[c->functionCount] = funcVal;
+                CometOperand funcOperand = createOperand(CO_SYMBOL);
+                funcOperand.symbolIdx = c->functionCount;
+
+                c->functionCount++;
 
                 current->value = funcOperand;
+                break;
             }
 
-            default:
+            case COMET_TYPE: {
+                CometStruct* structVal = current->value.imm.typeVal.structType;
+
+                CometMethod** vtable = malloc(sizeof(CometMethod*) * structVal->numMethods);
+                for (size_t i = 0; i < structVal->numMethods; i++) {
+                    CometFunction* func = (CometFunction*)(structVal->vtable[i]);
+
+                    CometMethod* method = malloc(sizeof(CometMethod));
+                    method->argCount = func->argCount;
+                    method->returnType = func->returnType;
+                    method->startIdx = func->startIdx;
+                    memcpy(method->name, func->name, 32);
+
+                    // find symbol idx
+
+                    bool found = false;
+                    for (size_t funcIdx = 0; funcIdx < c->functionCount; funcIdx++) {
+                        if (c->functions[funcIdx] == func) {
+                            found = true;
+
+                            method->symbolIdx = funcIdx;
+
+                            vtable[i] = method;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        Estr buffer = CREATE_ESTR("Could not find function \"");
+                        APPEND_ESTR(buffer, func->name);
+                        APPEND_ESTR(buffer, "\" and I don't know why.");
+
+                        ErrorMessage errMsg = createError(
+                            c->inputFilePath,
+                            c->sourceCode,
+                            "ExternalLibError",
+                            buffer.str,
+                            NULL,
+                            1,
+                            1,
+                            1
+                        );
+                        return Error(CometOperand, ErrorMessage, errMsg);
+                    }
+                }
+                structVal->vtable = vtable;
+
+                append(c->structs, structVal);
+                break;
+            }
+
+            default: {
                 continue;
+            }
         }
 
         
@@ -807,7 +852,7 @@ ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList ch
                     APPEND_ESTR(buffer, "\" is not a type");
 
                     char* typeStr = typeToString(attribRecord->type);
-                    printf("%d\n", attribRecord->type.typeKind);
+
                     Estr help = CREATE_ESTR("It is of type ");
                     APPEND_ESTR(help, typeStr);
 
@@ -994,7 +1039,29 @@ ResultType(voidPtr, ErrorMessage) visitLValue(CometCompiler* c, CometASTNode* no
                         return Error(voidPtr, ErrorMessage, errMsg);
                     }
 
-                    uint32_t fieldIndex = getFieldIndex(leftType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
+                    char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
+                    uint32_t fieldIndex = getFieldIndex(leftType.as.success.structType, fieldName);
+                    if (fieldIndex == -1) {
+                        Estr buffer = CREATE_ESTR("Struct \"");
+                        APPEND_ESTR(buffer, typeToString(leftType.as.success));
+                        APPEND_ESTR(buffer, "\" doesn't have a field named \"");
+                        APPEND_ESTR(buffer, fieldName);
+                        APPEND_ESTR(buffer, "\"");
+
+                        ErrorMessage errMsg = createError(
+                            c->inputFilePath,
+                            c->sourceCode,
+                            "FieldNotFound",
+                            buffer.str,
+                            NULL,
+                            node->lineNum,
+                            node->startCol,
+                            node->endCol
+                        );
+
+                        return Error(voidPtr, ErrorMessage, errMsg);
+                    }
+
                     buildGetField(c, fieldIndex);
                     break;
                 }
@@ -2184,6 +2251,27 @@ ResultType(CometOperand, ErrorMessage) getField(CometCompiler* c, CometASTNode* 
         return structValue;
 
     int32_t fieldIdx = getFieldIndex(structType.as.success.structType, fieldName);
+    if (fieldIdx == -1) {
+        Estr buffer = CREATE_ESTR("Struct \"");
+        APPEND_ESTR(buffer, typeToString(structType.as.success));
+        APPEND_ESTR(buffer, "\" doesn't have a field named \"");
+        APPEND_ESTR(buffer, fieldName);
+        APPEND_ESTR(buffer, "\"");
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "FieldNotFound",
+            buffer.str,
+            NULL,
+            field->lineNum,
+            field->startCol,
+            field->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
     CometOperand dest = buildGetField(c, fieldIdx);
 
     return Success(CometOperand, ErrorMessage, dest);
@@ -3172,8 +3260,13 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
 
     // get struct type
-    char* structName = newStmt.structName->data.AST_TYPE.baseType.pointer[0]->data.AST_IDENTIFIER.ident;
-    int32_t idx = getStructIndex(c, structName);
+    
+    ResultType(CometType, ErrorMessage) structType = getType(c, newStmt.structName);
+    if (structType.error)
+        return Error(CometOperand, ErrorMessage, structType.as.error);
+    char* structName = structType.as.success.structType->name;
+
+    int32_t idx = getStructIndex(c, structType.as.success.structType);
 
     if (idx == -1) {
         Estr buffer = CREATE_ESTR("The type \"");
@@ -3209,9 +3302,30 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
         append(funcCallArgs, argValue.as.success);
     }
 
+    
+
     // call constructor
     Estr constructorName = CREATE_ESTR(structName);
     APPEND_ESTR(constructorName, "_INIT");
+
+    if (getSymbolIndex(c, constructorName.str) == -1) {
+        Estr buffer = CREATE_ESTR("Could not find constructor for struct \"");
+        APPEND_ESTR(buffer, structName);
+        APPEND_ESTR(buffer, "\"");
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "CompilerIssue",
+            buffer.str,
+            "This is a bug. If the struct causing this error is from a library then it means the library creator forget to create a constructor.",
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
     buildCall(c, constructorName.str, funcCallArgs);
     DESTROY_ESTR(constructorName);
 
@@ -3500,7 +3614,7 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
 
     for (size_t structIdx = 0; structIdx < c->structs.count; structIdx++) {
         CometStruct* structType = *get(c->structs, structIdx);
-        CometSerializedStruct* serializedStruct = serializeStruct(structType);
+        CometSerializedStruct* serializedStruct = serializeStruct(c->functions, structType);
 
         CometSerializedStructHeader header = {
             .numFields = serializedStruct->numFields,

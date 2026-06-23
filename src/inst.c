@@ -2,6 +2,7 @@
 #include "../include/comet_operand.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -139,7 +140,7 @@ bool immediatesAreEqual(CometImmediate a, CometImmediate b) {
 int32_t getSymbolIndex(CometCompiler* c, const char* symbolName) {
     for (size_t i = 0; i < c->functionCount; i++) {
         CometFunction* func = c->functions[i];
-
+        
         if (strcmp(func->name, symbolName) == 0) {
             return i;
         }
@@ -440,6 +441,8 @@ CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
 CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
     CometOperand funcValue = createOperand(CO_SYMBOL);
     funcValue.symbolIdx = getSymbolIndex(c, name);
+
+    assert(funcValue.symbolIdx != -1);
 
     CometOperand returnValue = pushVal(c);
 

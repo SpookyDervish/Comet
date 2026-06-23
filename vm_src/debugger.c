@@ -358,7 +358,7 @@ void printStructInfo(CometDebugger* dbgr, uint32_t structIdx, CometSerializedStr
 
     for (uint32_t methodIdx = 0; methodIdx < structType.numMethods; methodIdx++) {
         //uint32_t symbolIdx = structType.vtable[methodIdx].symbolIdx;
-        CometSerializedFunc func = structType.vtable[methodIdx];//dbgr->vm->functions[symbolIdx];
+        CometSerializedFunc func = dbgr->vm->functions[structType.vtable[methodIdx]];//dbgr->vm->functions[symbolIdx];
 
         printf(ESC_BRIGHT_BLUE_FG "            %s:\n" ESC_RESET, func.name);
         printf(ESC_BOLD "                Number of arguments:" ESC_RESET " %d\n", func.numArgs);
@@ -406,9 +406,54 @@ ResultType(charptr, charptr) structsHandler(CometDebugger* dbgr, int argc, char*
         if (range.start < 0 || range.end >= dbgr->vm->numStructs) 
             return Error(charptr, charptr, "struct index out of bounds");
 
-        for (uint32_t i = 0; i < dbgr->vm->numStructs; i++) {
+        for (uint32_t i = range.start; i < range.end; i++) {
             CometSerializedStruct structType = dbgr->vm->structs[i];
             printStructInfo(dbgr, i, structType);
+        }
+    }
+
+    return Success(charptr, charptr, NULL);
+}
+
+void printFuncInfo(CometSerializedFunc func, uint32_t idx) {
+    printf("    - [%d]:\n", idx);
+    printf("        - Name:          %s\n", func.name);
+    printf("        - Start IP:      %zu\n", func.startIdx);
+    printf("        - # Args:        %d\n", func.numArgs);
+    printf("        - Variadic Args: %d\n", func.isVarArgs);
+    printf("        - Is External:   %s\n", func.isExternal ? "yes" : "no");
+
+    if (func.isExternal) {
+        printf("            - External Function Index: %d\n", func.externFuncIndex);
+        printf("            - External Library Index:  %d\n", func.libIdx);
+    }
+    putchar('\n');
+}
+
+ResultType(charptr, charptr) functionsHandler(CometDebugger* dbgr, int argc, char** argv) {
+    printf(ESC_BOLD ESC_CYAN_FG "--> Functions <--\n\n" ESC_RESET);
+
+    // print all functions
+    if (argc < 1) {
+        for (uint32_t i = 0; i < dbgr->vm->numFunctions; i++) {
+            CometSerializedFunc func = dbgr->vm->functions[i];
+            printFuncInfo(func, i);
+        }
+    } else {
+        Range range = parseRange(argv[0]);
+
+        if (range.start > range.end) {
+            uint32_t newEnd = range.start;
+            range.start = range.end;
+            range.end = newEnd;
+        }
+
+        if (range.start < 0 || range.end >= dbgr->vm->numFunctions) 
+            return Error(charptr, charptr, "function index out of bounds");
+
+        for (uint32_t i = range.start; i < range.end; i++) {
+            CometSerializedFunc func = dbgr->vm->functions[i];
+            printFuncInfo(func, i);
         }
     }
 
@@ -460,6 +505,7 @@ static const char* structsAliases[] = {"ls", NULL};
 static const char* stepAliases[] = {"s", NULL};
 static const char* continueAliases[] = {"c", "cont", NULL};
 static const char* quitAliases[] = {"q", "stop", "exit", NULL};
+static const char* functionsAliases[] = {"f", "fu", "fls", NULL};
 
 ResultType(charptr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv);
 const CometDebugCommand DBGR_COMMANDS[] = {
@@ -471,6 +517,7 @@ const CometDebugCommand DBGR_COMMANDS[] = {
     {"stack", stackHandler, "display the current state of the stack", "st | st <index>", stackAliases},
     {"variable", variableHandler, "get the value of a variable / variables", "v <index> | v <startIndex>:<endIndex>", variableAliases},
     {"structs", structsHandler, "print all structs or display info about a struct", "ls | ls <index> | ls <startIndex>:<endIndex>", structsAliases},
+    {"functions", functionsHandler, "print all function symbols", "f | f <index> | f <startIndex>:<endIndex>", functionsAliases},
     {"step", stepHandler, "execute next instruction", "s | s <numInstructions>", stepAliases},
     {"continue", continueHandler, "continue execution", "c", continueAliases},
 };
@@ -653,7 +700,7 @@ Range parseRange(const char* str) {
     return r;
 }
 
-char* cometImmediateToCStr(CometImmediate immediate) {
+char* cometImmediateToCStr(CometVM* vm, CometImmediate immediate) {
     switch (immediate.typeKind) {
         case COMET_SMALL: {
             char* buffer = malloc(4);
@@ -702,7 +749,7 @@ char* cometImmediateToCStr(CometImmediate immediate) {
 char* cometOperandToCStr(CometVM* vm, CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE:
-            return cometImmediateToCStr(operand.imm);
+            return cometImmediateToCStr(vm, operand.imm);
 
         case CO_STACK: {
             char* buffer = malloc(32);
@@ -819,7 +866,7 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_LTEF
         {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_LOAD_ARG
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_RET
-        {COMET_FUNCTION, COMET_SMALL, COMET_VOID}, // INST_CALL
+        {COMET_FUNCTION, COMET_INT, COMET_VOID}, // INST_CALL
         {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_JMP
         {COMET_INT,  COMET_VOID, COMET_VOID}, // INST_JMP_IF_FALSE
         {COMET_INT,  COMET_VOID, COMET_VOID}, // INST_JMP_IF_TRUE
@@ -898,7 +945,7 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
             };
         case COMET_FUNCTION:
             return (CometOperand){
-                .type = CO_IMMEDIATE,
+                .type = CO_SYMBOL,
                 .symbolIdx = arg
             };
         default:

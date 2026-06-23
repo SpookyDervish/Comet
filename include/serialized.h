@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "comet_operand.h"
+#include "function.h"
 
 #define MAX_ARGS 16
 
@@ -76,7 +77,7 @@ typedef struct {
 typedef struct {
     uint32_t numFields;
     uint32_t numMethods;
-    CometSerializedFunc* vtable;
+    uint32_t* vtable;
 } CometSerializedStruct;
 
 typedef struct {
@@ -109,7 +110,7 @@ typedef struct {
 } CometInst;
 
 CometSerializedInst* serializeInst(CometInst inst);
-CometSerializedStruct* serializeStruct(CometStruct* structType);
+CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType);
 uint32_t serializeOperand(CometOperand operand);
 
 #endif

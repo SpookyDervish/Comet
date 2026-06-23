@@ -410,7 +410,7 @@ void printNode(CometASTNode* node) {
             for (size_t i = 0; i < node->data.AST_TYPE.baseType.count; i++) {
                 printNode(*get(node->data.AST_TYPE.baseType, i));
                 if (i < node->data.AST_TYPE.baseType.count - 1)
-                    putchar(',');
+                    putchar('.');
             }
 
             if (node->data.AST_TYPE.dimensions > 0) {
@@ -1737,17 +1737,9 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     if (expectName.error)
         return Error(astNodePtr, ErrorMessage, expectName.as.error);
 
-    CometASTNode* structName = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
-    structName->startCol = parser->currentToken->startCol;
-    structName->endCol = parser->currentToken->endCol;
-
-
-    nodeList baseType = newList(astNodePtr);
-    append(baseType, structName);
-
-    CometASTNode* structType = AST_NODE(AST_TYPE, structName->lineNum, baseType, NULL, 0);
-    structType->startCol = structName->startCol;
-    structType->endCol = structName->endCol;
+    ResultType(astNodePtr, ErrorMessage) structType = parseType(parser);
+    if (structType.error)
+        return structType;
 
     parserNextToken(parser);
 
@@ -1755,7 +1747,7 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     if (constructorArgs.error)
         return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
 
-    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType, constructorArgs.as.success);
+    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType.as.success, constructorArgs.as.success);
     stmt->startCol = startCol;
     stmt->endCol = parser->currentToken->endCol;
 

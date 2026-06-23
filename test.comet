@@ -1,7 +1,6 @@
 import testlib
 
 func main() -> int {
-    testlib.Foo hi = 123
-
-    return 0
+    testlib.Foo hi = new testlib.Foo(123)
+    return hi.test
 }

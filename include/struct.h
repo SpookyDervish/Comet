@@ -27,7 +27,7 @@ struct CometStruct {
 typedef struct CometSerializedFunc CometSerializedFunc;
 typedef struct {
     int64_t* fields;
-    CometSerializedFunc* vtable;
+    uint32_t* vtable;
 } CometObject;
 
 FieldAttribute attribStringToFieldAttrib(char* str);
