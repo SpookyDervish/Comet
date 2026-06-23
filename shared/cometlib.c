@@ -8,56 +8,6 @@
 #include <string.h>
 #include <sys/types.h>
 
-CometFunction* cometDefineFunc(
-    CometEnvironment* env,
-    char* name,
-    CometType returnType,
-    uint32_t numArgs,
-    bool isVarArgs,
-    bool isMethod,
-    ...
-) {
-    CometFunction* func = malloc(sizeof(CometFunction));
-    memcpy(func->name, name, 32);
-    func->argCount = numArgs;
-    func->isMethod = isMethod;
-    func->returnType = returnType;
-    func->startIdx = 0;
-    func->isExternal = true;
-    func->isVarArgs = isVarArgs;
-    
-    CometType type = {
-        .typeKind = COMET_FUNCTION,
-    };
-    type.functionType = func;
-
-    CometOperand funcVal = {
-        .type = CO_IMMEDIATE,
-        .imm = {
-            .typeKind = COMET_FUNCTION,
-            .bigVal = (int64_t)func
-        }
-    };
-
-    va_list args;
-    va_start(args, isMethod);
-
-    CometType* argTypes = numArgs > 0 ? calloc(numArgs, sizeof(CometType)) : NULL;
-    for (size_t i = 0; i < numArgs; i++) {
-        argTypes[i] = va_arg(args, CometType);
-    }
-
-    func->argTypes = argTypes;
-
-    va_end(args);
-
-    if (env) {
-        defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
-    }
-    
-    return func;
-}
-
 CometSerializedFunc cometSerializeFunction(
     CometVM* vm,
     CometFunction* func,
@@ -237,11 +187,14 @@ API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType)
     return cArray;
 }
 
-CometStruct* cometDefineStruct(CometEnvironment* env, char* name, List(StructField) fields, List(cometFuncPtr) methods) {
-    CometStruct* newStruct = malloc(sizeof(CometStruct)); 
-
+void setStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
     char** fieldNames = calloc(fields.count, sizeof(char*));
     CometType* fieldTypes = calloc(fields.count, sizeof(CometType));
+
+    CometFunction** methodsArr = malloc(sizeof(CometFunction*) * methods.count);
+    for (size_t i = 0; i < methods.count; i++) {
+        methodsArr[i] = *get(methods, i);
+    }
 
     for (size_t i = 0; i < fields.count; i++) {
         StructField field = *get(fields, i);
@@ -249,20 +202,29 @@ CometStruct* cometDefineStruct(CometEnvironment* env, char* name, List(StructFie
         fieldTypes[i] = field.type;
     }
 
+    cometStruct->fieldNames = fieldNames;
+    cometStruct->fieldTypes = fieldTypes;
+    cometStruct->fieldCount = fields.count;
+    cometStruct->numMethods = methods.count;
+    cometStruct->vtable = (CometMethod**)methodsArr;
+}
+
+CometStruct* cometDefineStruct(CometEnvironment* env, char* name) {
+    CometStruct* newStruct = malloc(sizeof(CometStruct)); 
+
+    
+
     name = strdup(name);
 
-    CometFunction** methodsArr = malloc(sizeof(CometFunction*) * methods.count);
-    for (size_t i = 0; i < methods.count; i++) {
-        methodsArr[i] = *get(methods, i);
-    }
+    
     
     *newStruct = (CometStruct){
         .name = name,
-        .fieldNames = fieldNames,
-        .fieldTypes = fieldTypes,
-        .fieldCount = fields.count,
-        .numMethods = methods.count,
-        .vtable = (CometMethod**)methodsArr,
+        .fieldNames = NULL,
+        .fieldTypes = NULL,
+        .fieldCount = 0,
+        .numMethods = 0,
+        .vtable = NULL,
         .parent = NULL
     };
 
@@ -284,6 +246,101 @@ CometStruct* cometDefineStruct(CometEnvironment* env, char* name, List(StructFie
     defineVar(env, name, RECORD_LOCAL, structVal, typeType, false);
 
     return newStruct;
+}
+
+CometFunction* cometDefineFunc(
+    CometEnvironment* env,
+    char* name,
+    CometType returnType,
+    uint32_t numArgs,
+    bool isVarArgs,
+    ...
+) {
+    CometFunction* func = malloc(sizeof(CometFunction));
+    memcpy(func->name, name, 32);
+    func->argCount = numArgs;
+    func->isMethod = false;
+    func->returnType = returnType;
+    func->startIdx = 0;
+    func->isExternal = true;
+    func->isVarArgs = isVarArgs;
+    
+    CometType type = {
+        .typeKind = COMET_FUNCTION,
+    };
+    type.functionType = func;
+
+    CometOperand funcVal = {
+        .type = CO_IMMEDIATE,
+        .imm = {
+            .typeKind = COMET_FUNCTION,
+            .bigVal = (int64_t)func
+        }
+    };
+
+    va_list args;
+    va_start(args, isVarArgs);
+
+    CometType* argTypes = numArgs > 0 ? calloc(numArgs, sizeof(CometType)) : NULL;
+    for (size_t i = 0; i < numArgs; i++) {
+        argTypes[i] = va_arg(args, CometType);
+    }
+
+    func->argTypes = argTypes;
+
+    va_end(args);
+
+    defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
+    
+    return func;
+}
+
+CometFunction* cometDefineMethod(
+    CometEnvironment* env,
+    char* name,
+    CometStruct* cometStruct,
+    CometType returnType,
+    uint32_t numArgs,
+    bool isVarArgs,
+    ...
+) {
+    CometFunction* func = malloc(sizeof(CometFunction));
+    memcpy(func->name, name, 32);
+    func->argCount = numArgs + 1;
+    func->isMethod = true;
+    func->returnType = returnType;
+    func->startIdx = 0;
+    func->isExternal = true;
+    func->isVarArgs = isVarArgs;
+    
+    CometType type = {
+        .typeKind = COMET_FUNCTION,
+    };
+    type.functionType = func;
+
+    CometOperand funcVal = {
+        .type = CO_IMMEDIATE,
+        .imm = {
+            .typeKind = COMET_FUNCTION,
+            .bigVal = (int64_t)func
+        }
+    };
+
+    va_list args;
+    va_start(args, isVarArgs);
+
+    CometType* argTypes = calloc(numArgs + 1, sizeof(CometType));
+    argTypes[0] = (CometType){ .typeKind = COMET_STRUCT, .structType = cometStruct };
+    for (size_t i = 0; i < numArgs; i++) {
+        argTypes[i + 1] = va_arg(args, CometType);
+    }
+
+    func->argTypes = argTypes;
+
+    va_end(args);
+    defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
+
+    return func;
 }
 
 void cometDefineConstructor(

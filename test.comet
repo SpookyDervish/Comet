@@ -6,14 +6,13 @@ struct Test {
     init(int x) {
         self.x = x
     }
+
+    func foo(int a, int b) -> int {
+        return a + b
+    }
 }
 
 func main() -> int {
-    testlib.Foo hi = new testlib.Foo(123)
-    hi.test = 50
-
-    Test hi2 = new Test(12)
-    hi2.x = 50
-
-    return hi.test
+    testlib.Foo testStruct = new testlib.Foo(10)
+    return testStruct.add(3, 4)
 }

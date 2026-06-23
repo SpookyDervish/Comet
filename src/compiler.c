@@ -238,6 +238,8 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
     // whenever an external lib creates a function we need to create a symbol for it in the compiler
 
     Record* current, *tmp;
+
+    // iterate over functions first
     HASH_ITER(hh, libEnv->records, current, tmp) {
 
         switch (current->type.typeKind) {
@@ -255,6 +257,17 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
                 break;
             }
 
+            default: {
+                continue;
+            }
+        }
+
+        
+    }
+
+    // then iterate over structs after we know all the funcs exist
+    HASH_ITER(hh, libEnv->records, current, tmp) {
+        switch (current->type.typeKind) {
             case COMET_TYPE: {
                 CometStruct* structVal = current->value.imm.typeVal.structType;
 
@@ -272,6 +285,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
 
                     bool found = false;
                     for (size_t funcIdx = 0; funcIdx < c->functionCount; funcIdx++) {
+
                         if (c->functions[funcIdx] == func) {
                             found = true;
 
@@ -306,11 +320,9 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
                 break;
             }
 
-            default: {
-                continue;
-            }
+            default:
+                break;
         }
-
         
     }
 
@@ -618,6 +630,25 @@ ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, Co
             
 
             int32_t methodIdx = getMethodIndex(structType.as.success.structType, fieldName);
+            if (methodIdx == -1) {
+                Estr buffer = CREATE_ESTR("There is no method called \"");
+                APPEND_ESTR(buffer, fieldName);
+                APPEND_ESTR(buffer, "\" in the struct \"");
+                APPEND_ESTR(buffer, structType.as.success.structType->name);
+                APPEND_ESTR(buffer, "\"");
+
+                ErrorMessage errMsg = createError(
+                    c->inputFilePath,
+                    c->sourceCode,
+                    "MethodNotFound",
+                    buffer.str,
+                    NULL,
+                    node->lineNum,
+                    node->startCol,
+                    node->endCol
+                );
+                return Error(CometFunctionTypeInfo, ErrorMessage, errMsg);
+            }
 
             CometOperand funcValue = createOperand(CO_SYMBOL);
             funcValue.symbolIdx = structType.as.success.structType->vtable[methodIdx]->symbolIdx;
@@ -1662,7 +1693,7 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                     
                     char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
 
-                    ResultType(CometFunctionTypeInfo, ErrorMessage) funcInfo = getFunction(c, expr.right, false);
+                    ResultType(CometFunctionTypeInfo, ErrorMessage) funcInfo = getFunction(c, node, false);
                     if (!funcInfo.error) {
                         // resolving type of method
                         int32_t methodIdx = getMethodIndex(left.as.success.structType, fieldName);
@@ -2604,6 +2635,8 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
 
     List(CometOperand) funcCallArgs = newList(CometOperand);
     for (size_t argIdx = 0; argIdx < funcCall.args.count; argIdx++) {
+        size_t actualArgIdx = func->isMethod ? argIdx + 1 : argIdx;
+
         CometASTNode* argNode = *get(funcCall.args, argIdx);
 
         ResultType(CometOperand, ErrorMessage) argValue = visitValue(c, argNode);
@@ -2614,9 +2647,9 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
         if (argType.error)
             return Error(CometOperand, ErrorMessage, argType.as.error);
 
-        if (argIdx < neededArgCount && !typesAreEqual(argType.as.success, func->argTypes[argIdx])) {
+        if (argIdx < neededArgCount && !typesAreEqual(argType.as.success, func->argTypes[actualArgIdx])) {
             char* buffer = malloc(128);
-            snprintf(buffer, 128, "Argument %zu of function \"%s\" is the wrong type", argIdx, func->name);
+            snprintf(buffer, 128, "Argument %zu of function \"%s\" is the wrong type", actualArgIdx+1, func->name);
 
             char* help = malloc(256);
             snprintf(
@@ -2915,10 +2948,11 @@ ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c,
 
     // get arg types
     CometType* argTypes = calloc(funcDef.args.count+1, sizeof(CometType));
+    argTypes[0] = structType;
     for (size_t argTypeIdx = 0; argTypeIdx < funcDef.args.count; argTypeIdx++) {
         CometASTNode* argNode = *get(funcDef.args, argTypeIdx);
 
-        ResultType(CometType, ErrorMessage) argType = getType(c, argNode);
+        ResultType(CometType, ErrorMessage) argType = getType(c, argNode->data.AST_ARG_DEF.type);
         if (argType.error)
             return Error(CometOperand, ErrorMessage, argType.as.error);
 
@@ -2926,6 +2960,7 @@ ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c,
     } 
 
     // get return type
+    
     ResultType(CometType, ErrorMessage) returnType = getType(c, funcDef.returnType);
     if (returnType.error)
         return Error(CometOperand, ErrorMessage, returnType.as.error);
