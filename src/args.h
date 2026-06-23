@@ -11,6 +11,7 @@ typedef struct {
     char* outputPath;
     bool outputASM;
     bool debugSymbols;
+    bool printAST;
     int optimisation;
     bool showVersion;
 } CometArgs;

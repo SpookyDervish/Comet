@@ -8,6 +8,7 @@ const struct argp_option options[] = {
     { "version", 'v', 0, 0, "display version number and quit", 0 },
     { "debug", 'd', 0, 0, "include debug symbols in outputted file", 0 },
     { "asm", 'a', 0, 0, "output assembly instead of an executable file", 0 },
+    { "ast", 'A', 0, 0, "print out AST", 0 },
     { "optimisation", 'O', "OPTIMISATION", 0, "the level of optimisation (0 - 3, default is 2)", 0 },
     { 0 }
 };
@@ -30,6 +31,10 @@ int parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
 
         case 'a':
             args->outputASM = true;
+            break;
+
+        case 'A':
+            args->printAST = true;
             break;
         
         case 'v':

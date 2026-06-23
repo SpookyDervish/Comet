@@ -53,8 +53,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printNode(ast.as.success);
-    printf("\n");
+    if (args.as.success.printAST) {
+        printf(ESC_BOLD "=== AST ===\n" ESC_RESET);
+        printNode(ast.as.success);
+        putchar('\n');
+    }
 
     ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(filePath, source, args.as.success.debugSymbols);
     if (compiler.error) {
