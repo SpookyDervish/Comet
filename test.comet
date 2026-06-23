@@ -1,6 +1,19 @@
 import testlib
 
+struct Test {
+    int x
+
+    init(int x) {
+        self.x = x
+    }
+}
+
 func main() -> int {
     testlib.Foo hi = new testlib.Foo(123)
+    hi.test = 50
+
+    Test hi2 = new Test(12)
+    hi2.x = 50
+
     return hi.test
 }

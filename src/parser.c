@@ -1134,13 +1134,21 @@ ResultType(astNodePtr, ErrorMessage) parseAssignmentStatement(CometParser* parse
         }
     }
 
+    uint32_t tokenIdx = parser->tokenIndex;
+    CometToken* currentTok = parser->currentToken;
+    CometToken* peekTok = parser->peekToken;
+
     ResultType(astNodePtr, ErrorMessage) type = parseType(parser);//AST_NODE(AST_IDENTIFIER, parser->currentToken->value.literal);
     if (type.error)
         return type;
 
     bool expectName = peekTokenIs(parser, CT_IDENT);
-    if (!expectName)
+    if (!expectName) { // backtrack, we're doing a reassignment
+        parser->currentToken = currentTok;
+        parser->peekToken = peekTok;
+        parser->tokenIndex = tokenIdx;
         return parseExpression(parser, PRECEDENCE_LOWEST);
+    }
     parserNextToken(parser);
 
     CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
