@@ -36,12 +36,11 @@ typedef struct {
 
 UseList(CometSerializedFunc);
 UseList(cometFuncPtr);
-UseList(charptr);
 UseList(StructField);
 
+API_EXPORT CometStruct* cometGetExceptionStruct(CometEnvironment* env);
 
-
-CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
+CometType cometCreateArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
 
 API_EXPORT CometSerializedFunc cometSerializeFunction(
     CometVM* vm,
@@ -49,12 +48,12 @@ API_EXPORT CometSerializedFunc cometSerializeFunction(
     externalLibFunc funcPtr
 );
 
-API_EXPORT CometOperand cometCreateObject(CometSerializedStruct* structType);
+API_EXPORT CometObject* cometCreateObject(CometSerializedStruct* structType);
 
 API_EXPORT CometOperand cometValue(CometValueTypeKind valueType, ...);
 
-API_EXPORT int64_t serializeValue(CometOperand value);
-API_EXPORT CometOperand deserializeValue(int64_t value, CometType type);
+API_EXPORT int64_t cometSerializeValue(CometOperand value);
+API_EXPORT CometOperand cometDeserializeValue(int64_t value, CometType type);
 API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType);
 API_EXPORT CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType);
 
@@ -76,9 +75,10 @@ API_EXPORT CometFunction* cometDefineMethod(
     ...
 );
 
-API_EXPORT void setStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods);
+API_EXPORT void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods);
 
-API_EXPORT CometStruct* cometDefineStruct(CometEnvironment* env, char* name);
+API_EXPORT CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* parent);
+
 API_EXPORT void cometDefineConstructor(
     CometEnvironment* env,
     CometStruct* structType,
@@ -87,5 +87,9 @@ API_EXPORT void cometDefineConstructor(
     ...
 );
 API_EXPORT void cometSetField(CometObject* object, uint32_t index, int64_t value);
+
+API_EXPORT CometSerializedStruct* cometVMGetStruct(CometVM* vm, char* structName);
+
+API_EXPORT ResultType(int64_t, objectPtr) cometError(CometVM* vm, char* errorName, char* errorMessage);
 
 #endif

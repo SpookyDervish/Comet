@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include "../include/cometlib.h"
 
 
 // -- HELPER METHODS -- //
@@ -3655,12 +3656,9 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         CometStruct* structType = *get(c->structs, structIdx);
         CometSerializedStruct* serializedStruct = serializeStruct(c->functions, structType);
 
-        CometSerializedStructHeader header = {
-            .numFields = serializedStruct->numFields,
-            .numMethods = serializedStruct->numMethods
-        };
-
-        fwrite(&header, sizeof(CometSerializedStructHeader), 1, file);
+        fwrite(serializedStruct->name, 1, 48, file);
+        fwrite(&serializedStruct->numFields, 1, sizeof(uint32_t), file);
+        fwrite(&serializedStruct->numMethods, 1, sizeof(uint32_t), file);
         fwrite(serializedStruct->vtable, sizeof(uint32_t), serializedStruct->numMethods, file);
     }
 
@@ -3695,6 +3693,30 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
     fclose(file);
 
     return Success(voidPtr, ErrorMessage, NULL);
+}
+
+ResultType(int64_t, objectPtr) impl_Exception_INIT(int64_t* args, CometVM* vm) {
+    CometObject* exception = (CometObject*)args[0];
+    exception->fields[0] = args[1];
+    exception->fields[1] = args[2];
+    return Success(int64_t, objectPtr, (int64_t)exception);
+}
+
+void createExceptionType(CometCompiler* c) {
+    List(StructField) fields = newList(StructField);
+    StructField nameField    = { .name = "name",    .type = cometTypeString };
+    StructField messageField = { .name = "message", .type = cometTypeString };
+    append(fields, nameField);
+    append(fields, messageField);
+
+    List(cometFuncPtr) methods = newList(cometFuncPtr);
+
+    CometStruct* exceptionType = cometDefineStruct(NULL, "Exception", NULL);
+    cometSetStructFieldsAndMethods(exceptionType, fields, methods);
+
+    cometDefineConstructor(NULL, exceptionType, 2, false, cometTypeString, cometTypeString);
+
+    append(c->structs, exceptionType);
 }
 
 ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {
@@ -3758,6 +3780,8 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
 
     CometTypeMapEntry stringTypeEntry = { .name = "string", .type = stringType};
     append(newCompiler->typeMap, stringTypeEntry);
+
+    createExceptionType(newCompiler);
 
     // return new compiler
     

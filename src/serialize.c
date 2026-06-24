@@ -35,6 +35,9 @@ CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruc
         .numMethods = structType->numMethods
     };
 
+    size_t nameLen = strlen(structType->name) + 1;
+    memcpy(serialized->name, structType->name, nameLen < 48 ? nameLen : 48);
+
     for (size_t i = 0; i < structType->numMethods; i++) {
         CometMethod* method = structType->vtable[i];
         serialized->vtable[i] = method->symbolIdx;

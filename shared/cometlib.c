@@ -8,6 +8,8 @@
 #include <string.h>
 #include <sys/types.h>
 
+static CometStruct* exceptStruct = NULL;
+
 static CometArrayType stringArray = {
     .elem = &cometTypeSmall,
     .isFixedSize = {false},
@@ -18,6 +20,31 @@ CometType const cometTypeString = {
     .typeKind = COMET_ARRAY,
     .arrayType = &stringArray
 };
+
+int64_t Exception_INIT(int64_t* args, CometVM* vm) {
+    CometObject* exception = (CometObject*)args[0];
+    cometSetField(exception, 0, args[1]);
+    cometSetField(exception, 1, args[2]);
+    return (int64_t)exception;
+}
+
+CometStruct* cometGetExceptionStruct(CometEnvironment* env) {
+    if (exceptStruct != NULL)
+        return exceptStruct;
+
+    CometStruct* exceptStruct = cometDefineStruct(env, "Exception", NULL);
+
+    List(StructField) fields = newList(StructField);
+    StructField typeField = { .name = "type",    .type = cometTypeString };
+    StructField msgField  = { .name = "message", .type = cometTypeString };
+
+    List(cometFuncPtr) methods = newList(cometFuncPtr);
+
+    cometSetStructFieldsAndMethods(exceptStruct, fields, methods);
+    cometDefineConstructor(env, exceptStruct, 2, false, cometTypeString, cometTypeString);
+
+    return exceptStruct;
+}
 
 CometSerializedFunc cometSerializeFunction(
     CometVM* vm,
@@ -42,7 +69,7 @@ CometSerializedFunc cometSerializeFunction(
     return serializedFunc;
 }
 
-int64_t serializeValue(CometOperand value) {
+int64_t cometSerializeValue(CometOperand value) {
     if (value.type == CO_SYMBOL) {
         return value.symbolIdx;
     }
@@ -65,7 +92,7 @@ int64_t serializeValue(CometOperand value) {
                 return 0;
 
             for (size_t i = 0; i < capacity; i++) {
-                arr->data[i] = serializeValue(value.imm.arrayVal.data[i]);
+                arr->data[i] = cometSerializeValue(value.imm.arrayVal.data[i]);
             }
             arr->capacity = capacity;
             arr->elemType = cometTypeBig;
@@ -86,7 +113,7 @@ int64_t serializeValue(CometOperand value) {
     }
 }
 
-CometOperand deserializeValue(int64_t value, CometType type) {
+CometOperand cometDeserializeValue(int64_t value, CometType type) {
     switch (type.typeKind) {
         case COMET_SMALL   : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_SMALL,  .imm.smallVal = value };
         case COMET_INT     : return (CometOperand){ .type = CO_IMMEDIATE, .imm.typeKind = COMET_INT,    .imm.intVal = value };
@@ -128,7 +155,7 @@ CometOperand deserializeValue(int64_t value, CometType type) {
             int64_t* serializedData = array->data;
 
             for (size_t i = 0; i < capacity; i++) {
-                deserializedData[i] = deserializeValue(serializedData[i], array->elemType);
+                deserializedData[i] = cometDeserializeValue(serializedData[i], array->elemType);
             }
 
             return deserializedValue;
@@ -198,19 +225,34 @@ API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType)
     return cArray;
 }
 
-void setStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
-    char** fieldNames = calloc(fields.count, sizeof(char*));
-    CometType* fieldTypes = calloc(fields.count, sizeof(CometType));
+void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
+    size_t fieldCount  = cometStruct->parent == NULL ? fields.count : fields.count + cometStruct->parent->fieldCount;
+    size_t methodCount = cometStruct->parent == NULL ? methods.count : methods.count + cometStruct->parent->numMethods;
 
-    CometFunction** methodsArr = malloc(sizeof(CometFunction*) * methods.count);
-    for (size_t i = 0; i < methods.count; i++) {
-        methodsArr[i] = *get(methods, i);
+    
+
+    char** fieldNames = calloc(fieldCount, sizeof(char*));
+    CometType* fieldTypes = calloc(fieldCount, sizeof(CometType));
+
+    CometFunction** methodsArr = calloc(methodCount, sizeof(CometFunction*));
+    size_t methodIdx = 0;
+    size_t fieldIdx = 0;
+
+    if (cometStruct->parent != NULL) {
+        memcpy(methodsArr, cometStruct->parent->vtable, sizeof(CometMethod*) * cometStruct->parent->numMethods);
+
+        memcpy(fieldNames, cometStruct->parent->fieldNames, sizeof(char*) * cometStruct->parent->fieldCount);
+        memcpy(fieldTypes, cometStruct->parent->fieldTypes, sizeof(CometType) * cometStruct->parent->fieldCount);
     }
 
-    for (size_t i = 0; i < fields.count; i++) {
-        StructField field = *get(fields, i);
-        fieldNames[i] = strdup(field.name); // we strdup it or else it might go out of scope and become invalid
-        fieldTypes[i] = field.type;
+    for (methodIdx = methodIdx; methodIdx < methods.count; methodIdx++) {
+        methodsArr[methodIdx] = *get(methods, methodIdx);
+    }
+
+    for (fieldIdx = fieldIdx; fieldIdx < fields.count; fieldIdx++) {
+        StructField field = *get(fields, fieldIdx);
+        fieldNames[fieldIdx] = strdup(field.name); // we strdup it or else it might go out of scope and become invalid
+        fieldTypes[fieldIdx] = field.type;
     }
 
     cometStruct->fieldNames = fieldNames;
@@ -220,7 +262,7 @@ void setStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) field
     cometStruct->vtable = (CometMethod**)methodsArr;
 }
 
-CometStruct* cometDefineStruct(CometEnvironment* env, char* name) {
+CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* parent) {
     CometStruct* newStruct = malloc(sizeof(CometStruct)); 
 
     
@@ -236,7 +278,7 @@ CometStruct* cometDefineStruct(CometEnvironment* env, char* name) {
         .fieldCount = 0,
         .numMethods = 0,
         .vtable = NULL,
-        .parent = NULL
+        .parent = parent
     };
 
     CometType structType = {
@@ -254,7 +296,8 @@ CometStruct* cometDefineStruct(CometEnvironment* env, char* name) {
         .typeKind = COMET_TYPE,
     };
 
-    defineVar(env, name, RECORD_LOCAL, structVal, typeType, false);
+    if (env)
+        defineVar(env, name, RECORD_LOCAL, structVal, typeType, false);
 
     return newStruct;
 }
@@ -301,7 +344,8 @@ CometFunction* cometDefineFunc(
 
     va_end(args);
 
-    defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
+    if (env)
+        defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
     
     return func;
 }
@@ -349,7 +393,9 @@ CometFunction* cometDefineMethod(
     func->argTypes = argTypes;
 
     va_end(args);
-    defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
+
+    if (env)
+        defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
 
     return func;
 }
@@ -404,7 +450,8 @@ void cometDefineConstructor(
 
     va_end(args);
 
-    defineVar(env, constructorName, RECORD_LOCAL, funcVal, type, false);
+    if (env)
+        defineVar(env, constructorName, RECORD_LOCAL, funcVal, type, false);
 }
 
 CometOperand cometValue(CometValueTypeKind valueType, ...) {
@@ -494,7 +541,7 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
     return newVal;
 }
 
-size_t GetCometTypeSize(CometType type) {
+size_t getCometTypeSize(CometType type) {
     switch (type.typeKind) {
         case COMET_SMALL: case COMET_BOOL:   return 1;
         case COMET_INT:   case COMET_FLOAT:  return 4;
@@ -512,7 +559,7 @@ CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemT
     if (!serializedData)
         return (CometOperand){.type = CO_NONE};
 
-    size_t elemSize = GetCometTypeSize(elemType);
+    size_t elemSize = getCometTypeSize(elemType);
 
     uint8_t* bytePtr = (uint8_t*)arrayValue;
 
@@ -528,7 +575,7 @@ CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemT
             default: break;
         }
 
-        serializedData[i] = deserializeValue(extractedValue, elemType);
+        serializedData[i] = cometDeserializeValue(extractedValue, elemType);
     }
 
     out.imm.typeKind = COMET_ARRAY;
@@ -540,7 +587,7 @@ CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemT
     return out;
 }
 
-CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]) {
+CometType cometCreateArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]) {
     CometType* elemPtr = malloc(sizeof(CometType));
     if (!elemPtr) return cometTypeVoid;
 
@@ -572,4 +619,33 @@ CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[]
 
 inline void cometSetField(CometObject* object, uint32_t index, int64_t value) {
     object->fields[index] = value;
+}
+
+CometSerializedStruct* cometVMGetStruct(CometVM* vm, char* structName) {
+    for (size_t i = 0; i < vm->numStructs; i++) {
+        if (strcmp(vm->structs[i].name, structName) == 0) {
+            return &vm->structs[i];
+        }
+    }
+
+    return NULL;
+}
+
+API_EXPORT CometObject* cometCreateObject(CometSerializedStruct* structType) {
+    CometObject* obj = malloc(sizeof(CometObject));
+
+    obj->fields = calloc(structType->numFields, sizeof(int64_t));
+    obj->vtable = structType->vtable;
+
+    return obj;
+}
+
+ResultType(int64_t, objectPtr) cometError(CometVM* vm, char* errorName, char* errorMessage) {
+    CometSerializedStruct* exceptionStruct = cometVMGetStruct(vm, "Exception");
+    CometObject* exceptionObj = cometCreateObject(exceptionStruct);
+
+    exceptionObj->fields[0] = (int64_t)strdup(errorName);
+    exceptionObj->fields[1] = (int64_t)strdup(errorMessage);
+
+    return Error(int64_t, objectPtr, exceptionObj);
 }

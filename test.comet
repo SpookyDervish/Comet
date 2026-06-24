@@ -1,0 +1,7 @@
+import io
+
+func main() -> int {
+    io.File f = new io.File("test.txt", "w")
+    io.println("f.ptr = %n", f.ptr)
+    return 0
+}

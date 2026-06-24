@@ -13,6 +13,8 @@
 #include "debug.h"
 #include <stdint.h>
 
+typedef CometObject* objectPtr;
+Result(int64_t, objectPtr);
 Result(int, charptr);
 
 typedef struct DebuggerBreakpoint DebuggerBreakpoint;
@@ -26,7 +28,7 @@ typedef struct {
 } Frame;
 
 typedef struct CometVM CometVM;
-typedef int64_t (*externalLibFunc)(int64_t args[], CometVM* vm);
+typedef ResultType(int64_t, objectPtr) (*externalLibFunc)(int64_t args[], CometVM* vm);
 
 typedef struct {
     uint64_t handlerIP;
@@ -92,5 +94,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs);
 Return from the function the VM is currently in.
 */
 void returnFromFunc(CometVM* vm);
+
+void vmThrow(CometVM* vm, char* errName, char* msg, CometObject* errPtr);
 
 #endif

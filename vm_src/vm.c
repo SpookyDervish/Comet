@@ -101,9 +101,13 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
         for (int8_t argIdx = numArgs; argIdx > 0; argIdx--) {
             args[argIdx - 1] = popValue(vm);
         }
-        int64_t returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+        ResultType(int64_t, objectPtr) returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
+        if (returnValue.error) {
+            CometObject* obj = returnValue.as.error;
+            vmThrow(vm, (char*)obj->fields[0], (char*)obj->fields[1], obj);
+        }
 
-        pushValue(vm, returnValue);
+        pushValue(vm, returnValue.as.success);
 
         return;
     }
@@ -171,7 +175,7 @@ ResultType(voidPtr, charptr) invalidInstruction(CometSerializedInst inst) {
     return Error(voidPtr, charptr, buffer);
 }
 
-void throw(CometVM* vm, char* errName, char* msg, CometObject* errPtr) {
+void vmThrow(CometVM* vm, char* errName, char* msg, CometObject* errPtr) {
     if (vm->currentExcept == 0) {
         char* trace = stackTrace(vm);
 
@@ -365,7 +369,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         int64_t b = popValue(vm);
 
         if (b == 0) {
-            throw(vm, "DivisionByZero", "Division by zero", NULL);
+            vmThrow(vm, "DivisionByZero", "Division by zero", NULL);
             DISPATCH();
         }
 
@@ -385,7 +389,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&bDouble, &b, sizeof(double));
 
         if (bDouble == 0) {
-            throw(vm, "DivisionByZero", "Division by zero", NULL);
+            vmThrow(vm, "DivisionByZero", "Division by zero", NULL);
             DISPATCH();
         }
 
@@ -676,7 +680,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
             exceptMsg[i] = exceptMsgArr->data[i];
         }
 
-        throw(vm, exceptName, exceptMsg, exception);
+        vmThrow(vm, exceptName, exceptMsg, exception);
         DISPATCH();
     }
     LIST_LENGTH: {
@@ -767,6 +771,10 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     for (uint32_t i = 0; i < loadedFile->numStructs; i++) {
         uint32_t numFields;
         uint32_t numMethods;
+        char name[48];
+
+        memcpy(name, cursor, 48);
+        cursor += 48;
 
         memcpy(&numFields, cursor, sizeof(uint32_t));
         cursor += sizeof(uint32_t);
@@ -776,6 +784,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
         newVM->structs[i].numFields = numFields;
         newVM->structs[i].numMethods = numMethods;
+        memcpy(newVM->structs[i].name, name, 48);
 
         newVM->structs[i].vtable =
             malloc(sizeof(uint32_t) * numMethods);

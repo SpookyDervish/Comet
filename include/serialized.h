@@ -75,12 +75,14 @@ typedef struct {
 } CometSerializedInst;
 
 typedef struct {
+    char name[48];
     uint32_t numFields;
     uint32_t numMethods;
     uint32_t* vtable;
 } CometSerializedStruct;
 
 typedef struct {
+    char name[48];
     uint32_t numFields;
     uint32_t numMethods;
 } CometSerializedStructHeader;
