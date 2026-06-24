@@ -23,7 +23,6 @@ static CometType cometTypeFloat  = (CometType){.typeKind = COMET_FLOAT };
 static CometType cometTypeDouble = (CometType){.typeKind = COMET_DOUBLE};
 static CometType cometTypeBool   = (CometType){.typeKind = COMET_BOOL  };
 static CometType cometTypeVoid   = (CometType){.typeKind = COMET_VOID  };
-
 extern const CometType cometTypeString;
 
 #define on_import void onImport(CometEnvironment* env)

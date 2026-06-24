@@ -1,8 +1,0 @@
-import testlib
-import io
-
-func main() -> int {
-    testlib.Foo test = new testlib.Foo("hi")
-    io.println(test.test)
-    return 0
-}

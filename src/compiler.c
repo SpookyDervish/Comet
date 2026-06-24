@@ -184,8 +184,9 @@ int32_t getMethodIndex(CometStruct* structType, char* methodName) {
 ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const char* path, char* libName) {
     void* handle = dlopen(path, RTLD_LAZY);
     if (!handle) {
+        char* dlErrMsg = dlerror();
         Estr buffer = CREATE_ESTR("Failed to load module: ");
-        APPEND_ESTR(buffer,  dlerror());
+        APPEND_ESTR(buffer, dlErrMsg);
 
         ErrorMessage errMsg = createError(
             c->inputFilePath,
@@ -200,14 +201,16 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
         return Error(CometOperand, ErrorMessage, errMsg);
     }
 
+    dlerror();
     void (*onLibImport)(CometEnvironment* env) = dlsym(handle, "onImport");
     if (!onLibImport) {
         dlclose(handle);
 
+        char* errorMsg = dlerror();
         Estr buffer = CREATE_ESTR("Could not get the \"onImport\" function from the library \"");
         APPEND_ESTR(buffer, libName);
         APPEND_ESTR(buffer, "\". (");
-        APPEND_ESTR(buffer, dlerror());
+        APPEND_ESTR(buffer, errorMsg);
         APPEND_ESTR(buffer, ")");
 
         ErrorMessage errMsg = createError(
