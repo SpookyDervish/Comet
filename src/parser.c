@@ -439,8 +439,9 @@ void printNode(CometASTNode* node) {
             break;
 
         case AST_PREFIX_EXPRESSION:
-            printf("%s", node->data.AST_PREFIX_EXPRESSION.op.value.literal);
+            printf("%s(", node->data.AST_PREFIX_EXPRESSION.op.value.literal);
             printNode(node->data.AST_PREFIX_EXPRESSION.right);
+            putchar(')');
             break;
 
         case AST_FUNC_CALL:
@@ -921,7 +922,7 @@ ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) 
 
     parserNextToken(parser);
 
-    ResultType(astNodePtr, ErrorMessage) rightSide = parseExpression(parser, PRECEDENCE_INDEX);
+    ResultType(astNodePtr, ErrorMessage) rightSide = parseExpression(parser, PRECEDENCE_PREFIX);
     if (rightSide.error)
         return rightSide;
 
