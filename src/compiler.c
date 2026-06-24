@@ -2652,7 +2652,9 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
         if (argType.error)
             return Error(CometOperand, ErrorMessage, argType.as.error);
 
-        if (argIdx < neededArgCount && !typesAreEqual(argType.as.success, func->argTypes[actualArgIdx])) {
+        if (argIdx < neededArgCount &&
+            !typesAreEqual(argType.as.success, func->argTypes[actualArgIdx]) &&
+            !canImplicitCastType(func->argTypes[actualArgIdx], argType.as.success)) {
             char* buffer = malloc(128);
             snprintf(buffer, 128, "Argument %zu of function \"%s\" is the wrong type", actualArgIdx+1, func->name);
 
@@ -2661,7 +2663,7 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
                 help,
                 256,
                 "Expected %s but got %s. Full function signature is %s",
-                typeToString(func->argTypes[argIdx]),
+                typeToString(func->argTypes[actualArgIdx]),
                 typeToString(argType.as.success),
                 typeToString((CometType){ .typeKind = COMET_FUNCTION, .functionType = func })
             );

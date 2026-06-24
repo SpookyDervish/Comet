@@ -101,6 +101,7 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
         for (int8_t argIdx = numArgs; argIdx > 0; argIdx--) {
             args[argIdx - 1] = popValue(vm);
         }
+        
         ResultType(int64_t, objectPtr) returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
         if (returnValue.error) {
             CometObject* obj = returnValue.as.error;
