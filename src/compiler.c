@@ -245,6 +245,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
         switch (current->type.typeKind) {
             case COMET_FUNCTION: {
                 CometFunction* funcVal = (CometFunction*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
+                funcVal->libIdx = libIdx;
 
                 // doin it manually lo-
                 c->functions[c->functionCount] = funcVal;

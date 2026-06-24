@@ -8,6 +8,17 @@
 #include <string.h>
 #include <sys/types.h>
 
+static CometArrayType stringArray = {
+    .elem = &cometTypeSmall,
+    .isFixedSize = {false},
+    .dims = 1
+};
+
+CometType const cometTypeString = {
+    .typeKind = COMET_ARRAY,
+    .arrayType = &stringArray
+};
+
 CometSerializedFunc cometSerializeFunction(
     CometVM* vm,
     CometFunction* func,
@@ -559,6 +570,6 @@ CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[]
     };
 }
 
-void cometSetField(CometObject* object, uint32_t index, int64_t value) {
+inline void cometSetField(CometObject* object, uint32_t index, int64_t value) {
     object->fields[index] = value;
 }

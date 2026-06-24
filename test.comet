@@ -1,18 +1,8 @@
 import testlib
-
-struct Test {
-    int x
-
-    init(int x) {
-        self.x = x
-    }
-
-    func foo(int a, int b) -> int {
-        return a + b
-    }
-}
+import io
 
 func main() -> int {
-    testlib.Foo testStruct = new testlib.Foo(10)
-    return testStruct.add(3, 4)
+    testlib.Foo test = new testlib.Foo("hi")
+    io.println(test.test)
+    return 0
 }

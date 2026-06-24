@@ -18,7 +18,7 @@ on_import {
     CometStruct* fooStruct = cometDefineStruct(env, "Foo");
 
     List(StructField) fields = newList(StructField);
-    StructField field = (StructField){"test", cometTypeInt};
+    StructField field = (StructField){"test", cometTypeString};
     append(fields, field);
 
     List(cometFuncPtr) methods = newList(cometFuncPtr);
@@ -27,5 +27,5 @@ on_import {
 
 
     setStructFieldsAndMethods(fooStruct, fields, methods);
-    cometDefineConstructor(env, fooStruct, 1, false, cometTypeInt);
+    cometDefineConstructor(env, fooStruct, 1, false, cometTypeString);
 }
