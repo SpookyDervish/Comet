@@ -16,13 +16,24 @@
     #endif
 #endif
 
-#define cometTypeSmall (CometType){.typeKind = COMET_SMALL}
-#define cometTypeInt (CometType){.typeKind = COMET_INT}
-#define cometTypeBig (CometType){.typeKind = COMET_BIG}
-#define cometTypeFloat (CometType){.typeKind = COMET_FLOAT}
-#define cometTypeDouble (CometType){.typeKind = COMET_DOUBLE}
-#define cometTypeBool (CometType){.typeKind = COMET_BOOL}
-#define cometTypeVoid (CometType){.typeKind = COMET_VOID}
+static CometType cometTypeSmall  = (CometType){.typeKind = COMET_SMALL };
+static CometType cometTypeInt    = (CometType){.typeKind = COMET_INT   };
+static CometType cometTypeBig    = (CometType){.typeKind = COMET_BIG   };
+static CometType cometTypeFloat  = (CometType){.typeKind = COMET_FLOAT };
+static CometType cometTypeDouble = (CometType){.typeKind = COMET_DOUBLE};
+static CometType cometTypeBool   = (CometType){.typeKind = COMET_BOOL  };
+static CometType cometTypeVoid   = (CometType){.typeKind = COMET_VOID  };
+
+static CometArrayType stringArray = {
+    .elem = &cometTypeSmall,
+    .isFixedSize = {false},
+    .dims = 1
+};
+
+static CometType cometTypeString = {
+    .typeKind = COMET_ARRAY,
+    .arrayType = &stringArray
+};
 
 #define on_import void onImport(CometEnvironment* env)
 
@@ -37,6 +48,8 @@ UseList(CometSerializedFunc);
 UseList(cometFuncPtr);
 UseList(charptr);
 UseList(StructField);
+
+
 
 CometType createArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
 
