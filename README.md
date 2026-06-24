@@ -18,9 +18,9 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [x] While loops
   - [x] For loops
 - [ ] Standard library
-  - [ ] IO - Input/Output
+  - [x] IO - Input/Output
     - [x] Printing
-    - [ ] File IO
+    - [x] File IO
   - [ ] Collections - data structures
     - [ ] List
     - [ ] Hashmap

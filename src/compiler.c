@@ -616,6 +616,24 @@ ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, Co
                 if (value.error)
                     return Error(CometFunctionTypeInfo, ErrorMessage, value.as.error);
 
+                if (value.as.success.type != CO_SYMBOL) {
+                    Estr buffer = CREATE_ESTR("Attribute \"");
+                    APPEND_ESTR(buffer, fieldName);
+                    APPEND_ESTR(buffer, "\" is not a function");
+
+                    ErrorMessage errMsg = createError(
+                        c->inputFilePath,
+                        c->sourceCode,
+                        "NotAFunction",
+                        buffer.str,
+                        NULL,
+                        node->lineNum,
+                        node->startCol,
+                        node->endCol
+                    );
+                    return Error(CometFunctionTypeInfo, ErrorMessage, errMsg);
+                }
+
                 CometFunctionTypeInfo functionInfo = {
                     .funcType = FUNC_FUNC,
                     .value = value.as.success,
@@ -2607,12 +2625,15 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
         APPEND_ESTR(buffer, func->name);
         APPEND_ESTR(buffer, "\"");
 
+        char* help = malloc(64);
+        snprintf(help, 64, "Function expects %d args but got %zu.", neededArgCount, funcCall.args.count);
+
         ErrorMessage errMsg = createError(
             c->inputFilePath,
             c->sourceCode,
             "NotEnoughArgs",
             buffer.str,
-            NULL,
+            help,
             node->lineNum,
             node->startCol,
             node->endCol
@@ -2624,12 +2645,15 @@ ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTN
         APPEND_ESTR(buffer, func->name);
         APPEND_ESTR(buffer, "\"");
 
+        char* help = malloc(64);
+        snprintf(help, 64, "Function expects %d args but got %zu.", neededArgCount, funcCall.args.count);
+
         ErrorMessage errMsg = createError(
             c->inputFilePath,
             c->sourceCode,
             "TooManyArgs",
             buffer.str,
-            NULL,
+            help,
             node->lineNum,
             node->startCol,
             node->endCol

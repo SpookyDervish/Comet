@@ -16,14 +16,14 @@
     #endif
 #endif
 
-static CometType cometTypeSmall  = (CometType){.typeKind = COMET_SMALL };
-static CometType cometTypeInt    = (CometType){.typeKind = COMET_INT   };
-static CometType cometTypeBig    = (CometType){.typeKind = COMET_BIG   };
-static CometType cometTypeFloat  = (CometType){.typeKind = COMET_FLOAT };
-static CometType cometTypeDouble = (CometType){.typeKind = COMET_DOUBLE};
-static CometType cometTypeBool   = (CometType){.typeKind = COMET_BOOL  };
-static CometType cometTypeVoid   = (CometType){.typeKind = COMET_VOID  };
-extern const CometType cometTypeString;
+extern CometType cometTypeSmall;
+extern CometType cometTypeInt;
+extern CometType cometTypeBig;
+extern CometType cometTypeFloat;
+extern CometType cometTypeDouble;
+extern CometType cometTypeBool;
+extern CometType cometTypeVoid;
+extern CometType cometTypeString;
 
 #define on_import void onImport(CometEnvironment* env)
 
