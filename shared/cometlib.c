@@ -21,6 +21,35 @@ CometType const cometTypeString = {
     .arrayType = &stringArray
 };
 
+
+
+int8_t cometArgSmall(int64_t argVal) {
+    return cometDeserializeValue(argVal, cometTypeSmall).imm.smallVal;
+}
+int32_t cometArgInt(int64_t argVal) {
+    return cometDeserializeValue(argVal, cometTypeInt).imm.intVal;
+}
+int64_t cometArgBig(int64_t argVal) {
+    return cometDeserializeValue(argVal, cometTypeBig).imm.bigVal;
+}
+float cometArgFloat(int64_t argVal) {
+    return cometDeserializeValue(argVal, cometTypeFloat).imm.floatVal;
+}
+double cometArgDouble(int64_t argVal) {
+    return cometDeserializeValue(argVal, cometTypeDouble).imm.doubleVal;
+}
+bool cometArgBool(int64_t argVal) {
+    return cometDeserializeValue(argVal, cometTypeBool).imm.boolVal;
+}
+char* cometArgString(int64_t argVal) {
+    CometOperand stringArr = cometDeserializeValue(argVal, cometTypeString);
+    return cometArrayToCArray(stringArr, cometTypeSmall);
+}
+int64_t cometSerializeString(char* cString) {
+    CometOperand cometArray = CArrayToCometArray(cString, strlen(cString) + 1, cometTypeSmall);
+    return cometSerializeValue(cometArray);
+}
+
 int64_t Exception_INIT(int64_t* args, CometVM* vm) {
     CometObject* exception = (CometObject*)args[0];
     cometSetField(exception, 0, args[1]);
@@ -398,6 +427,13 @@ CometFunction* cometDefineMethod(
         defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
 
     return func;
+}
+
+StructField cometCreateField(char* name, CometType type) {
+    return (StructField){
+        .name = strdup(name),
+        .type = type
+    };
 }
 
 void cometDefineConstructor(
