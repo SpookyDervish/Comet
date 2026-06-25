@@ -1,4 +1,6 @@
+import io
+
 func main() -> int {
-    int[*] someArray
+    io.print("You look...\n\n \"silly\"\n")
     return 0
 }

@@ -319,6 +319,60 @@ ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char st
     while (lexer->currentChar != startingQuote && lexer->pos < lexer->sourceLen) {
         char current = lexer->currentChar;
 
+        // escape sequences
+        if (current == '\\') {
+            switch (lexer->source[lexer->pos+1]) {
+                case '\\': {
+                    current = '\\';
+                    break;
+                }
+                case 'n': {
+                    current = '\n';
+                    break;
+                }
+                case 't': {
+                    current = '\t';
+                    break;
+                }
+                case 'r': {
+                    current = '\r';
+                    break;
+                }
+                case '0': {
+                    current = 0;
+                    break;
+                }
+                case 'a': {
+                    current = '\a';
+                    break;
+                }
+                case 'b': {
+                    current = '\b';
+                    break;
+                }
+                case 'v': {
+                    current = '\v';
+                    break;
+                }  
+                case 'f': {
+                    current = '\f';
+                    break;
+                }
+                case '"': {
+                    current = '"';
+                    break;
+                }
+                case '\'': {
+                    current = '\'';
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+
+            lexer->pos++;
+        } 
         buffer[bufferPos] = current;
         bufferPos++;
 
