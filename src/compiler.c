@@ -1841,25 +1841,6 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
 
     c->currentLine = node->lineNum;
 
-    if (!expr) {
-        Estr buffer = CREATE_ESTR("Variable \"");
-        APPEND_ESTR(buffer, ident);
-        APPEND_ESTR(buffer, "\" was not assigned a value.");
-
-        ErrorMessage errMsg = createError(
-            c->inputFilePath,
-            c->sourceCode,
-            "UninitialisedVariable",
-            buffer.str,
-            NULL,
-            node->lineNum,
-            node->startCol,
-            node->endCol
-        );
-
-        return Error(CometOperand, ErrorMessage, errMsg);
-    }
-
     Record* existingVar = lookup(c->env, ident);
     if (existingVar) {
         Estr buffer = CREATE_ESTR("Redefinition of \"");
@@ -1880,13 +1861,30 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
         return Error(CometOperand, ErrorMessage, errMsg);
     }
 
+    ResultType(CometType, ErrorMessage) varType = getType(c, node->data.AST_ASSIGN_STATEMENT.type);
+    if (varType.error)
+        return Error(CometOperand, ErrorMessage, varType.as.error);
+
+    if (!expr) { // no value was given, just give it a default value of 0
+        CometOperand zeroVal = createOperand(CO_IMMEDIATE);
+        zeroVal.imm.typeKind = COMET_BIG;
+        zeroVal.imm.bigVal = 0;
+
+        CometOperand zeroConst = storeConst(c, zeroVal);
+        buildPushConst(c, zeroConst);
+
+        uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, zeroConst, varType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
+        buildStore(c, idx);
+        return Success(CometOperand, ErrorMessage, NO_OPERAND);
+    }
+
+    
+
     ResultType(CometType, ErrorMessage) exprType = resolveType(c, expr);
     if (exprType.error)
         return Error(CometOperand, ErrorMessage, exprType.as.error);
 
-    ResultType(CometType, ErrorMessage) varType = getType(c, node->data.AST_ASSIGN_STATEMENT.type);
-    if (varType.error)
-        return Error(CometOperand, ErrorMessage, varType.as.error);
+    
 
     ResultType(CometOperand, ErrorMessage) exprResult = visitValue(c, expr);
     if (exprResult.error)
@@ -3737,12 +3735,26 @@ void createExceptionType(CometCompiler* c) {
 
     List(cometFuncPtr) methods = newList(cometFuncPtr);
 
-    CometStruct* exceptionType = cometDefineStruct(NULL, "Exception", NULL);
-    cometSetStructFieldsAndMethods(exceptionType, fields, methods);
+    CometStruct* exceptionStruct = cometDefineStruct(NULL, "Exception", NULL);
+    cometSetStructFieldsAndMethods(exceptionStruct, fields, methods);
 
-    cometDefineConstructor(NULL, exceptionType, 2, false, cometTypeString, cometTypeString);
+    cometDefineConstructor(NULL, exceptionStruct, 2, false, cometTypeString, cometTypeString);
 
-    append(c->structs, exceptionType);
+    append(c->structs, exceptionStruct);
+
+
+    // add to type map
+    CometType exceptionType = {
+        .typeKind = COMET_STRUCT,
+        .structType = exceptionStruct
+    };
+
+    CometTypeMapEntry typeMapEntry = {
+        .name = "Exception",
+        .type = exceptionType
+    };
+
+    append(c->typeMap, typeMapEntry);
 }
 
 ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {

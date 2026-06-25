@@ -688,8 +688,8 @@ ResultType(int64_t, objectPtr) cometError(CometVM* vm, char* errorName, char* er
     CometSerializedStruct* exceptionStruct = cometVMGetStruct(vm, "Exception");
     CometObject* exceptionObj = cometCreateObject(exceptionStruct);
 
-    exceptionObj->fields[0] = (int64_t)strdup(errorName);
-    exceptionObj->fields[1] = (int64_t)strdup(errorMessage);
+    exceptionObj->fields[0] = cometSerializeString(errorName);
+    exceptionObj->fields[1] = cometSerializeString(errorMessage);
 
     return Error(int64_t, objectPtr, exceptionObj);
 }

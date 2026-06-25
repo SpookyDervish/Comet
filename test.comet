@@ -1,9 +1,22 @@
 import io
 
 func main() -> int {
-    io.File f = new io.File("test.txt", "r")
+    io.print("Enter a file path: ")
+    string filePath = io.getline()
 
-    io.println(f.readAll())
+    mut string fileContent
+
+    try {
+        io.File f = new io.File(filePath, "r")
+        fileContent = f.readAll()
+        f.close()
+    } except Exception e {
+        io.println(e.message)
+        return 1
+    }
+
+    io.println("File contents:")
+    io.println(fileContent)
 
     return 0
 }
