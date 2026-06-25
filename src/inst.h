@@ -9,20 +9,15 @@
 #include "../include/function.h"
 #include "../include/debug.h"
 #include "../include/error_message.h"
+#include "typemap.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #define NO_OPERAND ((CometOperand){0})
 
-typedef struct {
-    char* name;
-    CometType type;
-} CometTypeMapEntry;
-
 typedef CometStruct* cometStructPtr;
 
-UseList(CometTypeMapEntry);
 UseList(cometStructPtr);
 UseList(charptr);
 UseList(uint64_t);
@@ -47,7 +42,7 @@ typedef struct {
     CometFunction* functions[128];
     CometFunction* currentFunction;
     CometEnvironment* env;
-    List(CometTypeMapEntry) typeMap;
+    CometTypeMap* typeMap;
     List(cometStructPtr) structs;
     List(charptr) libs;
 } CometCompiler;

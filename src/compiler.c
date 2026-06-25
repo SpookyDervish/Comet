@@ -14,7 +14,6 @@
 #include <unistd.h>
 #include <assert.h>
 #include <dlfcn.h>
-#include "../include/cometlib.h"
 
 
 // -- HELPER METHODS -- //
@@ -701,15 +700,10 @@ ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, Co
 }
 
 ResultType(CometType, ErrorMessage) getTypeByName(CometCompiler* c, char* typeName, CometASTNode* node) {
-    List(CometTypeMapEntry) typeMap = c->typeMap;
 
-    for (size_t i = 0; i < typeMap.count; i++) {
-        CometTypeMapEntry type = *get(typeMap, i);
-
-        if (strcmp(type.name, typeName) == 0) {
-            return Success(CometType, ErrorMessage, type.type);
-        }
-    }
+    CometTypeMapEntry* entry = lookupType(c->typeMap, typeName);
+    if (entry)
+        return Success(CometType, ErrorMessage, entry->type);
 
     Estr buffer = CREATE_ESTR("Cannot find type with name \"");
     APPEND_ESTR(buffer, typeName);
@@ -772,18 +766,11 @@ CometType flattenArrayType(CometType type) {
 }
 
 ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometASTNode* node) {
-    List(CometTypeMapEntry) typeMap = c->typeMap;
-
     char* baseTypeName = node->data.AST_IDENTIFIER.ident;
 
-    bool found = false;
-    for (size_t i = 0; i < typeMap.count; i++) {
-        CometTypeMapEntry* type = get(typeMap, i);
-
-        if (strcmp(type->name, baseTypeName) == 0) {
-            return Success(cometTypePtr, ErrorMessage, &type->type);
-        }
-    }
+    CometTypeMapEntry* entry = lookupType(c->typeMap, baseTypeName);
+    if (entry)
+        return Success(cometTypePtr, ErrorMessage, &entry->type);
 
     Estr buffer = CREATE_ESTR("Unkown type \"");
     APPEND_ESTR(buffer, baseTypeName);
@@ -3171,7 +3158,10 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         }
     };
 
-    append(c->typeMap, typeMapEntry);
+    defineType(c->typeMap, structName, (CometType){
+        .typeKind = COMET_STRUCT,
+        .structType = structType
+    });
     append(c->structs, structType);
 
     // if we inherit from another struct then pull in its methods and fields
@@ -3493,7 +3483,7 @@ ResultType(CometOperand, ErrorMessage) visitImportStatement(CometCompiler* c, Co
         return Error(CometOperand, ErrorMessage, ast.as.error);
     }
 
-    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(path, fileContents, c->includeDebugSymbols);
+    ResultType(cometCompilerPtr, ErrorMessage) compiler = createCompiler(path, fileContents, c->includeDebugSymbols);
     if (compiler.error) {
         freeNode(ast.as.success);
         return Error(CometOperand, ErrorMessage, compiler.as.error);
@@ -3757,10 +3747,10 @@ void createExceptionType(CometCompiler* c) {
         .type = exceptionType
     };
 
-    append(c->typeMap, typeMapEntry);
+    defineType(c->typeMap, "Exception", exceptionType);
 }
 
-ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {
+ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {
     CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
     if (newCompiler == NULL) {
         ErrorMessage errMsg = createError(
@@ -3781,7 +3771,7 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
     newCompiler->stackIdx = 0;
     newCompiler->env = newEnvironment("root", NULL, false);
     newCompiler->structs = newList(cometStructPtr);
-    newCompiler->typeMap = newList(CometTypeMapEntry);
+    newCompiler->typeMap = newTypemap(NULL);
     newCompiler->libs = newList(charptr);
     newCompiler->currentFunction = NULL;
     newCompiler->inputFilePath = inputFilePath;
@@ -3791,20 +3781,13 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
     newCompiler->debugInstInfo = newList(uint64_t);
 
     // fill in type map
-    CometTypeMapEntry smallType =  { .name = "small",  .type = (CometType){.typeKind = COMET_SMALL}  };
-    CometTypeMapEntry intType =    { .name = "int",    .type = (CometType){.typeKind = COMET_INT}    };
-    CometTypeMapEntry bigType =    { .name = "big",    .type = (CometType){.typeKind = COMET_BIG}    };
-    CometTypeMapEntry boolType =   { .name = "bool",   .type = (CometType){.typeKind = COMET_BOOL}   };
-    CometTypeMapEntry floatType =  { .name = "float",  .type = (CometType){.typeKind = COMET_FLOAT}  };
-    CometTypeMapEntry doubleType = { .name = "double", .type = (CometType){.typeKind = COMET_DOUBLE} };
-    CometTypeMapEntry voidType =   { .name = "void",   .type = (CometType){.typeKind = COMET_VOID}   };
-    append(newCompiler->typeMap, smallType);
-    append(newCompiler->typeMap, intType);
-    append(newCompiler->typeMap, bigType);
-    append(newCompiler->typeMap, boolType);
-    append(newCompiler->typeMap, floatType);
-    append(newCompiler->typeMap, doubleType);
-    append(newCompiler->typeMap, voidType);
+    defineType(newCompiler->typeMap, "small",  (CometType){.typeKind = COMET_SMALL });
+    defineType(newCompiler->typeMap, "int",    (CometType){.typeKind = COMET_INT   });
+    defineType(newCompiler->typeMap, "big",    (CometType){.typeKind = COMET_BIG   });
+    defineType(newCompiler->typeMap, "float",  (CometType){.typeKind = COMET_FLOAT });
+    defineType(newCompiler->typeMap, "double", (CometType){.typeKind = COMET_DOUBLE});
+    defineType(newCompiler->typeMap, "bool",   (CometType){.typeKind = COMET_BOOL  });
+    defineType(newCompiler->typeMap, "void",   (CometType){.typeKind = COMET_VOID  });
 
     // string type
     CometType stringType;
@@ -3819,8 +3802,7 @@ ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char
     stringArrayType->elem = charType;
     stringType.arrayType = stringArrayType;
 
-    CometTypeMapEntry stringTypeEntry = { .name = "string", .type = stringType};
-    append(newCompiler->typeMap, stringTypeEntry);
+    defineType(newCompiler->typeMap, "string", stringType);
 
     createExceptionType(newCompiler);
 

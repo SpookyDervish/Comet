@@ -14,6 +14,8 @@
 #include "../include/environment.h"
 #include "../include/util.h"
 #include "../include/debug.h"
+#include "../include/cometlib.h"
+#include "typemap.h"
 
 typedef void* voidPtr;
 
@@ -30,7 +32,7 @@ Result(cometTypePtr, ErrorMessage);
 
 
 ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* node);
-ResultType(cometCompilerPtr, ErrorMessage) newCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols);
+ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols);
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols);
 CometOperand createOperand(CometOperandKind type);
 

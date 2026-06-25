@@ -1,6 +1,6 @@
-import io
-
 func main() -> int {
-    io.print("\027[1m\027[31mBold\nred\ttext\bin\nco\rmet!\027[0m\n")
-    return 0
+
+    int x = 12
+
+    return x
 }

@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
         putchar('\n');
     }
 
-    ResultType(cometCompilerPtr, ErrorMessage) compiler = newCompiler(filePath, source, args.as.success.debugSymbols);
+    ResultType(cometCompilerPtr, ErrorMessage) compiler = createCompiler(filePath, source, args.as.success.debugSymbols);
     if (compiler.error) {
         freeNode(ast.as.success);
         printErrorMessage(compiler.as.error);
