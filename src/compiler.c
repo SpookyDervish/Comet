@@ -3100,6 +3100,33 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         structType->parent = parentStruct;
     }
 
+    // handle generic types
+    c->typeMap = newTypemap(c->typeMap);
+    for (size_t i = 0; i < structDef.genericTypes.count; i++) {
+        CometASTNode* genericTypeNode = *get(structDef.genericTypes, i);
+        char* genericTypeName = genericTypeNode->data.AST_IDENTIFIER.ident;
+
+        bool success = defineType(c->typeMap, genericTypeName, (CometType){ .typeKind = COMET_GENERIC, .genericParamName = genericTypeName });
+        if (!success) {
+            Estr buffer = CREATE_ESTR("Duplicate generic type name \"");
+            APPEND_ESTR(buffer, genericTypeName);
+            APPEND_ESTR(buffer, "\"");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "DuplicateTypedef",
+                buffer.str,
+                NULL,
+                genericTypeNode->lineNum,
+                genericTypeNode->startCol,
+                genericTypeNode->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+    }
+
     // fill in fieldDefs
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
         CometASTNode* fieldDef = *get(structDef.fieldDefs, i);
@@ -3148,14 +3175,6 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     CometType generalStructType = {
         .typeKind = COMET_STRUCT,
         .structType = structType
-    };
-
-    CometTypeMapEntry typeMapEntry = {
-        .name = strdup(structName),
-        .type = {
-            .typeKind = COMET_STRUCT,
-            .structType = structType
-        }
     };
 
     defineType(c->typeMap, structName, (CometType){
@@ -3309,6 +3328,8 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     ResultType(CometOperand, ErrorMessage) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct);
     if (constructorResult.error)
         return constructorResult;
+
+    c->typeMap = destroyTypeMap(c->typeMap); // destroy type map used for generics
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
