@@ -1,22 +1,10 @@
 import io
 
 func main() -> int {
-    io.print("Enter a file path: ")
-    string filePath = io.getline()
 
-    mut string fileContent
-
-    try {
-        io.File f = new io.File(filePath, "r")
-        fileContent = f.readAll()
-        f.close()
-    } except Exception e {
-        io.println(e.message)
-        return 1
-    }
-
-    io.println("File contents:")
-    io.println(fileContent)
+    io.File f = new io.File("test.come", "r")
+    io.println(f.readAll())
+    f.close()
 
     return 0
 }

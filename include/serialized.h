@@ -115,4 +115,9 @@ CometSerializedInst* serializeInst(CometInst inst);
 CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType);
 uint32_t serializeOperand(CometOperand operand);
 
+int64_t cometSerializeValue(CometOperand value);
+CometOperand cometDeserializeValue(int64_t value, CometType type);
+void* cometArrayToCArray(CometOperand arrayValue, CometType elemType);
+CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType);
+
 #endif

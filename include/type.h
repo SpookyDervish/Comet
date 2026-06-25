@@ -2,6 +2,7 @@
 #define TYPE_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "list.h"
 
 #define MAX_ARRAY_DEPTH 8
@@ -65,5 +66,13 @@ typedef struct {
 } CometLabel;
 
 
+extern CometType cometTypeSmall;
+extern CometType cometTypeInt;
+extern CometType cometTypeBig;
+extern CometType cometTypeFloat;
+extern CometType cometTypeDouble;
+extern CometType cometTypeBool;
+extern CometType cometTypeVoid;
+extern CometType cometTypeString;
 
 #endif

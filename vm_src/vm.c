@@ -105,7 +105,13 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
         ResultType(int64_t, objectPtr) returnValue = vm->externalFuncs[function->externFuncIndex](args, vm);
         if (returnValue.error) {
             CometObject* obj = returnValue.as.error;
-            vmThrow(vm, (char*)obj->fields[0], (char*)obj->fields[1], obj);
+
+            CometOperand exceptNameArr = cometDeserializeValue(obj->fields[0], cometTypeString);
+            char* exceptionName = cometArrayToCArray(exceptNameArr, cometTypeSmall);
+            CometOperand exceptMsgArr = cometDeserializeValue(obj->fields[1], cometTypeString);
+            char* exceptionMsg = cometArrayToCArray(exceptMsgArr, cometTypeSmall);
+
+            vmThrow(vm, exceptionName, exceptionMsg, obj);
         }
 
         pushValue(vm, returnValue.as.success);

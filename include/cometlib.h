@@ -16,15 +16,6 @@
     #endif
 #endif
 
-extern CometType cometTypeSmall;
-extern CometType cometTypeInt;
-extern CometType cometTypeBig;
-extern CometType cometTypeFloat;
-extern CometType cometTypeDouble;
-extern CometType cometTypeBool;
-extern CometType cometTypeVoid;
-extern CometType cometTypeString;
-
 #define on_import void onImport(CometEnvironment* env)
 
 typedef CometFunction* cometFuncPtr;
@@ -51,11 +42,6 @@ API_EXPORT CometSerializedFunc cometSerializeFunction(
 API_EXPORT CometObject* cometCreateObject(CometSerializedStruct* structType);
 
 API_EXPORT CometOperand cometValue(CometValueTypeKind valueType, ...);
-
-API_EXPORT int64_t cometSerializeValue(CometOperand value);
-API_EXPORT CometOperand cometDeserializeValue(int64_t value, CometType type);
-API_EXPORT void* cometArrayToCArray(CometOperand arrayValue, CometType elemType);
-API_EXPORT CometOperand CArrayToCometArray(void* arrayValue, size_t length, CometType elemType);
 
 API_EXPORT int8_t cometArgSmall(int64_t argVal);
 API_EXPORT int32_t cometArgInt(int64_t argVal);
