@@ -38,12 +38,6 @@ struct CometArrayType {
     uint8_t dims;
 };
 
-UseList(CometType);
-typedef struct {
-    CometStruct* structType;
-    List(CometType) genericTypes;
-} GenericStruct;
-
 struct CometType {
     CometValueTypeKind typeKind;
     union {

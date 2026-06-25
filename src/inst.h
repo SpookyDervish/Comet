@@ -9,6 +9,7 @@
 #include "../include/function.h"
 #include "../include/debug.h"
 #include "../include/error_message.h"
+#include "ast.h"
 #include "typemap.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -18,10 +19,22 @@
 
 typedef CometStruct* cometStructPtr;
 
+UseList(CometType);
+typedef struct {
+    CometStruct* structType;
+    List(CometType) genericTypes;
+} CachedGenericStruct;
+
+typedef struct {
+    char* name;
+    CometASTNode* structDefNode;
+} GenericStructDef;
+UseList(GenericStructDef);
+
 UseList(cometStructPtr);
 UseList(charptr);
 UseList(uint64_t);
-UseList(GenericStruct);
+UseList(CachedGenericStruct);
 
 typedef struct {
     uint32_t programIdx;
@@ -37,7 +50,8 @@ typedef struct {
     char* inputFilePath;
     char* sourceCode;
 
-    List(GenericStruct) genericStructs;
+    List(CachedGenericStruct) cachedGenerics;
+    List(GenericStructDef) genericDefinitions;
 
     CometOperand consts[512];
     CometLabel* labels[512];

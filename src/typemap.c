@@ -42,7 +42,7 @@ CometTypeMapEntry* lookupType(CometTypeMap* typeMap, char* typeName) {
     }
 
     if (typeMap->parent) {
-        return lookupType(typeMap, typeName);
+        return lookupType(typeMap->parent, typeName);
     }
 
     return NULL;

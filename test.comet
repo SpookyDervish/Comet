@@ -4,11 +4,15 @@ struct Box <T> {
     init(T value) {
         self.value = value
     }
+
+    func add(T amount) -> void {
+        self.value += amount
+    }
 }
 
 func main() -> int {
-
-    Box<int> myBox = new Box<int>(123)
+    Box<int> myBox = new Box<int>(1)
+    myBox.add(2)
 
     return myBox.value
 }
