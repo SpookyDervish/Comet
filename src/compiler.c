@@ -174,6 +174,10 @@ int32_t getStructIndex(CometCompiler* c, CometStruct* needle) {
 
 int32_t getMethodIndex(CometStruct* structType, char* methodName) {
     for (size_t i = 0; i < structType->numMethods; i++) {
+        if (!structType->vtable[i]) {
+            break;
+        }
+
         if (strcmp(structType->vtable[i]->name, methodName) == 0) {
             return i;
         }
@@ -2135,6 +2139,7 @@ ResultType(CometOperand, ErrorMessage) visitArrayReassignStatement(CometCompiler
 }
 ResultType(CometOperand, ErrorMessage) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
     c->currentLine = node->lineNum;
+
     ResultType(CometOperand, ErrorMessage) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
     if (exprResult.error)
         return exprResult;
@@ -3314,8 +3319,6 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     ResultType(CometOperand, ErrorMessage) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct);
     if (constructorResult.error)
         return constructorResult;
-
-    
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
