@@ -300,6 +300,58 @@ ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
     return Success(CometToken, ErrorMessage, tok);
 }
 
+char lexerEscape(CometLexer* lexer) {
+    char escapeBuffer[128] = {0};
+    size_t buffIdx = 0;
+    bool isNumber = false;
+
+    bool escaping = true;
+    while (escaping) {
+        lexerConsume(lexer);
+        char current = lexer->source[lexer->pos];
+
+        if (isdigit(current)) {
+            isNumber = true;
+            escapeBuffer[buffIdx] = current;
+            buffIdx++;
+
+            if (buffIdx > 2) {
+                escapeBuffer[buffIdx] = 0;
+                long result = strtol(escapeBuffer, NULL, 10);
+                return result;
+            } else {
+                continue;
+            }
+        } else {
+            if (isNumber) {
+                escapeBuffer[buffIdx] = current;
+                long result = strtol(escapeBuffer, NULL, 10);
+                return result;
+            }
+        }
+
+        switch (current) {
+            case 'n':  return '\n';
+            case 't':  return '\t';
+            case 'a':  return '\a';
+            case 'b':  return '\b';
+            case 'e':  return '\e';
+            case 'r':  return '\r';
+            case '\"': return '\"';
+            case '\'': return '\'';
+            case '\\': return '\\';
+            case 'v':  return '\v';
+            case 'f':  return '\f';
+            case '0':  return 0;
+            default:   return current;
+        }
+
+        lexer->pos++;
+    }
+
+    return 0;
+}
+
 ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char startingQuote) {
     CometToken tok = {
         .literalType = CL_STRING,
@@ -321,57 +373,7 @@ ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char st
 
         // escape sequences
         if (current == '\\') {
-            switch (lexer->source[lexer->pos+1]) {
-                case '\\': {
-                    current = '\\';
-                    break;
-                }
-                case 'n': {
-                    current = '\n';
-                    break;
-                }
-                case 't': {
-                    current = '\t';
-                    break;
-                }
-                case 'r': {
-                    current = '\r';
-                    break;
-                }
-                case '0': {
-                    current = 0;
-                    break;
-                }
-                case 'a': {
-                    current = '\a';
-                    break;
-                }
-                case 'b': {
-                    current = '\b';
-                    break;
-                }
-                case 'v': {
-                    current = '\v';
-                    break;
-                }  
-                case 'f': {
-                    current = '\f';
-                    break;
-                }
-                case '"': {
-                    current = '"';
-                    break;
-                }
-                case '\'': {
-                    current = '\'';
-                    break;
-                }
-                default: {
-                    break;
-                }
-            }
-
-            lexer->pos++;
+            current = lexerEscape(lexer);
         } 
         buffer[bufferPos] = current;
         bufferPos++;
