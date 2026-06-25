@@ -112,32 +112,99 @@ char* typeToString(CometType type) {
         }
 
         case COMET_STRUCT: {
-            /*size_t buffSize = 256;
-            char* buffer = malloc(buffSize);
-            if (!buffer)
-                return NULL;
+            Estr buffer = CREATE_ESTR(type.structType->name);
 
-            CometType* fieldTypes = type.structType->fieldTypes;
-            uint32_t fieldCount = type.structType->fieldCount;
+            if (type.structType->numGivenGenericTypes > 0) {
+                APPEND_ESTR(buffer, "<");
+                for (size_t i = 0; i < type.structType->numGivenGenericTypes; i++) {
+                    APPEND_ESTR(buffer, typeToString(type.structType->givenGenericTypes[i]));
 
-            int written = 0;
-            int remaining = buffSize - written;
-
-            written += snprintf(buffer + written, remaining, "%s - { ", type.structType->name);
-
-            for (uint32_t i = 0; i < fieldCount; i++) {
-                if (i < fieldCount - 1) {
-                    written += snprintf(buffer + written, remaining, "%s, ", typeToString(fieldTypes[i]));
-                } else {
-                    written += snprintf(buffer + written, remaining, "%s }", typeToString(fieldTypes[i]));
+                    if (i < type.structType->numGivenGenericTypes - 1) {
+                        printf(", ");
+                    }
                 }
-            }*/
+                APPEND_ESTR(buffer, ">");
+            }
 
-            return type.structType->name;
+            return buffer.str;
         }
 
         default: return "unkown";
     }
+}
+
+CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(GenericTypeMapping) resolvedGenericTypes) {
+    // look for existing struct
+    for (size_t i = 0; i < c->genericStructs.count; i++) {
+        GenericStruct currentStruct = *get(c->genericStructs, i);
+
+        if (strcmp(currentStruct.structType->name, cometStruct->name) == 0) {
+
+            bool found = true;
+
+            for (size_t genericTypeIdx = 0; genericTypeIdx < currentStruct.genericTypes.count; genericTypeIdx++) {
+                if (!typesAreEqual(get(currentStruct.genericTypes, genericTypeIdx)[genericTypeIdx], get(resolvedGenericTypes, genericTypeIdx)->newType)) {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found) {
+                return currentStruct.structType;
+            }
+        }
+    }
+
+    // if it doesnt exist, make a new one with the types
+    Estr newStructName = CREATE_ESTR(cometStruct->name);
+    for (size_t i = 0; i < resolvedGenericTypes.count; i++) {
+        APPEND_ESTR(newStructName, "_");
+        APPEND_ESTR(newStructName, typeToString(get(resolvedGenericTypes, i)->newType));
+    }
+
+    CometType* newFieldTypes = malloc(sizeof(CometType) * resolvedGenericTypes.count);
+
+    for (size_t fieldIdx = 0; fieldIdx < cometStruct->fieldCount; fieldIdx++) {
+        if (cometStruct->fieldTypes[fieldIdx].typeKind != COMET_GENERIC)
+            continue; // dont replace type of a field that doesnt use a generic type
+
+        for (size_t genericIdx = 0; genericIdx < resolvedGenericTypes.count; genericIdx++) {
+            GenericTypeMapping resolvedGeneric = *get(resolvedGenericTypes, genericIdx);
+
+            if (strcmp(resolvedGeneric.genericTypeName, cometStruct->fieldTypes[fieldIdx].genericParamName) == 0) {
+                newFieldTypes[fieldIdx] = resolvedGeneric.newType;
+                break;
+            }
+        }
+    }
+
+    CometType* givenGenericTypes = malloc(sizeof(CometType) * resolvedGenericTypes.count);
+    for (size_t i = 0; i < resolvedGenericTypes.count; i++) {
+        givenGenericTypes[i] = (*get(resolvedGenericTypes, i)).newType;
+    }
+
+    CometStruct* newStruct = malloc(sizeof(CometStruct));
+    newStruct->name = cometStruct->name;
+    newStruct->fieldTypes = newFieldTypes;
+    newStruct->fieldNames = cometStruct->fieldNames;
+    newStruct->fieldCount = cometStruct->fieldCount;
+    newStruct->vtable = cometStruct->vtable;
+    newStruct->numMethods = cometStruct->numMethods;
+    newStruct->genericTypeNames = NULL;
+    newStruct->numGenericTypes = 0;
+    newStruct->givenGenericTypes = givenGenericTypes;
+    newStruct->numGivenGenericTypes = resolvedGenericTypes.count;
+    newStruct->parent = cometStruct->parent;
+
+    GenericStruct newGeneric = {
+        .structType = newStruct,
+        .genericTypes = newFieldTypes
+    };
+
+    append(c->structs, newStruct);
+    append(c->genericStructs, newGeneric);
+
+    return newStruct;
 }
 
 bool isAssignmentOperator(CometASTNode* expr) {
@@ -765,12 +832,41 @@ CometType flattenArrayType(CometType type) {
     return out;
 }
 
-ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometASTNode* node) {
+ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* typeNode);
+ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometASTNode* node, nodeList genericTypes) {
     char* baseTypeName = node->data.AST_IDENTIFIER.ident;
 
     CometTypeMapEntry* entry = lookupType(c->typeMap, baseTypeName);
-    if (entry)
+    if (entry) {
+        if (genericTypes.count > 0) {
+            // map given types to struct generic types
+            List(GenericTypeMapping) mapping = newList(GenericTypeMapping);
+
+            CometStruct* structType = entry->type.structType;
+            for (uint8_t i = 0; i < structType->numGenericTypes; i++) {
+                ResultType(CometType, ErrorMessage) currentType = getType(c, *get(genericTypes, i));
+                if (currentType.error)
+                    return Error(cometTypePtr, ErrorMessage, currentType.as.error);
+
+                GenericTypeMapping genericNameToType = (GenericTypeMapping){
+                    .genericTypeName = structType->genericTypeNames[i],
+                    .newType = currentType.as.success
+                };
+
+                append(mapping, genericNameToType);
+            }
+
+            CometStruct* genericStructWithTypes = getGenericStruct(c, structType, mapping);
+            
+            CometType* typePtr = malloc(sizeof(CometType));
+            typePtr->typeKind = COMET_STRUCT;
+            typePtr->structType = genericStructWithTypes;
+
+            return Success(cometTypePtr, ErrorMessage, typePtr);
+        }
+
         return Success(cometTypePtr, ErrorMessage, &entry->type);
+    }
 
     Estr buffer = CREATE_ESTR("Unkown type \"");
     APPEND_ESTR(buffer, baseTypeName);
@@ -790,9 +886,9 @@ ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometAS
     return Error(cometTypePtr, ErrorMessage, errMsg);
 }
 
-ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList chain) {
-    
-    ResultType(cometTypePtr, ErrorMessage) builtinType = findBuiltinType(c, *get(chain, 0));
+ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList chain, nodeList genericTypes) {
+
+    ResultType(cometTypePtr, ErrorMessage) builtinType = findBuiltinType(c, *get(chain, 0), genericTypes);
     if (!builtinType.error)
         return builtinType;
 
@@ -915,6 +1011,35 @@ ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList ch
                     return Error(cometTypePtr, ErrorMessage, errMsg);
                 }
 
+                CometType type = attribRecord->value.imm.typeVal;
+
+                if (genericTypes.count > 0) {
+                    // map given types to struct generic types
+                    List(GenericTypeMapping) mapping = newList(GenericTypeMapping);
+
+                    CometStruct* structType = type.structType;
+                    for (uint8_t i = 0; i < structType->numGenericTypes; i++) {
+                        ResultType(CometType, ErrorMessage) currentType = getType(c, *get(genericTypes, i));
+                        if (currentType.error)
+                            return Error(cometTypePtr, ErrorMessage, currentType.as.error);
+
+                        GenericTypeMapping genericNameToType = (GenericTypeMapping){
+                            .genericTypeName = structType->genericTypeNames[i],
+                            .newType = currentType.as.success
+                        };
+
+                        append(mapping, genericNameToType);
+                    }
+
+                    CometStruct* genericStructWithTypes = getGenericStruct(c, structType, mapping);
+            
+                    CometType* typePtr = malloc(sizeof(CometType));
+                    typePtr->typeKind = COMET_STRUCT;
+                    typePtr->structType = genericStructWithTypes;
+
+                    return Success(cometTypePtr, ErrorMessage, typePtr);
+                }
+
                 return Success(cometTypePtr, ErrorMessage, &attribRecord->value.imm.typeVal);
             }
 
@@ -957,7 +1082,7 @@ ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* type
     struct AST_TYPE type = typeNode->data.AST_TYPE;
 
     // get base type
-    ResultType(cometTypePtr, ErrorMessage) baseType = getBaseType(c, type.baseType);
+    ResultType(cometTypePtr, ErrorMessage) baseType = getBaseType(c, type.baseType, typeNode->data.AST_TYPE.genericTypes);
     if (baseType.error)
         return Error(CometType, ErrorMessage, baseType.as.error);
 
@@ -3102,6 +3227,12 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
 
     // handle generic types
     c->typeMap = newTypemap(c->typeMap);
+    structType->genericTypeNames = malloc(sizeof(char*) * structDef.genericTypes.count);
+    structType->numGenericTypes = structDef.genericTypes.count;
+    for (size_t genericIdx = 0; genericIdx < structDef.genericTypes.count; genericIdx++) {
+        structType->genericTypeNames[genericIdx] = (*get(structDef.genericTypes, genericIdx))->data.AST_IDENTIFIER.ident;
+    }
+
     for (size_t i = 0; i < structDef.genericTypes.count; i++) {
         CometASTNode* genericTypeNode = *get(structDef.genericTypes, i);
         char* genericTypeName = genericTypeNode->data.AST_IDENTIFIER.ident;
@@ -3176,12 +3307,6 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         .typeKind = COMET_STRUCT,
         .structType = structType
     };
-
-    defineType(c->typeMap, structName, (CometType){
-        .typeKind = COMET_STRUCT,
-        .structType = structType
-    });
-    append(c->structs, structType);
 
     // if we inherit from another struct then pull in its methods and fields
     for (size_t i = 0; i < parentFieldCount; i++) {
@@ -3331,6 +3456,12 @@ ResultType(CometOperand, ErrorMessage) visitStructDefStatement(CometCompiler* c,
 
     c->typeMap = destroyTypeMap(c->typeMap); // destroy type map used for generics
 
+    defineType(c->typeMap, structName, (CometType){
+        .typeKind = COMET_STRUCT,
+        .structType = structType
+    });
+    append(c->structs, structType);
+
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, CometASTNode* node) {
@@ -3338,10 +3469,10 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
 
     // get struct type
-    
     ResultType(CometType, ErrorMessage) structType = getType(c, newStmt.structName);
     if (structType.error)
         return Error(CometOperand, ErrorMessage, structType.as.error);
+    
     char* structName = structType.as.success.structType->name;
 
     int32_t idx = getStructIndex(c, structType.as.success.structType);
@@ -3800,6 +3931,7 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     newCompiler->currentLine = 0;
     newCompiler->includeDebugSymbols = debugSymbols;
     newCompiler->debugInstInfo = newList(uint64_t);
+    newCompiler->genericStructs = newList(GenericStruct);
 
     // fill in type map
     defineType(newCompiler->typeMap, "small",  (CometType){.typeKind = COMET_SMALL });

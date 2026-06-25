@@ -21,6 +21,7 @@ typedef CometStruct* cometStructPtr;
 UseList(cometStructPtr);
 UseList(charptr);
 UseList(uint64_t);
+UseList(GenericStruct);
 
 typedef struct {
     uint32_t programIdx;
@@ -35,6 +36,8 @@ typedef struct {
 
     char* inputFilePath;
     char* sourceCode;
+
+    List(GenericStruct) genericStructs;
 
     CometOperand consts[512];
     CometLabel* labels[512];

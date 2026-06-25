@@ -12,6 +12,10 @@ bool typesAreEqual(CometType a, CometType b) {
         return false;
     }
 
+    if (a.typeKind == COMET_GENERIC) {
+        return strcmp(a.genericParamName, b.genericParamName) == 0;
+    }
+
     if (a.typeKind == COMET_STRUCT) {
         if (a.structType->parent != NULL) {
             CometType parentType = {

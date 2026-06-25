@@ -969,9 +969,9 @@ ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) 
 ResultType(nodeList, ErrorMessage) parseGenericType(CometParser* parser) {
     List(astNodePtr) genericTypes = newList(astNodePtr);
 
-    while (true) {
-        parserNextToken(parser);
+    parserNextToken(parser);
 
+    while (true) {
         ResultType(astNodePtr, ErrorMessage) genericType = parseType(parser);
         if (genericType.error)
             return Error(nodeList, ErrorMessage, genericType.as.error);

@@ -38,7 +38,11 @@ struct CometArrayType {
     uint8_t dims;
 };
 
-
+UseList(CometType);
+typedef struct {
+    CometStruct* structType;
+    List(CometType) genericTypes;
+} GenericStruct;
 
 struct CometType {
     CometValueTypeKind typeKind;
@@ -49,6 +53,12 @@ struct CometType {
         char* genericParamName;
     };
 };
+
+typedef struct {
+    char* genericTypeName;
+    CometType newType;
+} GenericTypeMapping;
+UseList(GenericTypeMapping);
 
 typedef struct {
     char name[32];

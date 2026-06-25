@@ -1,13 +1,14 @@
-struct Dict <Key, Value> {
-    Key[*] keys
-    Value[*] values
+struct Box <T> {
+    T value
 
-    init() {}
+    init(T value) {
+        self.value = value
+    }
 }
 
 func main() -> int {
 
-    int x = 12
+    Box<int> myBox = new Box<int>(123)
 
-    return x
+    return myBox.value
 }
