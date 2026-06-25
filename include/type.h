@@ -22,6 +22,8 @@ typedef enum {
                     // we can resolve imported values
 
     COMET_TYPE,     // this is also not actually represented in the asm
+
+    COMET_GENERIC
 } CometValueTypeKind;
 
 typedef struct CometStruct CometStruct;
@@ -44,6 +46,7 @@ struct CometType {
         CometStruct* structType;
         CometFunction* functionType;
         CometArrayType* arrayType;
+        char* genericParamName;
     };
 };
 

@@ -1,10 +1,4 @@
-import io
-
 func main() -> int {
-
-    io.File f = new io.File("test.come", "r")
-    io.println(f.readAll())
-    f.close()
-
+    int[*] someArray
     return 0
 }

@@ -20,6 +20,7 @@ Result(voidPtr, charptr);
 // For Clang and GCC on macOS
 #define FORCE_INLINE __attribute__((always_inline)) static inline
 
+
 void createBreakpoint(CometVM* vm) {
     vm->breakpoints[vm->currentFrame->ip - 1] = 1;
 }

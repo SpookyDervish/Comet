@@ -79,6 +79,7 @@ struct CometASTNode {
 
         struct AST_TYPE {
             List(astNodePtr) baseType;
+            List(astNodePtr) genericTypes;
             List(astNodePtr) shape;
             int dimensions;
         } AST_TYPE;
@@ -109,6 +110,8 @@ struct CometASTNode {
         struct AST_CONTINUE_STATEMENT { } AST_CONTINUE_STATEMENT;
         struct AST_FUNC_DEF_STATEMENT {
             CometASTNode* ident;
+            List(astNodePtr) genericTypes;
+
             CometASTNode* program;
             List(astNodePtr) args;
             CometASTNode* returnType;
@@ -119,6 +122,8 @@ struct CometASTNode {
         struct AST_RETURN_STATEMENT { CometASTNode* expression; } AST_RETURN_STATEMENT;
         struct AST_STRUCT_DEF_STATEMENT {
             CometASTNode* ident;
+            List(astNodePtr) genericTypes;
+
             List(astNodePtr) fieldDefs;
             CometASTNode* constructor;
             CometASTNode* destructor;

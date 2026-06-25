@@ -31,6 +31,12 @@ Result(nodeList, ErrorMessage);
 typedef ResultType(astNodePtr, ErrorMessage) (*prefixFuncType)(CometParser*);
 typedef ResultType(astNodePtr, ErrorMessage) (*infixFuncType)(CometParser*, CometASTNode* left);
 
+typedef struct {
+    nodeList chain;
+    nodeList genericArgs;
+} ParsedBaseType;
+
+Result(ParsedBaseType, ErrorMessage);
 Result(int, ErrorMessage);
 Result(parserPtr, ErrorMessage);
 Result(prefixFuncType, int);

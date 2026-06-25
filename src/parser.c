@@ -413,6 +413,20 @@ void printNode(CometASTNode* node) {
                     putchar('.');
             }
 
+            nodeList genericTypes = node->data.AST_TYPE.genericTypes;
+            if (genericTypes.count > 0) {
+                putchar('<');
+
+                for (size_t i = 0; i < genericTypes.count; i++) {
+                    printNode(*get(genericTypes, i));
+                    if (i < genericTypes.count - 1) {
+                        printf(", ");
+                    } else {
+                        putchar('>');
+                    }
+                }
+            }
+
             if (node->data.AST_TYPE.dimensions > 0) {
                 printf("[");
                 for (size_t i = 0; i < node->data.AST_TYPE.shape.count; i++) {
@@ -569,6 +583,24 @@ void printNode(CometASTNode* node) {
         case AST_STRUCT_DEF_STATEMENT:
             printf("struct ");
             printNode(node->data.AST_STRUCT_DEF_STATEMENT.ident);
+
+            if (node->data.AST_STRUCT_DEF_STATEMENT.parentName) {
+                printf(" : %s", node->data.AST_STRUCT_DEF_STATEMENT.parentName->data.AST_IDENTIFIER.ident);
+            }
+
+            List(astNodePtr) genericTypes = node->data.AST_STRUCT_DEF_STATEMENT.genericTypes;
+            if (genericTypes.count > 0) {
+                printf(" <");
+                for (size_t i = 0; i < genericTypes.count; i++) {
+                    printNode(*get(genericTypes, i));
+                    if (i < genericTypes.count - 1) {
+                        printf(", ");
+                    } else {
+                        putchar('>');
+                    }
+                }
+            }
+
             printf(" {\n");
 
             List(astNodePtr) structDefs = node->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
@@ -934,78 +966,27 @@ ResultType(astNodePtr, ErrorMessage) parsePrefixExpression(CometParser* parser) 
 }
 
 // -- TYPE PARSING -- //
-ResultType(nodeList, ErrorMessage) parseBaseType(CometParser* parser) {
-    List(astNodePtr) typeChain = newList(astNodePtr);
+ResultType(nodeList, ErrorMessage) parseGenericType(CometParser* parser) {
+    List(astNodePtr) genericTypes = newList(astNodePtr);
 
     while (true) {
-        CometASTNode* current = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
-        current->startCol = parser->currentToken->startCol;
-        current->endCol = parser->currentToken->endCol;
-
-        append(typeChain, current);
-
-        if (!peekTokenIs(parser, CT_DOT))
-            break;
-
-        parserNextToken(parser); // consume type name
-        parserNextToken(parser); // consume dot
-    }
-
-    return Success(nodeList, ErrorMessage, typeChain);
-}
-
-ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
-
-    uint32_t lineNum = parser->currentToken->lineNum;
-    uint32_t startCol = parser->currentToken->startCol;
-    
-    ResultType(nodeList, ErrorMessage) baseType = parseBaseType(parser);
-    if (baseType.error)
-        return Error(astNodePtr, ErrorMessage, baseType.as.error);
-
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.as.success, newList(astNodePtr), 0);
-    typeNode->startCol = startCol;
-
-    parserNextToken(parser); // consume '['
-
-    while (true) {
-
-        if (parser->currentToken->type == CT_TIMES) {
-            char* buffer = malloc(2);
-            buffer[0] = '*';
-            buffer[1] = 0;
-
-            CometASTNode* node = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, buffer);
-            node->startCol = parser->currentToken->startCol;
-            node->endCol = parser->currentToken->endCol;
-
-            append(
-                typeNode->data.AST_TYPE.shape,
-                node
-            );
-
-        } else {
-            ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
-            if (expr.error)
-                return expr;
-
-            append(typeNode->data.AST_TYPE.shape, expr.as.success);
-
-            
-        }
-
-        
         parserNextToken(parser);
 
-        typeNode->data.AST_TYPE.dimensions++;
+        ResultType(astNodePtr, ErrorMessage) genericType = parseType(parser);
+        if (genericType.error)
+            return Error(nodeList, ErrorMessage, genericType.as.error);
 
-        if (currentTokenIs(parser, CT_COMMA)) {
+        append(genericTypes, genericType.as.success);
+
+        parserNextToken(parser);
+
+        if (currentTokenIs(parser, CT_GT)) {
+            break;
+        } else if (currentTokenIs(parser, CT_COMMA)) {
             parserNextToken(parser);
             continue;
-        } else if (currentTokenIs(parser, CT_CLOSE_SQUARE)) {
-            break;
         } else {
-            Estr buffer = CREATE_ESTR("Expected ',' or ']' when continuing array type, got \"");
+            Estr buffer = CREATE_ESTR("Expected ',' or '>', got \"");
             APPEND_ESTR(buffer, tokenTypeToCStr(parser->currentToken->type));
             APPEND_ESTR(buffer, "\" instead.");
 
@@ -1020,18 +1001,15 @@ ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser) {
                 parser->currentToken->endCol
             );
 
-            return Error(astNodePtr, ErrorMessage, errMsg);
+            return Error(nodeList, ErrorMessage, errMsg);
         }
     }
 
-    typeNode->endCol = parser->currentToken->endCol;
-
-    return Success(astNodePtr, ErrorMessage, typeNode);
+    return Success(nodeList, ErrorMessage, genericTypes);
 }
 
-ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
-    uint32_t lineNum = parser->currentToken->lineNum;
-    uint32_t startCol = parser->currentToken->startCol;
+ResultType(ParsedBaseType, ErrorMessage) parseBaseType(CometParser* parser) {
+    List(astNodePtr) typeChain = newList(astNodePtr);
 
     if (!currentTokenIs(parser, CT_IDENT)) {
         Estr buffer = CREATE_ESTR("Expected type name, got ");
@@ -1049,14 +1027,116 @@ ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
             parser->currentToken->endCol
         );
 
-        return Error(astNodePtr, ErrorMessage, errMsg);
+        return Error(ParsedBaseType, ErrorMessage, errMsg);
     }
 
-    ResultType(nodeList, ErrorMessage) baseType = parseBaseType(parser);
-    if (baseType.error)
-        return Error(astNodePtr, ErrorMessage, baseType.as.error);
+    while (true) {
+        CometASTNode* current = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+        current->startCol = parser->currentToken->startCol;
+        current->endCol = parser->currentToken->endCol;
 
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.as.success, NULL, 0);
+        append(typeChain, current);
+
+        if (!peekTokenIs(parser, CT_DOT))
+            break;
+
+        parserNextToken(parser); // consume type name
+        parserNextToken(parser); // consume dot
+    }
+
+    ParsedBaseType baseType = {
+        .chain = typeChain,
+    };
+    
+    if (peekTokenIs(parser, CT_LT)) {
+        parserNextToken(parser);
+
+        ResultType(nodeList, ErrorMessage) genericTypes = parseGenericType(parser);
+        if (genericTypes.error)
+            return Error(ParsedBaseType, ErrorMessage, genericTypes.as.error);
+
+        baseType.genericArgs = genericTypes.as.success;
+    }
+
+    return Success(ParsedBaseType, ErrorMessage, baseType);
+}
+
+ResultType(astNodePtr, ErrorMessage) parseArrayType(CometParser* parser, ParsedBaseType baseType) {
+
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.chain, baseType.genericArgs, newList(astNodePtr), 0);
+    typeNode->startCol = startCol;
+
+    parserNextToken(parser); // consume '['
+
+    while (true) {
+        if (parser->peekToken->type == CT_TIMES) {
+            char* buffer = malloc(2);
+            buffer[0] = '*';
+            buffer[1] = 0;
+
+            CometASTNode* node = AST_NODE(AST_IDENTIFIER, parser->peekToken->lineNum, buffer);
+            node->startCol = parser->peekToken->startCol;
+            node->endCol = parser->peekToken->endCol;
+
+            append(
+                typeNode->data.AST_TYPE.shape,
+                node
+            );
+
+            parserNextToken(parser);
+
+        } else {
+            parserNextToken(parser);
+
+            ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
+            if (expr.error)
+                return expr;
+
+            append(typeNode->data.AST_TYPE.shape, expr.as.success);
+        }
+
+        typeNode->data.AST_TYPE.dimensions++;
+
+        if (peekTokenIs(parser, CT_COMMA)) {
+            parserNextToken(parser);
+            continue;
+        } else if (peekTokenIs(parser, CT_CLOSE_SQUARE)) {
+            break;
+        } else {
+            Estr buffer = CREATE_ESTR("Expected ',' or ']' when continuing array type, got \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(parser->peekToken->type));
+            APPEND_ESTR(buffer, "\" instead.");
+
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                buffer.str,
+                NULL,
+                parser->peekToken->lineNum,
+                parser->peekToken->startCol,
+                parser->peekToken->endCol
+            );
+
+            return Error(astNodePtr, ErrorMessage, errMsg);
+        }
+    }
+
+    typeNode->endCol = parser->peekToken->endCol;
+
+    parserNextToken(parser);
+
+    return Success(astNodePtr, ErrorMessage, typeNode);
+}
+
+ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser, ParsedBaseType baseType) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.chain, baseType.genericArgs, NULL, 0);
     typeNode->startCol = startCol;
     typeNode->endCol = parser->currentToken->endCol;
 
@@ -1064,10 +1144,14 @@ ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser) {
 }
 
 ResultType(astNodePtr, ErrorMessage) parseType(CometParser* parser) {
+    ResultType(ParsedBaseType, ErrorMessage) baseType = parseBaseType(parser);
+    if (baseType.error)
+        return Error(astNodePtr, ErrorMessage, baseType.as.error);
+
     if (peekTokenIs(parser, CT_OPEN_SQUARE)) {
-        return parseArrayType(parser);
+        return parseArrayType(parser, baseType.as.success);
     } else {
-        return parseScalarType(parser);
+        return parseScalarType(parser, baseType.as.success);
     }
 }
 
@@ -1144,6 +1228,7 @@ ResultType(astNodePtr, ErrorMessage) parseAssignmentStatement(CometParser* parse
         return type;
 
     bool expectName = peekTokenIs(parser, CT_IDENT);
+
     if (!expectName) { // backtrack, we're doing a reassignment
         parser->currentToken = currentTok;
         parser->peekToken = peekTok;
@@ -1562,6 +1647,7 @@ ResultType(astNodePtr, ErrorMessage) parseFunctionDefStatement(CometParser* pars
         AST_FUNC_DEF_STATEMENT,
         lineNum,
         ident,
+        newList(astNodePtr),
         block,
         args.as.success,
         returnType.as.success,
@@ -1630,6 +1716,58 @@ ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
+ResultType(nodeList, ErrorMessage) parseGenericsDef(CometParser* parser) {
+    List(astNodePtr) genericTypes = newList(astNodePtr);
+
+    if (!peekTokenIs(parser, CT_LT)) {
+        return Success(nodeList, ErrorMessage, genericTypes);
+    }
+
+    parserNextToken(parser);
+
+    while (true) {
+        ResultType(int, ErrorMessage) expectIdent = expectPeek(parser, CT_IDENT);
+        if (expectIdent.error)
+            return Error(nodeList, ErrorMessage, expectIdent.as.error);
+
+        CometASTNode* ident = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
+        ident->startCol = parser->currentToken->startCol;
+        ident->endCol = parser->currentToken->endCol;
+
+        append(genericTypes, ident);
+
+        if (peekTokenIs(parser, CT_GT)) {
+            parserNextToken(parser);
+            break;
+        } else if (peekTokenIs(parser, CT_COMMA)) {
+            parserNextToken(parser);
+            continue;
+        } else {
+            Estr buffer = CREATE_ESTR("Expected next token to be ',' or identifier, got \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(parser->peekToken->type));
+            APPEND_ESTR(buffer, "\" instead.");
+
+            ErrorMessage errMsg = createError(
+                parser->fileName,
+                parser->sourceCode, 
+                "InvalidSyntax",
+                buffer.str,
+                NULL,
+                parser->peekToken->lineNum,
+                parser->peekToken->startCol,
+                parser->peekToken->endCol
+            );
+
+            return Error(nodeList, ErrorMessage, errMsg);
+        }
+
+        printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
+        printf("peek tok = %s\n", tokenToCStr(*parser->peekToken));
+    }
+
+    return Success(nodeList, ErrorMessage, genericTypes);
+}
+
 ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser) {
     // basic format:
     /*
@@ -1674,6 +1812,11 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
 
         parentName = parentNameResult.as.success;
     }
+
+    // parse generics if there are any
+    ResultType(nodeList, ErrorMessage) genericTypes = parseGenericsDef(parser);
+    if (genericTypes.error)
+        return Error(astNodePtr, ErrorMessage, genericTypes.as.error);
 
     List(astNodePtr) fieldDefs = newList(astNodePtr);
 
@@ -1726,7 +1869,10 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
     CometASTNode* stmt = AST_NODE(
         AST_STRUCT_DEF_STATEMENT,
         lineNum,
+
         structName,
+        genericTypes.as.success,
+
         fieldDefs,
         constructor,
         NULL,
