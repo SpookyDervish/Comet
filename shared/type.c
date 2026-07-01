@@ -10,6 +10,16 @@ CometType cometTypeDouble = (CometType){.typeKind = COMET_DOUBLE};
 CometType cometTypeBool   = (CometType){.typeKind = COMET_BOOL  };
 CometType cometTypeVoid   = (CometType){.typeKind = COMET_VOID  };
 
+#if INTPTR_MAX == INT64_MAX
+    // 64-bit pointers
+    CometType cometTypePointer = (CometType){.typeKind = COMET_BIG };
+#elif INTPTR_MAX == INT32_MAX
+    // 32-bit pointers
+    CometType cometTypePointer = (CometType){.typeKind = COMET_INT };
+#else
+    #error "Unsupported pointer size"
+#endif
+
 static CometArrayType stringArray = {
     .elem = &cometTypeSmall,
     .isFixedSize = {false},

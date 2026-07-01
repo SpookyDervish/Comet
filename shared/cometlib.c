@@ -32,6 +32,17 @@ char* cometArgString(int64_t argVal) {
     CometOperand stringArr = cometDeserializeValue(argVal, cometTypeString);
     return cometArrayToCArray(stringArr, cometTypeSmall);
 }
+uintptr_t cometArgPointer(int64_t argVal) {
+    #if INTPTR_MAX == INT64_MAX
+        // 64-bit pointers
+        return cometDeserializeValue(argVal, cometTypeBig).imm.bigVal;
+    #elif INTPTR_MAX == INT32_MAX
+        // 32-bit pointers
+        return cometDeserializeValue(argVal, cometTypeint).imm.intVal;
+    #else
+        #error "Unsupported pointer size"
+    #endif
+}
 int64_t cometSerializeString(char* cString) {
     CometOperand cometArray = CArrayToCometArray(cString, strlen(cString) + 1, cometTypeSmall);
     return cometSerializeValue(cometArray);
@@ -60,6 +71,13 @@ CometStruct* cometGetExceptionStruct(CometEnvironment* env) {
     cometDefineConstructor(env, exceptStruct, 2, false, cometTypeString, cometTypeString);
 
     return exceptStruct;
+}
+
+CometType cometGenericType(char* name) {
+    return (CometType){
+        .typeKind = COMET_GENERIC,
+        .genericParamName = strdup(name)
+    };
 }
 
 void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
@@ -97,6 +115,19 @@ void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) 
     cometStruct->fieldCount = fields.count;
     cometStruct->numMethods = methods.count;
     cometStruct->vtable = (CometMethod**)methodsArr;
+}
+
+CometStruct* cometDefineGenericStruct(CometEnvironment* env, char* name, CometStruct* parent, List(charptr) genericTypeNames) {
+    CometStruct* baseStruct = cometDefineStruct(env, name, parent);
+
+    for (size_t i = 0; i < genericTypeNames.count; i++) {
+        genericTypeNames.pointer[i] = strdup(genericTypeNames.pointer[i]);
+    }
+
+    baseStruct->genericTypeNames = genericTypeNames.pointer;
+    baseStruct->numGenericTypes = genericTypeNames.count;
+
+    return baseStruct;
 }
 
 CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* parent) {

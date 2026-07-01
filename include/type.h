@@ -7,6 +7,9 @@
 
 #define MAX_ARRAY_DEPTH 8
 
+typedef char* charptr;
+UseList(charptr);
+
 typedef enum {
     COMET_VOID,
     COMET_SMALL,
@@ -83,6 +86,7 @@ extern CometType cometTypeDouble;
 extern CometType cometTypeBool;
 extern CometType cometTypeVoid;
 extern CometType cometTypeString;
+extern CometType cometTypePointer;
 
 bool typesAreEqual(CometType a, CometType b);
 

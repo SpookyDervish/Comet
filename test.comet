@@ -1,5 +1,6 @@
-func main() -> int {
-    ptr myPointer
+import testlib
 
+func main() -> int {
+    testlib.Pointer<int> x = new testlib.Pointer<int>(10, 4)
     return 0
 }

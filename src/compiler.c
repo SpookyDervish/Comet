@@ -163,6 +163,7 @@ bool methodIsGeneric(CometCompiler* c, CometMethod* method) {
 CometType* resolveGenericType(char* genericValTypeName, List(GenericTypeMapping) resolvedGenericTypes) {
     for (size_t genericIdx = 0; genericIdx < resolvedGenericTypes.count; genericIdx++) {
         GenericTypeMapping* resolvedGeneric = get(resolvedGenericTypes, genericIdx);
+        printf("%s, %s\n", resolvedGeneric->genericTypeName, genericValTypeName);
 
         if (strcmp(resolvedGeneric->genericTypeName, genericValTypeName) == 0) {
             return &resolvedGeneric->newType;
@@ -208,7 +209,9 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         if (cometStruct->fieldTypes[fieldIdx].typeKind != COMET_GENERIC)
             continue; // dont replace type of a field that doesnt use a generic type
 
-        newFieldTypes[fieldIdx] = *resolveGenericType(cometStruct->fieldTypes[fieldIdx].genericParamName, resolvedGenericTypes);
+        CometType* resolvedGenericType = resolveGenericType(cometStruct->fieldTypes[fieldIdx].genericParamName, resolvedGenericTypes);
+        printf("%p\n", resolvedGenericType);
+        newFieldTypes[fieldIdx] = *resolvedGenericType;
     }
 
     // fill in generic methods

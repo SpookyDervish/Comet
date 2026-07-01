@@ -21,7 +21,6 @@ struct Block {
 };
 
 
-UseList(charptr);
 UseList(uint64_t);
 UseList(Block);
 
