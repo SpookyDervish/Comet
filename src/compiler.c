@@ -4054,6 +4054,22 @@ void createExceptionType(CometCompiler* c) {
     defineType(c->typeMap, "Exception", exceptionType);
 }
 
+void createPointerType(CometCompiler* c) {
+    CometType ptrType;
+
+    switch (sizeof(void*)) {
+        case 4:
+            ptrType = (CometType){.typeKind = COMET_INT };
+            break;
+        default:
+            ptrType = (CometType){.typeKind = COMET_BIG };
+            break;
+    }
+
+    defineType(c->typeMap, "ptr", ptrType);
+
+}
+
 ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {
     CometCompiler* newCompiler = calloc(1, sizeof(CometCompiler));
     if (newCompiler == NULL) {
@@ -4110,6 +4126,7 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     defineType(newCompiler->typeMap, "string", stringType);
 
     createExceptionType(newCompiler);
+    createPointerType(newCompiler);
 
     // return new compiler
     

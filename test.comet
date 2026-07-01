@@ -1,14 +1,5 @@
-struct Test <T> {
-    T foo
-
-    init(T foo) {
-        self.foo = foo
-    }
-}
-
 func main() -> int {
-    Test<bool> myStruct = new Test<bool>(123)
-    myStruct.foo = 12
+    ptr myPointer
 
-    return myStruct.foo
+    return 0
 }

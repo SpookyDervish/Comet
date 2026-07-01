@@ -71,7 +71,7 @@
             "patterns": [
                 {
                     "name": "support.type.primitive.comet",
-                    "match": "\\b(small|int|big|float|double|bool|void|string)\\b"
+                    "match": "\\b(small|int|big|float|double|bool|void|string|ptr)\\b"
                 },
                 {
 					"name": "storage.type.comet",
