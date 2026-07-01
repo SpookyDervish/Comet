@@ -732,6 +732,13 @@ ResultType(int, charptr) startVM(CometVM* vm) {
     return Success(int, charptr, getTop(vm));
 }
 
+void print_hex_bytes(const unsigned char *buffer, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+        printf("%02X ", buffer[i]);
+    }
+    printf("\n");
+}
+
 ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     CometFile* loadedFile = (CometFile*)getFileContents(filePath);
 
@@ -878,11 +885,14 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         cursor += 64;
     }
 
+    print_hex_bytes(cursor-16, sizeof(CometSerializedInst) * loadedFile->numInstructions);
+
     // instructions
     memcpy(newVM->instructions,
        cursor,
        sizeof(CometSerializedInst) * loadedFile->numInstructions);    
     cursor += sizeof(CometSerializedInst) * loadedFile->numInstructions;
+
 
     newVM->currentFrame = NULL,
     newVM->callIdx = 0;

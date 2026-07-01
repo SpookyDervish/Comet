@@ -1,58 +1,12 @@
 #include "inst.h"
 #include "../include/comet_operand.h"
+#include "../include/type.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-bool typesAreEqual(CometType a, CometType b) {
-    if (a.typeKind != b.typeKind) {
-        return false;
-    }
-
-    if (a.typeKind == COMET_GENERIC) {
-        return strcmp(a.genericParamName, b.genericParamName) == 0;
-    }
-
-    if (a.typeKind == COMET_STRUCT) {
-        if (a.structType->parent != NULL) {
-            CometType parentType = {
-                .typeKind = COMET_STRUCT,
-                .structType = a.structType->parent
-            };
-
-            return typesAreEqual(parentType, b);
-        }
-
-        return a.structType == b.structType;
-    }
-
-    if (a.typeKind == COMET_ARRAY) {
-        
-        if (a.arrayType->dims != b.arrayType->dims)
-            return false;
-
-        for (size_t i = 0; i < a.arrayType->dims; i++) {
-
-            if (!(typesAreEqual(*a.arrayType->elem, *b.arrayType->elem))) 
-                return false;
-
-            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i]) 
-                return false;
-
-            if (!a.arrayType->isFixedSize[i])
-                return true;
-
-            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i]) 
-                return false;
-            
-        }
-    }
-
-    return true;
-}
 
 CometOperand createOperand(CometOperandKind type) {
     return (CometOperand){
@@ -102,14 +56,14 @@ void buildInst(
 ) {
     append(compiler->debugInstInfo, compiler->currentLine);
 
-    compiler->outputProgram[compiler->programIdx] = (CometInst){
+    CometInst newInst = {
         .opcode = opcode,
         .a = a,
         .b = b,
-        .c = c,
-        .pos = compiler->programIdx
+        .c = c
     };
-    compiler->programIdx++;
+
+    append(compiler->currentBlock->instructions, newInst);
 }
 
 CometOperand pushVal(CometCompiler* c) {
@@ -134,7 +88,7 @@ bool immediatesAreEqual(CometImmediate a, CometImmediate b) {
         case COMET_FLOAT: return a.floatVal == b.floatVal;
         case COMET_DOUBLE: return a.doubleVal == b.doubleVal;
         case COMET_VOID: return true;
-        default: break;;
+        default: break;
         
     }
 
@@ -415,7 +369,10 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, Come
     newFunction->isVarArgs = isVarArgs;
 
     strncpy(newFunction->name, name, 31);
-    newFunction->startIdx = c->programIdx;
+    //newFunction->startIdx = c->programIdx;
+
+    newFunction->blockIdx = c->blocks.count;
+    startBlock(c);
 
     c->functions[c->functionCount] = newFunction;
 
@@ -626,6 +583,22 @@ CometLabel* buildLabel(CometCompiler* c) {
     return newLabel;
 }
 void resolveLabel(CometCompiler* c, CometLabel* label) {
-    label->pos = c->programIdx;
-    label->resolved = true;
+    label->blockPos = c->currentBlock->instructions.count;
+    //label->resolved = true;
+}
+
+// -- BLOCKS -- //
+Block* startBlock(CometCompiler* c) {
+    Block newBlock = {
+        .instructions = newList(CometInst),
+        .parent = c->currentBlock
+    };
+    append(c->blocks, newBlock);
+
+    c->currentBlock = &c->blocks.pointer[c->blocks.count-1];
+    return c->currentBlock;
+}
+
+void endBlock(CometCompiler* c) {
+    c->currentBlock = c->currentBlock->parent;
 }

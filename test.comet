@@ -1,15 +1,12 @@
-struct Box <T> {
-    T value
+struct Test <T> {
+    T foo
 
-    init(T value) {
-        self.value = value
+    init(T foo) {
+        self.foo = foo
     }
 }
 
-
 func main() -> int {
-    breakpoint
-    Box<int> box = new Box<int>(123)
-    Box<bool> box2 = new Box<bool>(1)
-    return 0
+    Test<int> myStruct = new Test<int>(123)
+    return myStruct.foo
 }

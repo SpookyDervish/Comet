@@ -10,6 +10,7 @@
 #include "../include/debug.h"
 #include "../include/error_message.h"
 #include "ast.h"
+#include "compiler_struct.h"
 #include "typemap.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -17,60 +18,7 @@
 
 #define NO_OPERAND ((CometOperand){0})
 
-typedef CometStruct* cometStructPtr;
-
-typedef struct {
-    char* name;
-    CometASTNode* structDefNode;
-} GenericStructDef;
-UseList(GenericStructDef);
-
-UseList(CometType);
-typedef struct {
-    CometStruct* structType; // the result of the generic. e.g: Box_int
-    List(CometType) genericTypes; // the types of all the generics. e.g: genericTypes[0] = T, T = int
-    char* baseStructName; // the name of the base generic. e.g: Box
-    GenericStructDef structDef; // ast node of struct def
-} CachedGenericStruct;
-
-UseList(cometStructPtr);
-UseList(charptr);
-UseList(uint64_t);
-UseList(CachedGenericStruct);
-
-typedef struct {
-    uint32_t programIdx;
-    uint32_t stackIdx;
-    uint32_t constIdx;
-    uint32_t functionCount;
-    uint32_t labelCount;
-
-    bool includeDebugSymbols;
-    uint64_t currentLine;
-    List(uint64_t) debugInstInfo;
-
-    char* inputFilePath;
-    char* sourceCode;
-
-    List(CachedGenericStruct) cachedGenerics;
-    List(GenericStructDef) genericDefinitions;
-
-    CometOperand consts[512];
-    CometLabel* labels[512];
-    CometInst* outputProgram;
-    CometFunction* functions[128];
-    CometFunction* currentFunction;
-    CometEnvironment* env;
-    CometTypeMap* typeMap;
-    List(cometStructPtr) structs;
-    List(charptr) libs;
-} CometCompiler;
-
-typedef CometCompiler* cometCompilerPtr;
-
 Result(CometOperand, ErrorMessage);
-
-bool typesAreEqual(CometType a, CometType b);
 
 
 CometType getValueType(CometCompiler* c, CometOperand value);
@@ -136,5 +84,8 @@ CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, Come
 
 CometLabel* buildLabel(CometCompiler* c);
 void resolveLabel(CometCompiler* c, CometLabel* label);
+
+Block* startBlock(CometCompiler* c);
+void endBlock(CometCompiler* c);
 
 #endif

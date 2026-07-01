@@ -408,7 +408,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
                     CometMethod* method = malloc(sizeof(CometMethod));
                     method->argCount = func->argCount;
                     method->returnType = func->returnType;
-                    method->startIdx = func->startIdx;
+                    method->blockIdx = func->blockIdx;
                     memcpy(method->name, func->name, 32);
 
                     // find symbol idx
@@ -2859,6 +2859,7 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
 
     // return back to the parent scope
     c->env = destroyEnv(c->env);
+    endBlock(c);
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
@@ -3238,7 +3239,8 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
 
     // return back to the parent scope
     c->env = destroyEnv(funcEnv);
-    
+    endBlock(c);
+
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType) {
@@ -3321,6 +3323,7 @@ ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c,
 
     // return back to the parent scope
     c->env = destroyEnv(c->env);
+    endBlock(c);
 
     return Success(CometOperand, ErrorMessage, funcValue);
 }
@@ -3528,7 +3531,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 memcpy(newMethod->name, function->name, strlen(function->name) + 1);
                 memcpy(function->name, newFuncName.str, newFuncName.size + 1);
                 newMethod->argCount = function->argCount;
-                newMethod->startIdx = function->startIdx,
+                newMethod->blockIdx = function->blockIdx,
                 newMethod->symbolIdx = result.as.success.symbolIdx;
 
                 DESTROY_ESTR(newFuncName);
@@ -3553,7 +3556,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 memcpy(newMethod->name, function->name, strlen(function->name) + 1);
                 memcpy(function->name, newFuncName.str, newFuncName.size + 1);
                 newMethod->argCount = function->argCount;
-                newMethod->startIdx = function->startIdx,
+                newMethod->blockIdx = function->blockIdx,
                 newMethod->symbolIdx = result.as.success.symbolIdx;
 
                 DESTROY_ESTR(newFuncName);
@@ -3934,11 +3937,23 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         return Error(voidPtr, ErrorMessage, errMsg);
     }
 
+    uint64_t instCount = 0;
+    for (size_t blockIdx = 0; blockIdx < c->blocks.count; blockIdx++) {
+        // resolve labels
+        for (size_t labelIdx = 0; labelIdx < c->labelCount; labelIdx++) {
+            CometLabel* label = c->labels[labelIdx];
+            label->pos = instCount + label->blockPos;
+            label->resolved = true;
+        }
+
+        instCount += (*get(c->blocks, blockIdx)).instructions.count;
+    }
+
     CometFile cometFile = {
         .magic = {'C', 'O', 'M', 'E',  'T'},
         .version = 1,
         .numConsts = c->constIdx,
-        .numInstructions = c->programIdx,
+        .numInstructions = instCount,
         .numFunctions = c->functionCount,
         .numStructs = c->structs.count,
         .numLibs = c->libs.count
@@ -3949,17 +3964,21 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
 
 
     for (size_t i = 0; i < c->functionCount; i++) {
+        CometFunction* func = c->functions[i];
+        uint32_t startIdx = 0;
+        for (size_t blockIdx = 0; blockIdx < c->functions[i]->blockIdx; blockIdx++) {
+            startIdx += get(c->blocks, blockIdx)->instructions.count;
+        }
         
 
         CometSerializedFunc serializedFunc = {
-            .startIdx = c->functions[i]->startIdx,
-            .numArgs = c->functions[i]->argCount,
-            .isExternal = c->functions[i]->isExternal,
-            .libIdx = c->functions[i]->libIdx,
-            .isVarArgs = c->functions[i]->isVarArgs
+            .startIdx = startIdx,
+            .numArgs = func->argCount,
+            .isExternal = func->isExternal,
+            .libIdx = func->libIdx,
+            .isVarArgs = func->isVarArgs
         };
-        strcpy(serializedFunc.name, c->functions[i]->name);
-        //memcpy(serializedFunc.argTypes, c->functions[i]->argTypes, sizeof(CometType) * c->functions[i]->argCount);
+        strcpy(serializedFunc.name, func->name);
 
         fwrite(&serializedFunc, sizeof(CometSerializedFunc), 1, file);
     }
@@ -3979,13 +3998,15 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         fwrite(libName, 64, 1, file);
     }
 
-    for (size_t instIdx = 0; instIdx < c->programIdx; instIdx++) {
-        CometInst inst = c->outputProgram[instIdx];
-        CometSerializedInst* serializedInst = serializeInst(inst);
-
-        fwrite(serializedInst, sizeof(CometSerializedInst), 1, file);
-        
+    for (size_t blockIdx = 0; blockIdx < c->blocks.count; blockIdx++) {
+        Block block = *get(c->blocks, blockIdx);
+        for (size_t instIdx = 0; instIdx < block.instructions.count; instIdx++) {
+            CometSerializedInst* inst = serializeInst(*get(block.instructions, instIdx));
+            fwrite(inst, sizeof(CometSerializedInst), 1, file);
+        }
     }
+
+
 
     fwrite(&debugSymbols, sizeof(bool), 1, file);
 
@@ -3999,10 +4020,11 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         fwrite(&sourceLen, sizeof(size_t), 1, file);
         fwrite(c->sourceCode, 1, sourceLen, file);
 
-        fwrite(c->debugInstInfo.pointer, sizeof(uint64_t), c->programIdx, file);
+        //fwrite(c->debugInstInfo.pointer, sizeof(uint64_t), c->programIdx, file);
     }
 
     fclose(file);
+
 
     return Success(voidPtr, ErrorMessage, NULL);
 }
@@ -4061,8 +4083,6 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
         return Error(cometCompilerPtr, ErrorMessage, errMsg);
     }
 
-    newCompiler->outputProgram = calloc(1024, sizeof(CometInst));
-    newCompiler->programIdx = 0;
     newCompiler->stackIdx = 0;
     newCompiler->env = newEnvironment("root", NULL, false);
     newCompiler->structs = newList(cometStructPtr);
@@ -4076,6 +4096,7 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     newCompiler->debugInstInfo = newList(uint64_t);
     newCompiler->cachedGenerics = newList(CachedGenericStruct);
     newCompiler->genericDefinitions = newList(GenericStructDef);
+    newCompiler->blocks = newList(Block);
 
     // fill in type map
     defineType(newCompiler->typeMap, "small",  (CometType){.typeKind = COMET_SMALL });

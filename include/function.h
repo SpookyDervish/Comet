@@ -7,7 +7,7 @@
 typedef struct CometFunction CometFunction;
 struct CometFunction {
     char name[32];
-    uint32_t startIdx;
+    uint32_t blockIdx;
     uint32_t argCount;
     CometType returnType;
     CometType* argTypes;

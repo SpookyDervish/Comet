@@ -36,6 +36,4 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols);
 CometOperand createOperand(CometOperandKind type);
 
-
-
 #endif

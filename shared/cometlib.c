@@ -62,29 +62,6 @@ CometStruct* cometGetExceptionStruct(CometEnvironment* env) {
     return exceptStruct;
 }
 
-CometSerializedFunc cometSerializeFunction(
-    CometVM* vm,
-    CometFunction* func,
-    externalLibFunc funcPtr
-) {
-    CometSerializedFunc serializedFunc = {
-        .isExternal = func->isExternal,
-        .isVarArgs = func->isVarArgs,
-        .startIdx = func->startIdx,
-        .libIdx = 0,
-        .externFuncIndex = vm->numExternalFuncs
-    };
-    memcpy(serializedFunc.name, func->name, 32);
-
-    vm->externalFuncs[vm->numExternalFuncs] = funcPtr;
-    vm->numExternalFuncs++;
-
-    vm->functions[vm->numFunctions] = serializedFunc;
-    vm->numFunctions++;
-
-    return serializedFunc;
-}
-
 void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
     size_t fieldCount  = cometStruct->parent == NULL ? fields.count : fields.count + cometStruct->parent->fieldCount;
     size_t methodCount = cometStruct->parent == NULL ? methods.count : methods.count + cometStruct->parent->numMethods;
@@ -175,7 +152,7 @@ CometFunction* cometDefineFunc(
     func->argCount = numArgs;
     func->isMethod = false;
     func->returnType = returnType;
-    func->startIdx = 0;
+    func->blockIdx = 0;
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
     
@@ -224,7 +201,7 @@ CometFunction* cometDefineMethod(
     func->argCount = numArgs + 1;
     func->isMethod = true;
     func->returnType = returnType;
-    func->startIdx = 0;
+    func->blockIdx = 0;
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
     
@@ -287,7 +264,7 @@ void cometDefineConstructor(
     func->argCount = numArgs + 1;
     func->isMethod = false;
     func->returnType = structType;
-    func->startIdx = 0;
+    func->blockIdx = 0;
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
     

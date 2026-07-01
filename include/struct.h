@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "type.h"
 
 typedef enum {
     FIELD_PRIVATE,
@@ -12,7 +11,11 @@ typedef enum {
     FIELD_PUBLIC,
 } FieldAttribute;
 
+typedef struct CometType CometType;
+typedef struct CometMethod CometMethod;
+
 // the actual struct type
+typedef struct CometStruct CometStruct;
 struct CometStruct {
     CometMethod** vtable;
     uint32_t numMethods;
@@ -43,5 +46,6 @@ typedef struct {
 
 FieldAttribute attribStringToFieldAttrib(char* str);
 int32_t getFieldIndex(CometStruct* structType, char* fieldName);
+
 
 #endif

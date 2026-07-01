@@ -54,13 +54,14 @@ typedef struct {
 } GenericTypeMapping;
 UseList(GenericTypeMapping);
 
-typedef struct {
+typedef struct CometMethod CometMethod;
+struct CometMethod {
     char name[32];
-    uint32_t startIdx;
+    uint32_t blockIdx;
     uint32_t argCount;
     uint32_t symbolIdx;
     CometType returnType;
-} CometMethod;
+};
 
 typedef enum {
     FUNC_FUNC,
@@ -69,6 +70,7 @@ typedef enum {
 
 typedef struct {
     uint32_t pos;
+    uint32_t blockPos;
     bool resolved;
 } CometLabel;
 
@@ -81,5 +83,7 @@ extern CometType cometTypeDouble;
 extern CometType cometTypeBool;
 extern CometType cometTypeVoid;
 extern CometType cometTypeString;
+
+bool typesAreEqual(CometType a, CometType b);
 
 #endif
