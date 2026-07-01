@@ -894,7 +894,6 @@ ResultType(cometTypePtr, ErrorMessage) generateGenericStruct(CometCompiler* c, G
     for (size_t structIdx = 0; structIdx < c->cachedGenerics.count; structIdx++) {
         CachedGenericStruct cachedGeneric = *get(c->cachedGenerics, structIdx);
 
-        printf("HIIIIII %s, %s (%s)\n", cachedGeneric.baseStructName, structName, cachedGeneric.baseStructName == structName ? "true" : "false");
         if (cachedGeneric.structDef.name == structDef.name && cachedGeneric.genericTypes.count == genericTypes.count) {
             bool found = true;
             for (size_t typeIdx = 0; typeIdx < cachedGeneric.genericTypes.count; typeIdx++) {
@@ -934,8 +933,6 @@ ResultType(cometTypePtr, ErrorMessage) generateGenericStruct(CometCompiler* c, G
         ResultType(CometType, ErrorMessage) resolvedType = getType(c, *get(genericTypes, i));
         if (resolvedType.error)
             return Error(cometTypePtr, ErrorMessage, resolvedType.as.error);
-
-        printf("resolved generic type %s to %s\n", genericTypeName, typeToString(resolvedType.as.success));
 
         bool success = defineType(c->typeMap, genericTypeName, resolvedType.as.success);
         if (!success) {
@@ -981,7 +978,6 @@ ResultType(cometTypePtr, ErrorMessage) generateGenericStruct(CometCompiler* c, G
     for (size_t structIdx = 0; structIdx < c->genericDefinitions.count; structIdx++) {
         GenericStructDef cometStruct = *get(c->genericDefinitions, structIdx);
 
-        printf("current c->structs %s, looking for %s\n", cometStruct.name, structName);
         if (strcmp(cometStruct.name, structName) == 0) {
             CachedGenericStruct cached = {
                 .structType = genericStructInstance.as.success->structType,
@@ -1002,9 +998,7 @@ ResultType(cometTypePtr, ErrorMessage) generateGenericStruct(CometCompiler* c, G
 ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometASTNode* node, nodeList genericTypes) {
     char* baseTypeName = node->data.AST_IDENTIFIER.ident;
 
-    printf("base type name = %s\n", baseTypeName);
     CometTypeMapEntry* entry = lookupType(c->typeMap, baseTypeName);
-    printf("entry addr = %p\n", entry);
     if (entry) {
         return Success(cometTypePtr, ErrorMessage, &entry->type);
     }
@@ -1230,10 +1224,6 @@ ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList ch
 
 ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* typeNode) {
     struct AST_TYPE type = typeNode->data.AST_TYPE;
-
-    printf("get type of ");
-    printNode(typeNode);
-    putchar('\n');
 
     // get base type
     ResultType(cometTypePtr, ErrorMessage) baseType = getBaseType(c, type.baseType, typeNode->data.AST_TYPE.genericTypes);
@@ -3351,7 +3341,6 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         APPEND_ESTR(mangledName, genericNameEnding);
         structName = mangledName.str;
     }
-    printf("\033[31mNEW STRUCT NAME = %s\n\033[0m", structName);
 
     structType->name = structName;
     structType->parent = NULL;
@@ -3590,8 +3579,6 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     }
     Estr constructorName = CREATE_ESTR(strdup(structName));
     APPEND_ESTR(constructorName, "_INIT");
-
-    printf("create constructor %s\n", constructorName.str);
 
     ResultType(CometOperand, ErrorMessage) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct);
     if (constructorResult.error)
