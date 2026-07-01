@@ -79,6 +79,8 @@ typedef struct {
     uint32_t numFields;
     uint32_t numMethods;
     uint32_t* vtable;
+    CometType* genericTypes;
+    uint32_t numGenericTypes;
 } CometSerializedStruct;
 
 typedef struct {

@@ -3981,6 +3981,10 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         fwrite(&serializedStruct->numFields, 1, sizeof(uint32_t), file);
         fwrite(&serializedStruct->numMethods, 1, sizeof(uint32_t), file);
         fwrite(serializedStruct->vtable, sizeof(uint32_t), serializedStruct->numMethods, file);
+        fwrite(&serializedStruct->numGenericTypes, sizeof(uint32_t), 1, file);
+        
+        if (structType->numGenericTypes > 0)
+            fwrite(serializedStruct->genericTypes, sizeof(CometType), serializedStruct->numGenericTypes, file);
     }
 
     for (size_t libIdx = 0; libIdx < c->libs.count; libIdx++) {

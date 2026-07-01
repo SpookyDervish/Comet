@@ -809,6 +809,14 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
             cursor,
             sizeof(uint32_t) * numMethods);
 
+        uint32_t numGenericTypes = 0;
+        memcpy(&numGenericTypes, cursor, sizeof(uint32_t));
+        newVM->structs[i].numGenericTypes = numGenericTypes;
+        cursor += sizeof(uint32_t);
+
+        memcpy(newVM->structs[i].genericTypes, cursor, sizeof(CometType) * numGenericTypes);
+        cursor += sizeof(CometType) * numGenericTypes;
+
         cursor += sizeof(uint32_t) * numMethods;
     }
 
