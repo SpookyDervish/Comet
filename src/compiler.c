@@ -184,7 +184,6 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
     for (size_t i = 0; i < c->cachedGenerics.count; i++) {
         CachedGenericStruct currentStruct = *get(c->cachedGenerics, i);
 
-        printf("current = %s, looking for = %s\n", currentStruct.structType->name, cometStruct->name);
         if (strcmp(currentStruct.structType->name, cometStruct->name) == 0) {
 
             bool found = true;
@@ -326,7 +325,7 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         givenGenericTypes[i] = (*get(resolvedGenericTypes, i)).newType;
     }
 
-    newStruct->name = strdup(cometStruct->name); //newStructName.str;
+    newStruct->name = newStructName.str;
     newStruct->fieldTypes = newFieldTypes;
     newStruct->fieldNames = cometStruct->fieldNames;
     newStruct->fieldCount = cometStruct->fieldCount;
@@ -1114,7 +1113,9 @@ ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometAS
         }
     }
 
-    Estr buffer = CREATE_ESTR("Unkown type \"");
+    return Success(cometTypePtr, ErrorMessage, NULL);
+
+    /*Estr buffer = CREATE_ESTR("Unkown type \"");
     APPEND_ESTR(buffer, baseTypeName);
     APPEND_ESTR(buffer, "\"");
 
@@ -1129,13 +1130,15 @@ ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometAS
         node->endCol
     );
 
-    return Error(cometTypePtr, ErrorMessage, errMsg);
+    return Error(cometTypePtr, ErrorMessage, errMsg);*/
 }
 
 ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList chain, nodeList genericTypes) {
 
     ResultType(cometTypePtr, ErrorMessage) builtinType = findBuiltinType(c, *get(chain, 0), genericTypes);
-    if (!builtinType.error)
+    if (builtinType.error)
+        return builtinType;
+    if (builtinType.as.success != NULL)
         return builtinType;
 
     for (size_t i = 0; i < chain.count; i++) {
@@ -1960,8 +1963,10 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
         case AST_IDENTIFIER: {
             char* varName = node->data.AST_IDENTIFIER.ident;
             Record* varRecord = lookup(c->env, varName);
+            
 
             if (!varRecord) {
+
                 Estr buffer = CREATE_ESTR("Undefined variable \"");
                 APPEND_ESTR(buffer, varName);
                 APPEND_ESTR(buffer, "\"");
@@ -3709,8 +3714,6 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
         return Error(CometOperand, ErrorMessage, structType.as.error);
     
     char* structName = structType.as.success.structType->name;
-    printf("struct name = %s\n", structName);
-
     int32_t idx = getStructIndex(c, structType.as.success.structType);
 
     if (idx == -1) {
