@@ -186,6 +186,7 @@ CometFunction* cometDefineFunc(
     func->blockIdx = 0;
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
+    func->funcDef = NULL;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,
@@ -235,6 +236,7 @@ CometFunction* cometDefineMethod(
     func->blockIdx = 0;
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
+    func->funcDef = NULL;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,
@@ -298,6 +300,7 @@ void cometDefineConstructor(
     func->blockIdx = 0;
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
+    func->funcDef = NULL;
     
     CometType type = {
         .typeKind = COMET_FUNCTION,

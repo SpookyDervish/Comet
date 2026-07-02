@@ -172,17 +172,25 @@ CometType* resolveGenericType(char* genericValTypeName, List(GenericTypeMapping)
     return NULL;
 }
 
+ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType);
 CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(GenericTypeMapping) resolvedGenericTypes) {
-    // look for existing struct
+    /*
+    
+    This function is used to get or generate a generic of a struct from a module or external lib.
+
+    */
+
+    // look for existing instantiated generic with the same generic parameter types
     for (size_t i = 0; i < c->cachedGenerics.count; i++) {
         CachedGenericStruct currentStruct = *get(c->cachedGenerics, i);
 
+        printf("current = %s, looking for = %s\n", currentStruct.structType->name, cometStruct->name);
         if (strcmp(currentStruct.structType->name, cometStruct->name) == 0) {
 
             bool found = true;
 
             for (size_t genericTypeIdx = 0; genericTypeIdx < currentStruct.genericTypes.count; genericTypeIdx++) {
-                if (!typesAreEqual(get(currentStruct.genericTypes, genericTypeIdx)[genericTypeIdx], get(resolvedGenericTypes, genericTypeIdx)->newType)) {
+                if (!typesAreEqual(*get(currentStruct.genericTypes, genericTypeIdx), get(resolvedGenericTypes, genericTypeIdx)->newType)) {
                     found = false;
                     break;
                 }
@@ -194,87 +202,135 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         }
     }
 
-    // if it doesnt exist, make a new one with the types
+    // create a mangled name for the instantiated struct
     Estr newStructName = CREATE_ESTR(cometStruct->name);
     for (size_t i = 0; i < resolvedGenericTypes.count; i++) {
         APPEND_ESTR(newStructName, "_");
         APPEND_ESTR(newStructName, typeToString(get(resolvedGenericTypes, i)->newType));
     }
 
-    CometType* newFieldTypes = malloc(sizeof(CometType) * resolvedGenericTypes.count);
+    // copy and resolve field types
+    CometType* newFieldTypes = malloc(sizeof(CometType) * cometStruct->fieldCount);
+    if (!newFieldTypes) return NULL;
+    memcpy(newFieldTypes, cometStruct->fieldTypes, sizeof(CometType) * cometStruct->fieldCount);
 
-    // fill in generic fields
     for (size_t fieldIdx = 0; fieldIdx < cometStruct->fieldCount; fieldIdx++) {
-        if (cometStruct->fieldTypes[fieldIdx].typeKind != COMET_GENERIC)
-            continue; // dont replace type of a field that doesnt use a generic type
-
-        
-        CometType* resolvedGenericType = resolveGenericType(cometStruct->fieldTypes[fieldIdx].genericParamName, resolvedGenericTypes);
-        newFieldTypes[fieldIdx] = *resolvedGenericType;
-    }
-
-    // fill in generic methods
-    for (size_t methodIdx; methodIdx < cometStruct->numMethods; methodIdx++) {
-        CometMethod* method = cometStruct->vtable[methodIdx];
-
-        if (!methodIsGeneric(c, method)) 
+        if (newFieldTypes[fieldIdx].typeKind != COMET_GENERIC)
             continue;
 
-        // copy the function cause we dont wanna modify the base method
-        CometMethod* new = malloc(sizeof(CometMethod));
-        new->argCount = method->argCount;
-        new->blockIdx = method->blockIdx;
-        memcpy(new->name, method->name, 32);
-        new->returnType = method->returnType;
-        new->symbolIdx = method->symbolIdx;
+        CometType* resolvedGenericType = resolveGenericType(newFieldTypes[fieldIdx].genericParamName, resolvedGenericTypes);
+        if (resolvedGenericType)
+            newFieldTypes[fieldIdx] = *resolvedGenericType;
+    }
 
-        if (new->returnType.typeKind == COMET_GENERIC)
-            new->returnType = *resolveGenericType(new->returnType.genericParamName, resolvedGenericTypes);
+    CometStruct* newStruct = malloc(sizeof(CometStruct));
+    if (!newStruct) return NULL;
+    CometType structType = {
+        .structType = newStruct,
+        .typeKind = COMET_STRUCT
+    };
+
+    // prepare vtable
+    CometMethod** newVtable = calloc(cometStruct->numMethods, sizeof(CometMethod*));
+
+    for (size_t methodIdx = 0; methodIdx < cometStruct->numMethods; methodIdx++) {
+        CometMethod* method = cometStruct->vtable[methodIdx];
+
+        if (!methodIsGeneric(c, method)) {
+            newVtable[methodIdx] = method;
+            continue;
+        }
+
+        // copy the method descriptor
+        CometMethod* newMethod = malloc(sizeof(CometMethod));
+        memcpy(newMethod, method, sizeof(CometMethod));
 
         CometFunction* funcPtr = c->functions[method->symbolIdx];
 
-        CometType* newArgTypes = malloc(sizeof(CometType) * funcPtr->argCount);
-        memcpy(newArgTypes, funcPtr->argTypes, sizeof(CometType) * funcPtr->argCount);
+        // build new arg type list (include `self` for methods)
+        uint32_t origArgCount = funcPtr->argCount;
+        uint32_t newArgCount = origArgCount + (funcPtr->isMethod ? 1 : 0);
+        CometType* newArgTypes = calloc(newArgCount, sizeof(CometType));
+        if (!newArgTypes) return NULL;
 
+        if (funcPtr->isMethod) {
+            newArgTypes[0] = structType;
+            if (origArgCount > 0)
+                memcpy(newArgTypes + 1, funcPtr->argTypes, sizeof(CometType) * origArgCount);
+        } else {
+            if (origArgCount > 0)
+                memcpy(newArgTypes, funcPtr->argTypes, sizeof(CometType) * origArgCount);
+        }
+
+        // resolve any generic arg/return types
+        for (size_t a = 0; a < newArgCount; a++) {
+            if (newArgTypes[a].typeKind == COMET_GENERIC) {
+                CometType* resolved = resolveGenericType(newArgTypes[a].genericParamName, resolvedGenericTypes);
+                if (resolved) newArgTypes[a] = *resolved;
+            }
+        }
+
+        CometType newReturnType = funcPtr->returnType;
+        if (newReturnType.typeKind == COMET_GENERIC) {
+            CometType* resolved = resolveGenericType(newReturnType.genericParamName, resolvedGenericTypes);
+            if (resolved) newReturnType = *resolved;
+        }
+
+        // mangle function name to avoid symbol collisions
+        Estr mangledName = CREATE_ESTR(newStructName.str);
+        APPEND_ESTR(mangledName, "_");
+        APPEND_ESTR(mangledName, method->name);
+
+        // create new function symbol and begin its block
         CometOperand symbolIdx = buildFunction(
             c,
-            new->name,
-            funcPtr->argCount,
-            funcPtr->returnType,
+            mangledName.str,
+            newArgCount,
+            newReturnType,
             newArgTypes,
             funcPtr->isVarArgs,
             funcPtr->isMethod,
             funcPtr->isExternal,
-            funcPtr->libIdx
+            funcPtr->libIdx,
+            funcPtr->funcDef
         );
 
-        CometFunction* oldFunc = c->currentFunction;
-        Block* oldBlock = c->currentBlock;
-        CometFunction* newFunc = c->functions[symbolIdx.symbolIdx];
-        c->currentFunction = oldFunc;
-        c->currentBlock = oldBlock;
+        newMethod->symbolIdx = symbolIdx.symbolIdx;
 
-        for (size_t argIdx = 0; argIdx < newFunc->argCount; argIdx++) {
-            CometType genericArgType = newArgTypes[argIdx];
+        // compile the function body into the new function
+        CometEnvironment* oldEnv = c->env;
+        CometFunction* oldFunc = c->currentFunction; // buildFunction set currentFunction to new function
 
-            if (genericArgType.typeKind == COMET_GENERIC) {
-                newArgTypes[argIdx] = *resolveGenericType(genericArgType.genericParamName, resolvedGenericTypes);
-            }
+        CometEnvironment* funcEnv = newEnvironment(mangledName.str, oldEnv, true);
+        c->env = funcEnv;
+
+        // external funcs dont have an AST node
+        if (!funcPtr->isExternal) {
+            ResultType(CometOperand, ErrorMessage) result = compile(c, funcPtr->funcDef);
+            if (result.error)
+                return NULL;
         }
-        
+
+        // restore env and end block for this function
+        c->env = destroyEnv(c->env);
+        endBlock(c);
+
+        newVtable[methodIdx] = newMethod;
+
+        DESTROY_ESTR(mangledName);
     }
 
+    // fill in given generic types array
     CometType* givenGenericTypes = malloc(sizeof(CometType) * resolvedGenericTypes.count);
     for (size_t i = 0; i < resolvedGenericTypes.count; i++) {
         givenGenericTypes[i] = (*get(resolvedGenericTypes, i)).newType;
     }
 
-    CometStruct* newStruct = malloc(sizeof(CometStruct));
-    newStruct->name = cometStruct->name;
+    newStruct->name = strdup(cometStruct->name); //newStructName.str;
     newStruct->fieldTypes = newFieldTypes;
     newStruct->fieldNames = cometStruct->fieldNames;
     newStruct->fieldCount = cometStruct->fieldCount;
-    newStruct->vtable = cometStruct->vtable;
+    newStruct->vtable = newVtable;
     newStruct->numMethods = cometStruct->numMethods;
     newStruct->genericTypeNames = NULL;
     newStruct->numGenericTypes = 0;
@@ -282,9 +338,17 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
     newStruct->numGivenGenericTypes = resolvedGenericTypes.count;
     newStruct->parent = cometStruct->parent;
 
+    // cache the instantiated generic
+    List(CometType) genTypes = newList(CometType);
+    for (size_t i = 0; i < resolvedGenericTypes.count; i++) {
+        append(genTypes, (*get(resolvedGenericTypes, i)).newType);
+    }
+
     CachedGenericStruct newGeneric = {
         .structType = newStruct,
-        .genericTypes = newFieldTypes
+        .genericTypes = genTypes,
+        .baseStructName = cometStruct->name,
+        .structDef = (GenericStructDef){ .name = cometStruct->name, .structDefNode = NULL }
     };
 
     append(c->structs, newStruct);
@@ -921,6 +985,13 @@ CometType flattenArrayType(CometType type) {
 ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c, CometASTNode* node, bool isGenericInstantiation, char* genericNameEnding);
 ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* typeNode);
 ResultType(cometTypePtr, ErrorMessage) generateGenericStruct(CometCompiler* c, GenericStructDef structDef, char* structName, List(astNodePtr) genericTypes) {
+    /*
+    
+    This function is used to generate generics of user-created structs.
+    
+    */
+
+
     // check if it already exists
     for (size_t structIdx = 0; structIdx < c->cachedGenerics.count; structIdx++) {
         CachedGenericStruct cachedGeneric = *get(c->cachedGenerics, structIdx);
@@ -2839,7 +2910,7 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
         return Error(CometOperand, ErrorMessage, returnType.as.error);
 
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, false, -1);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, false, -1, node);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -3181,7 +3252,7 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
     }
     argTypes[0] = structType;
 
-    buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, false, true, false, -1); // add 1 arg for self
+    buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, false, true, false, -1, node); // add 1 arg for self
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(constructorName, c->env, true);
@@ -3289,7 +3360,7 @@ ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c,
         return Error(CometOperand, ErrorMessage, returnType.as.error);
 
     // build the function start and define the function in the current scope
-    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType.as.success, argTypes, false, true, false, -1);
+    CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType.as.success, argTypes, false, true, false, -1, node);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
@@ -3638,6 +3709,7 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
         return Error(CometOperand, ErrorMessage, structType.as.error);
     
     char* structName = structType.as.success.structType->name;
+    printf("struct name = %s\n", structName);
 
     int32_t idx = getStructIndex(c, structType.as.success.structType);
 

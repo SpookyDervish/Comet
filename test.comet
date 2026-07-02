@@ -1,6 +1,18 @@
-import testlib
+import mem
+
+struct Foo <T> {
+    T value
+
+    init(T value) {
+        self.value = value
+    }
+
+    func foo() -> T {
+        return self.value
+    }
+}
 
 func main() -> int {
-    testlib.Pointer<int> x = new testlib.Pointer<int>(10, 4)
-    return x.get()
+    Foo<int> abc = new Foo<bool>(123)
+    return abc.foo()
 }

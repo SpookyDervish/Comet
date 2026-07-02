@@ -5,6 +5,7 @@
 #include "type.h"
 
 typedef struct CometFunction CometFunction;
+typedef struct CometASTNode CometASTNode;
 struct CometFunction {
     char name[32];
     uint32_t blockIdx;
@@ -15,6 +16,7 @@ struct CometFunction {
     bool isMethod;
     bool isExternal;
     int8_t libIdx;
+    CometASTNode* funcDef;
 };
 
 #endif

@@ -2,6 +2,17 @@
 #include "inst.h"
 
 CometFunction* copyFunction(CometCompiler* c, CometFunction* func, char* newName) {
-    CometOperand funcSymbol = buildFunction(c, newName, func->argCount, func->returnType, func->argTypes, func->isVarArgs, func->isMethod, func->isExternal, func->libIdx);
+    CometOperand funcSymbol = buildFunction(
+        c,
+        newName,
+        func->argCount,
+        func->returnType,
+        func->argTypes,
+        func->isVarArgs,
+        func->isMethod,
+        func->isExternal,
+        func->libIdx,
+        func->funcDef
+    );
     return c->functions[funcSymbol.symbolIdx];
 }
