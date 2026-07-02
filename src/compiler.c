@@ -4003,13 +4003,14 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
 
     for (size_t structIdx = 0; structIdx < c->structs.count; structIdx++) {
         CometStruct* structType = *get(c->structs, structIdx);
-        CometSerializedStruct* serializedStruct = serializeStruct(c->functions, structType);
+        CometSerializedStruct* serializedStruct = serializeStruct(c->functions, structType, structIdx);
 
         fwrite(serializedStruct->name, 1, 48, file);
         fwrite(&serializedStruct->numFields, 1, sizeof(uint32_t), file);
         fwrite(&serializedStruct->numMethods, 1, sizeof(uint32_t), file);
         fwrite(serializedStruct->vtable, sizeof(uint32_t), serializedStruct->numMethods, file);
         fwrite(&serializedStruct->numGenericTypes, sizeof(uint32_t), 1, file);
+        fwrite(&serializedStruct->structIdx, sizeof(uint32_t), 1, file);
 
         if (serializedStruct->numGenericTypes > 0) {
             fwrite(serializedStruct->genericTypes, sizeof(CometType), serializedStruct->numGenericTypes, file);

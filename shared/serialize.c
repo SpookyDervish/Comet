@@ -26,7 +26,7 @@ uint32_t serializeOperand(CometOperand operand) {
     }
 }
 
-CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType) {
+CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType, uint32_t idx) {
     CometSerializedStruct* serialized = calloc(1, sizeof(CometSerializedStruct));
     
     *serialized = (CometSerializedStruct){
@@ -47,6 +47,8 @@ CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruc
     if (structType->numGivenGenericTypes > 0) {
         serialized->genericTypes = structType->givenGenericTypes;
     }
+
+    serialized->structIdx = idx;
 
     return serialized;
     

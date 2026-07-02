@@ -596,6 +596,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
 
         newObj->vtable = vm->structs[inst.a].vtable;
         newObj->fields = calloc(vm->structs[inst.a].numFields, sizeof(int64_t));
+        newObj->structIdx = inst.a;
         
         pushValue(vm, (int64_t)newObj);
         DISPATCH();
@@ -821,8 +822,8 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
             cursor += sizeof(CometType) * numGenericTypes;
         }
 
-        
-        
+        memcpy(&newVM->structs[i].structIdx, cursor, sizeof(uint32_t));
+        cursor += sizeof(uint32_t);
     }
 
     

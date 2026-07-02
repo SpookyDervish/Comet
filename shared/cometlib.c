@@ -465,6 +465,7 @@ API_EXPORT CometObject* cometCreateObject(CometSerializedStruct* structType) {
 
     obj->fields = calloc(structType->numFields, sizeof(int64_t));
     obj->vtable = structType->vtable;
+    obj->structIdx = structType->structIdx;
 
     return obj;
 }
