@@ -129,7 +129,7 @@ char* typeToString(CometType type) {
                     APPEND_ESTR(buffer, typeToString(type.structType->givenGenericTypes[i]));
 
                     if (i < type.structType->numGivenGenericTypes - 1) {
-                        printf(", ");
+                        APPEND_ESTR(buffer, ", ");
                     }
                 }
                 APPEND_ESTR(buffer, ">");
@@ -163,7 +163,6 @@ bool methodIsGeneric(CometCompiler* c, CometMethod* method) {
 CometType* resolveGenericType(char* genericValTypeName, List(GenericTypeMapping) resolvedGenericTypes) {
     for (size_t genericIdx = 0; genericIdx < resolvedGenericTypes.count; genericIdx++) {
         GenericTypeMapping* resolvedGeneric = get(resolvedGenericTypes, genericIdx);
-        printf("%s, %s\n", resolvedGeneric->genericTypeName, genericValTypeName);
 
         if (strcmp(resolvedGeneric->genericTypeName, genericValTypeName) == 0) {
             return &resolvedGeneric->newType;
@@ -209,8 +208,8 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         if (cometStruct->fieldTypes[fieldIdx].typeKind != COMET_GENERIC)
             continue; // dont replace type of a field that doesnt use a generic type
 
+        
         CometType* resolvedGenericType = resolveGenericType(cometStruct->fieldTypes[fieldIdx].genericParamName, resolvedGenericTypes);
-        printf("%p\n", resolvedGenericType);
         newFieldTypes[fieldIdx] = *resolvedGenericType;
     }
 
@@ -221,16 +220,45 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         if (!methodIsGeneric(c, method)) 
             continue;
 
-        if (method->returnType.typeKind == COMET_GENERIC)
-            method->returnType = *resolveGenericType(method->returnType.genericParamName, resolvedGenericTypes);
+        // copy the function cause we dont wanna modify the base method
+        CometMethod* new = malloc(sizeof(CometMethod));
+        new->argCount = method->argCount;
+        new->blockIdx = method->blockIdx;
+        memcpy(new->name, method->name, 32);
+        new->returnType = method->returnType;
+        new->symbolIdx = method->symbolIdx;
+
+        if (new->returnType.typeKind == COMET_GENERIC)
+            new->returnType = *resolveGenericType(new->returnType.genericParamName, resolvedGenericTypes);
 
         CometFunction* funcPtr = c->functions[method->symbolIdx];
 
-        for (size_t argIdx = 0; argIdx < method->argCount; argIdx++) {
-            CometType genericArgType = funcPtr->argTypes[argIdx];
+        CometType* newArgTypes = malloc(sizeof(CometType) * funcPtr->argCount);
+        memcpy(newArgTypes, funcPtr->argTypes, sizeof(CometType) * funcPtr->argCount);
+
+        CometOperand symbolIdx = buildFunction(
+            c,
+            new->name,
+            funcPtr->argCount,
+            funcPtr->returnType,
+            newArgTypes,
+            funcPtr->isVarArgs,
+            funcPtr->isMethod,
+            funcPtr->isExternal,
+            funcPtr->libIdx
+        );
+
+        CometFunction* oldFunc = c->currentFunction;
+        Block* oldBlock = c->currentBlock;
+        CometFunction* newFunc = c->functions[symbolIdx.symbolIdx];
+        c->currentFunction = oldFunc;
+        c->currentBlock = oldBlock;
+
+        for (size_t argIdx = 0; argIdx < newFunc->argCount; argIdx++) {
+            CometType genericArgType = newArgTypes[argIdx];
 
             if (genericArgType.typeKind == COMET_GENERIC) {
-                funcPtr->argTypes[argIdx] = *resolveGenericType(genericArgType.genericParamName, resolvedGenericTypes);
+                newArgTypes[argIdx] = *resolveGenericType(genericArgType.genericParamName, resolvedGenericTypes);
             }
         }
         
@@ -3982,10 +4010,12 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         fwrite(&serializedStruct->numMethods, 1, sizeof(uint32_t), file);
         fwrite(serializedStruct->vtable, sizeof(uint32_t), serializedStruct->numMethods, file);
         fwrite(&serializedStruct->numGenericTypes, sizeof(uint32_t), 1, file);
-        
-        if (structType->numGenericTypes > 0)
+
+        if (serializedStruct->numGenericTypes > 0) {
             fwrite(serializedStruct->genericTypes, sizeof(CometType), serializedStruct->numGenericTypes, file);
+        }
     }
+
 
     for (size_t libIdx = 0; libIdx < c->libs.count; libIdx++) {
         char* libName = *get(c->libs, libIdx);

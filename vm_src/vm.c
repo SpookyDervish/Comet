@@ -787,9 +787,8 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     for (uint32_t i = 0; i < loadedFile->numStructs; i++) {
         uint32_t numFields;
         uint32_t numMethods;
-        char name[48];
 
-        memcpy(name, cursor, 48);
+        memcpy(newVM->structs[i].name, cursor, 48);
         cursor += 48;
 
         memcpy(&numFields, cursor, sizeof(uint32_t));
@@ -800,7 +799,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
         newVM->structs[i].numFields = numFields;
         newVM->structs[i].numMethods = numMethods;
-        memcpy(newVM->structs[i].name, name, 48);
+        
 
         newVM->structs[i].vtable =
             malloc(sizeof(uint32_t) * numMethods);
@@ -808,25 +807,34 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         memcpy(newVM->structs[i].vtable,
             cursor,
             sizeof(uint32_t) * numMethods);
+        cursor += sizeof(uint32_t) * numMethods;
 
         uint32_t numGenericTypes = 0;
         memcpy(&numGenericTypes, cursor, sizeof(uint32_t));
         newVM->structs[i].numGenericTypes = numGenericTypes;
         cursor += sizeof(uint32_t);
 
-        memcpy(newVM->structs[i].genericTypes, cursor, sizeof(CometType) * numGenericTypes);
-        cursor += sizeof(CometType) * numGenericTypes;
+        if (numGenericTypes > 0) {
+            CometType* genericTypes = malloc(sizeof(CometType) * numGenericTypes);
+            memcpy(genericTypes, cursor, sizeof(CometType) * numGenericTypes);
+            newVM->structs[i].genericTypes = genericTypes;
+            cursor += sizeof(CometType) * numGenericTypes;
+        }
 
-        cursor += sizeof(uint32_t) * numMethods;
+        
+        
     }
+
+    
 
     newVM->loadedLibs = calloc(loadedFile->numLibs, sizeof(void*));
     newVM->externalFuncs = calloc(loadedFile->numFunctions, sizeof(void*));
 
     newVM->numExternalFuncs = 0;
     for (size_t i = 0; i < loadedFile->numLibs; i++) {
-        char libName[128];
-        snprintf(libName, 128, "%s.cometlib", cursor);
+        char libName[64];
+        snprintf(libName, 64, "%s.cometlib", cursor);
+        cursor += 64;
 
         char* cometLibsPath = getLibsDir();
         if (!cometLibsPath) {
@@ -890,8 +898,6 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
 
             
         } 
-
-        cursor += 64;
     }
 
     // instructions
