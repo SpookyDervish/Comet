@@ -25,14 +25,17 @@ struct List <T> {
         return 0
     }
 
+    func pop() -> T {
+        self.length -= 1
+        return self.elements : self.length
+    }
+
     func at(int index) -> T {
         return self.elements : index
     }
 }
 
 func main() -> int {
-    List<int> test = new List<int>()
+    List<bool> test = new List<bool>()
     test.append(123)
-
-    return test.at(0)
 }
