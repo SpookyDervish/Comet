@@ -3011,10 +3011,22 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
         );
     }
 
-    // build the functions body
-    ResultType(CometOperand, ErrorMessage) bodyResult = compile(c, funcDef.program);
-    if (bodyResult.error)
-        return bodyResult;
+    if (funcDef.inlineExpr != NULL) { // its an inline function
+        // build the functions body
+        ResultType(CometOperand, ErrorMessage) exprResult = compile(c, funcDef.inlineExpr);
+        if (exprResult.error)
+            return exprResult;
+
+        // then return
+        buildReturn(c);
+    } else {
+        // build the functions body
+        ResultType(CometOperand, ErrorMessage) bodyResult = compile(c, funcDef.program);
+        if (bodyResult.error)
+            return bodyResult;
+    }
+
+    
 
     // return back to the parent scope
     c->env = destroyEnv(c->env);
