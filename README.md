@@ -24,8 +24,6 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [ ] Collections - data structures
     - [ ] List
     - [ ] Hashmap
-  - [ ] Memory - manual memory management
-  - [ ] Ansi - ANSI colour codes
   - [ ] String - string handling and management
 - [x] Imports
   - [x] Package system
