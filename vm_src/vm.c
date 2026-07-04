@@ -143,6 +143,19 @@ void returnFromFunc(CometVM* vm) {
     vm->currentFrame = &vm->callStack[vm->callIdx-1];
 }
 
+void newUninitList(CometVM* vm) {
+    int64_t length = popValue(vm);
+
+    CometSerializedArray* array = malloc(sizeof(CometSerializedArray));
+    int64_t* arrayData = calloc(sizeof(int64_t), length);
+
+    array->data = arrayData;
+    array->capacity = length;
+    array->elemType = (CometType){ .typeKind = COMET_SMALL };
+
+    pushValue(vm, (int64_t)array);
+}
+
 void buildList(CometVM* vm) {
     // get size
     int64_t size = popValue(vm);
@@ -274,7 +287,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&TRY,
         &&END_TRY,
         &&THROW,
-        &&LIST_LENGTH
+        &&LIST_LENGTH,
+        &&UNINIT_LIST
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -695,6 +709,11 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     LIST_LENGTH: {
         CometSerializedArray* array = (CometSerializedArray*)popValue(vm);
         pushValue(vm, (int64_t)array->capacity);
+
+        DISPATCH();
+    }
+    UNINIT_LIST: {
+        newUninitList(vm);
 
         DISPATCH();
     }

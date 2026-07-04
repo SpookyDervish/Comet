@@ -559,6 +559,15 @@ CometOperand buildListLength(CometCompiler* c) {
 
     return dest;
 }
+CometOperand buildUninitList(CometCompiler* c) {
+    popVal(c);
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_UNINIT_LIST, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+    
+}
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && typeIsFloat(after)) {
         buildI2F(c);

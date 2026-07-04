@@ -761,7 +761,7 @@ char* cometOperandToCStr(CometVM* vm, CometOperand operand) {
             CometSerializedFunc func = vm->functions[operand.symbolIdx];
 
             char* buffer = malloc(64);
-            sprintf(buffer, "func %s, %d args", func.name, func.numArgs); 
+            sprintf(buffer, "func %s, %d args (symbol idx: %d)", func.name, func.numArgs, operand.symbolIdx); 
             return buffer;
         }
 

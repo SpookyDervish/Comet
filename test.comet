@@ -1,11 +1,11 @@
-import io
-
 func main() -> int {
-    io.File f = new io.File("test.comet", "r")
 
-    io.println(f.readAll())
+    int[3] x = new int[3]
+    x : 0 = 1
+    x : 1 = 2
+    x : 2 = 3
 
-    f.close()
+    drop x
 
-    return 0
+    return x : 1
 }

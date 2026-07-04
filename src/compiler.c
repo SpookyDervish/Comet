@@ -184,7 +184,7 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
     for (size_t i = 0; i < c->cachedGenerics.count; i++) {
         CachedGenericStruct currentStruct = *get(c->cachedGenerics, i);
 
-        if (strcmp(currentStruct.structType->name, cometStruct->name) == 0) {
+        if (strcmp(currentStruct.baseStructName, cometStruct->name) == 0) {
 
             bool found = true;
 
@@ -200,6 +200,7 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
             }
         }
     }
+
 
     // create a mangled name for the instantiated struct
     Estr newStructName = CREATE_ESTR(cometStruct->name);
@@ -246,23 +247,13 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
 
         CometFunction* funcPtr = c->functions[method->symbolIdx];
 
-        // build new arg type list (include `self` for methods)
-        uint32_t origArgCount = funcPtr->argCount;
-        uint32_t newArgCount = origArgCount + (funcPtr->isMethod ? 1 : 0);
-        CometType* newArgTypes = calloc(newArgCount, sizeof(CometType));
+        CometType* newArgTypes = calloc(funcPtr->argCount, sizeof(CometType));
         if (!newArgTypes) return NULL;
 
-        if (funcPtr->isMethod) {
-            newArgTypes[0] = structType;
-            if (origArgCount > 0)
-                memcpy(newArgTypes + 1, funcPtr->argTypes, sizeof(CometType) * origArgCount);
-        } else {
-            if (origArgCount > 0)
-                memcpy(newArgTypes, funcPtr->argTypes, sizeof(CometType) * origArgCount);
-        }
+        memcpy(newArgTypes, funcPtr->argTypes, sizeof(CometType) * funcPtr->argCount);
 
         // resolve any generic arg/return types
-        for (size_t a = 0; a < newArgCount; a++) {
+        for (size_t a = 1; a < funcPtr->argCount; a++) {
             if (newArgTypes[a].typeKind == COMET_GENERIC) {
                 CometType* resolved = resolveGenericType(newArgTypes[a].genericParamName, resolvedGenericTypes);
                 if (resolved) newArgTypes[a] = *resolved;
@@ -280,15 +271,20 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         APPEND_ESTR(mangledName, "_");
         APPEND_ESTR(mangledName, method->name);
 
+        // struct MyStruct<T> { func foo() -> T } = int64_t impl_foo()
+
+        // MyStruct<int>
+        // struct MyStruct_int { func foo_int() -> T } = int64_t impl_foo_int()
+
         // create new function symbol and begin its block
         CometOperand symbolIdx = buildFunction(
             c,
-            mangledName.str,
-            newArgCount,
+            funcPtr->isExternal ? method->name : mangledName.str,
+            funcPtr->argCount,
             newReturnType,
             newArgTypes,
             funcPtr->isVarArgs,
-            funcPtr->isMethod,
+            true,
             funcPtr->isExternal,
             funcPtr->libIdx,
             funcPtr->funcDef
@@ -349,6 +345,41 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
         .baseStructName = cometStruct->name,
         .structDef = (GenericStructDef){ .name = cometStruct->name, .structDefNode = NULL }
     };
+
+    /*
+     * If the base struct (from a library) provided an external constructor named
+     * "<BaseName>_INIT" we need to create an alias for the instantiated generic
+     * so lookups for "<InstantiatedName>_INIT" succeed. This duplicates the
+     * CometFunction descriptor (so the alias has its own name) but keeps the
+     * remaining fields so calls dispatch to the same external implementation.
+     */
+    // create alias for external constructor if present
+    /*Estr baseCtorName = CREATE_ESTR(cometStruct->name);
+    APPEND_ESTR(baseCtorName, "_INIT");
+    int32_t baseCtorIdx = getSymbolIndex(c, baseCtorName.str);
+    if (baseCtorIdx != -1) {
+        CometFunction* baseFunc = c->functions[baseCtorIdx];
+        CometFunction* aliasFunc = malloc(sizeof(CometFunction));
+        if (aliasFunc) {
+            memcpy(aliasFunc, baseFunc, sizeof(CometFunction));
+
+            Estr newCtorName = CREATE_ESTR(newStructName.str);
+            APPEND_ESTR(newCtorName, "_INIT");
+
+            // ensure name buffer is nul-terminated and not overflowed
+            memset(aliasFunc->name, 0, sizeof(aliasFunc->name));
+            size_t copyLen = newCtorName.size < (sizeof(aliasFunc->name) - 1) ? newCtorName.size : (sizeof(aliasFunc->name) - 1);
+            memcpy(aliasFunc->name, newCtorName.str, copyLen);
+            aliasFunc->name[copyLen] = '\0';
+
+            // register alias in compiler function table
+            c->functions[c->functionCount] = aliasFunc;
+            c->functionCount++;
+
+            DESTROY_ESTR(newCtorName);
+        }
+    }
+    DESTROY_ESTR(baseCtorName);*/
 
     append(c->structs, newStruct);
     append(c->cachedGenerics, newGeneric);
@@ -504,6 +535,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
                     method->returnType = func->returnType;
                     method->blockIdx = func->blockIdx;
                     memcpy(method->name, func->name, 32);
+                    printf("external method %s with %d args\n", method->name, method->argCount);
 
                     // find symbol idx
 
@@ -1988,6 +2020,12 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
             return Success(CometType, ErrorMessage, varRecord->type);
         }
         case AST_NEW_STATEMENT: {
+            struct AST_TYPE typeData = node->data.AST_NEW_STATEMENT.structName->data.AST_TYPE;
+
+            if (typeData.dimensions > 0) { // new array
+                return getType(c, node->data.AST_NEW_STATEMENT.structName);
+            }
+
             ResultType(CometType, ErrorMessage) type = getType(c, node->data.AST_NEW_STATEMENT.structName);
             if (type.error)
                 return type;
@@ -3708,10 +3746,35 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
     c->currentLine = node->lineNum;
     struct AST_NEW_STATEMENT newStmt = node->data.AST_NEW_STATEMENT;
 
+    if (newStmt.structName->data.AST_TYPE.dimensions > 0) { // init array
+        for (size_t i = 0; i < newStmt.structName->data.AST_TYPE.dimensions; i++) {
+            CometASTNode* dimension = *get(newStmt.structName->data.AST_TYPE.shape, i);
+
+            ResultType(CometOperand, ErrorMessage) dimensionResult = visitValue(c, dimension);
+            if (dimensionResult.error)
+                return dimensionResult;
+
+            buildUninitList(c);
+        }
+
+        /*CometOperand dimensionsVal = createOperand(CO_IMMEDIATE);
+        dimensionsVal.imm.typeKind = COMET_INT;
+        dimensionsVal.imm.intVal = newStmt.structName->data.AST_TYPE.dimensions;
+
+        CometOperand dimensionsConst = storeConst(c, dimensionsVal);
+        buildPushConst(c, dimensionsConst);
+        buildUninitList(c);*/
+        return Success(CometOperand, ErrorMessage, NO_OPERAND);
+    }
+
     // get struct type
     ResultType(CometType, ErrorMessage) structType = getType(c, newStmt.structName);
     if (structType.error)
         return Error(CometOperand, ErrorMessage, structType.as.error);
+
+    if (structType.as.success.typeKind == COMET_ARRAY) {
+        buildUninitList(c);
+    }
     
     char* structName = structType.as.success.structType->name;
     int32_t idx = getStructIndex(c, structType.as.success.structType);
@@ -3749,8 +3812,6 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
 
         append(funcCallArgs, argValue.as.success);
     }
-
-    
 
     // call constructor
     Estr constructorName = CREATE_ESTR(structName);

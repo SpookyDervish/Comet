@@ -1896,13 +1896,18 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     if (structType.error)
         return structType;
 
-    parserNextToken(parser);
+    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType.as.success, NULL);
 
-    ResultType(argList, ErrorMessage) constructorArgs = parseFunctionCallArgs(parser);
-    if (constructorArgs.error)
-        return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
+    if (peekTokenIs(parser, CT_OPEN_PAREN)) {
+        parserNextToken(parser);
 
-    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType.as.success, constructorArgs.as.success);
+        ResultType(argList, ErrorMessage) constructorArgs = parseFunctionCallArgs(parser);
+        if (constructorArgs.error)
+            return Error(astNodePtr, ErrorMessage, constructorArgs.as.error);
+
+        stmt->data.AST_NEW_STATEMENT.args = constructorArgs.as.success;
+    }
+
     stmt->startCol = startCol;
     stmt->endCol = parser->currentToken->endCol;
 

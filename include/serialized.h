@@ -53,6 +53,9 @@ typedef enum {
     INST_END_TRY,
     INST_THROW,
     INST_LIST_LENGTH,
+    INST_UNINIT_LIST,
+    INST_DROP_LIST,
+    INST_DROP_STRUCT,
     INST_MAX
 } CometInstType;
 

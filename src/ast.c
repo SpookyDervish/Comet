@@ -7,6 +7,23 @@ CometASTNode* allocateNode(CometASTNode node) {
     return ptr;
 }
 
+bool nodeIsALiteral(CometASTNode* node) {
+    switch (node->nodeType) {
+        case AST_INT:
+        case AST_BOOL:
+        case AST_DOUBLE:
+        case AST_STRING:
+            return true;
+        
+        default:
+            return false;
+    }
+}
+
+uint64_t getNodeIntValue(CometASTNode* node) {
+    return node->data.AST_INT.number;
+}
+
 void freeNode(CometASTNode* node) {
     if (node == NULL) return;
 
