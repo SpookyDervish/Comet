@@ -535,7 +535,6 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
                     method->returnType = func->returnType;
                     method->blockIdx = func->blockIdx;
                     memcpy(method->name, func->name, 32);
-                    printf("external method %s with %d args\n", method->name, method->argCount);
 
                     // find symbol idx
 
@@ -2269,6 +2268,21 @@ ResultType(CometOperand, ErrorMessage) visitAssignStatement(CometCompiler* c, Co
     ResultType(CometType, ErrorMessage) varType = getType(c, node->data.AST_ASSIGN_STATEMENT.type);
     if (varType.error)
         return Error(CometOperand, ErrorMessage, varType.as.error);
+
+    if (varType.as.success.typeKind == COMET_VOID) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "BadType",
+            "You cannot create a variable of type \"void\"",
+            NULL,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
 
     if (!expr) { // no value was given, just give it a default value of 0
         CometOperand zeroVal = createOperand(CO_IMMEDIATE);

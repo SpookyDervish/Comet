@@ -288,7 +288,9 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&END_TRY,
         &&THROW,
         &&LIST_LENGTH,
-        &&UNINIT_LIST
+        &&UNINIT_LIST,
+        &&DROP_LIST,
+        &&DROP_STRUCT
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -714,6 +716,20 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     }
     UNINIT_LIST: {
         newUninitList(vm);
+
+        DISPATCH();
+    }
+    DROP_LIST: {
+        CometSerializedArray* array = (CometSerializedArray*)popValue(vm);
+
+        free(array->data);
+        free(array);
+        DISPATCH();
+    }
+    DROP_STRUCT: {
+        CometObject* object = (CometObject*)popValue(vm);
+        free(object->fields);
+        free(object);
 
         DISPATCH();
     }

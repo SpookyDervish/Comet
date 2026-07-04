@@ -1,3 +1,5 @@
+import io
+
 struct List <T> {
     T[*] elements
     int capacity
@@ -15,11 +17,14 @@ struct List <T> {
         self.length += 1
 
         if self.length == self.capacity {
-            drop self.elements
-
             self.capacity *= 2
 
+            T[*] old = self.elements
             self.elements = new T[self.capacity]
+
+            for int i in 0 .. self.length {
+                self.elements:i = old:i
+            }
         }
 
         return 0
@@ -36,6 +41,13 @@ struct List <T> {
 }
 
 func main() -> int {
-    List<bool> test = new List<bool>()
-    test.append(123)
+    
+    List<bool> myList = new List<bool>()
+
+    
+    for int i in 0 .. 100000 {
+        myList.append(123)
+    }
+    
+    return 0
 }
