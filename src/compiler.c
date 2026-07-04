@@ -943,7 +943,17 @@ ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, Co
         default: break;
     }
 
-    return Error(CometFunctionTypeInfo, ErrorMessage, "Attempted to call something which isn't a function!");
+    ErrorMessage errMsg = createError(
+        c->inputFilePath,
+        c->sourceCode,
+        "NotAFunction",
+        "Attempted to call something which isn't a function!",
+        NULL,
+        node->lineNum,
+        node->startCol,
+        node->endCol
+    );
+    return Error(CometFunctionTypeInfo, ErrorMessage, errMsg);
 }
 
 ResultType(CometType, ErrorMessage) getTypeByName(CometCompiler* c, char* typeName, CometASTNode* node) {
