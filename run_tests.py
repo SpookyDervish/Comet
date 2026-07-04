@@ -26,7 +26,7 @@ def make_test(case: str):
         result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-O0", "-o", obj_name])
         self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (cometc)!")
         
-        program_result = subprocess.run(["./comet", obj_name])
+        program_result = subprocess.run(["./comet", obj_name], stdout=subprocess.PIPE)
         self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully (comet)!")
     return test
 
