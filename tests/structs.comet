@@ -30,11 +30,11 @@ struct Child : Vector {
 
 func main() -> int {
     Vector myVector = new Vector(1, 2, 3)
-    io.print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+    io.print("myVector.x = %n, myVector.y = %n, myVector.z = %n\n", myVector.x, myVector.y, myVector.z)
 
     myVector.add(new Vector(1, 2, 3))
 
-    io.print("myVector.x = %d, myVector.y = %d, myVector.z = %d\n", myVector.x, myVector.y, myVector.z)
+    io.print("myVector.x = %n, myVector.y = %n, myVector.z = %n\n", myVector.x, myVector.y, myVector.z)
 
     io.print("test\n")
     Child myChildVector = new Child(1, 2, 3)

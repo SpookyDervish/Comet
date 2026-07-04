@@ -6,6 +6,6 @@ func main() -> int {
     int a = 2
     int b = 6
 
-    io.print("%d + %d = %d\n", a, b, add(a, b))
+    io.print("%n + %n = %n\n", a, b, add(a, b))
     return 0
 }
