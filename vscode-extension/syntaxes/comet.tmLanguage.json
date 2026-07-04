@@ -43,7 +43,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.comet",
-				"match": "\\b(if|self|while|for|return|import|func|struct|mut|private|protected|readonly|override|init|in|new|can|enum|step|else|break|continue|breakpoint|try|except|throw)\\b"
+				"match": "\\b(if|self|while|for|return|import|func|struct|mut|private|protected|readonly|override|init|in|new|can|enum|step|else|break|continue|breakpoint|try|except|throw|drop)\\b"
 			}]
 		},
 

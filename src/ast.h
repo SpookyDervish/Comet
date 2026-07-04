@@ -51,6 +51,7 @@ typedef enum {
     AST_BREAKPOINT_STATEMENT,
     AST_TRY_STATEMENT,
     AST_THROW_STATEMENT,
+    AST_DROP_STATEMENT,
 
     // expressions
     AST_INFIX_EXPRESSION,
@@ -157,6 +158,10 @@ struct CometASTNode {
         struct AST_THROW_STATEMENT {
             CometASTNode* newStmt;
         } AST_THROW_STATEMENT;
+
+        struct AST_DROP_STATEMENT {
+            CometASTNode* value;
+        } AST_DROP_STATEMENT;
 
     } data;  
 

@@ -3167,7 +3167,6 @@ ResultType(CometOperand, ErrorMessage) visitIfStatement(CometCompiler* c, CometA
     }
 
     resolveLabel(c, endLabel);
-    
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
@@ -4073,6 +4072,62 @@ ResultType(CometOperand, ErrorMessage) visitThrowStatement(CometCompiler* c, Com
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
+ResultType(CometOperand, ErrorMessage) visitDropStatement(CometCompiler* c, CometASTNode* node) {
+    CometASTNode* valueNode = node->data.AST_DROP_STATEMENT.value;
+
+    ResultType(CometType, ErrorMessage) valueType = resolveType(c, valueNode);
+    if (valueType.error)
+        return Error(CometOperand, ErrorMessage, valueType.as.error);
+
+    ResultType(CometOperand, ErrorMessage) value = visitValue(c, valueNode);
+    if (value.error)
+        return value;
+
+    switch (valueType.as.success.typeKind) {
+        case COMET_ARRAY:
+            buildDropList(c);
+            break;
+
+        case COMET_STRUCT: {
+            // look for destructor
+            Estr destructorName = CREATE_ESTR(valueType.as.success.structType->name);
+            APPEND_ESTR(destructorName, "_DESTROY");
+
+            int32_t destructorSymbolIdx = getSymbolIndex(c, destructorName.str);
+            if (destructorSymbolIdx != -1) {
+                List(CometOperand) args = newList(CometOperand);
+                append(args, value.as.success);
+
+                buildCall(c, destructorName.str, args);
+            }
+
+            buildDropStruct(c);
+            break;
+        }
+
+        default: {
+            Estr buffer = CREATE_ESTR("Cannot drop non-heap-allocated value of type \"");
+            APPEND_ESTR(buffer, typeToString(valueType.as.success));
+            APPEND_ESTR(buffer, "\"");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeError",
+                buffer.str,
+                NULL,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+    }
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 // -- MAIN -- //
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols) {
     FILE* file = fopen(filePath, "wb");
@@ -4093,14 +4148,16 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
 
     uint64_t instCount = 0;
     for (size_t blockIdx = 0; blockIdx < c->blocks.count; blockIdx++) {
+        Block currBlock = *get(c->blocks, blockIdx);
+
         // resolve labels
-        for (size_t labelIdx = 0; labelIdx < c->labelCount; labelIdx++) {
-            CometLabel* label = c->labels[labelIdx];
+        for (size_t labelIdx = 0; labelIdx < currBlock.labels.count; labelIdx++) {
+            CometLabel* label = *get(currBlock.labels, labelIdx);
             label->pos = instCount + label->blockPos;
             label->resolved = true;
         }
 
-        instCount += (*get(c->blocks, blockIdx)).instructions.count;
+        instCount += currBlock.instructions.count;
     }
 
     CometFile cometFile = {
@@ -4344,6 +4401,8 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitTryStatement(c, node);
         case AST_THROW_STATEMENT:
             return visitThrowStatement(c, node);
+        case AST_DROP_STATEMENT:
+            return visitDropStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

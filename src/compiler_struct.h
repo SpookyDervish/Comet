@@ -13,10 +13,14 @@
 
 typedef char* charptr;
 
+typedef CometLabel* labelPtr;
+
 UseList(CometInst);
+UseList(labelPtr);
 typedef struct Block Block;
 struct Block {
     List(CometInst) instructions;
+    List(labelPtr) labels;
     Block* parent;
 };
 
@@ -28,7 +32,6 @@ typedef struct {
     uint32_t stackIdx;
     uint32_t constIdx;
     uint32_t functionCount;
-    uint32_t labelCount;
 
     bool includeDebugSymbols;
     uint64_t currentLine;
@@ -44,7 +47,6 @@ typedef struct {
     Block* currentBlock;
 
     CometOperand consts[512];
-    CometLabel* labels[512];
     CometFunction* functions[128];
     CometFunction* currentFunction;
     CometEnvironment* env;

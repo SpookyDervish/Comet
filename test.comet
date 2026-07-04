@@ -1,11 +1,38 @@
+struct List <T> {
+    T[*] elements
+    int capacity
+    int length
+
+    init() {
+        self.length = 0
+        self.capacity = 8
+        self.elements = new T[self.capacity]
+    }
+
+    func append(T elem) -> void {
+        self.elements : self.length = elem
+
+        self.length += 1
+
+        if self.length == self.capacity {
+            drop self.elements
+
+            self.capacity *= 2
+
+            self.elements = new T[self.capacity]
+        }
+
+        return 0
+    }
+
+    func at(int index) -> T {
+        return self.elements : index
+    }
+}
+
 func main() -> int {
+    List<int> test = new List<int>()
+    test.append(123)
 
-    int[3] x = new int[3]
-    x : 0 = 1
-    x : 1 = 2
-    x : 2 = 3
-
-    drop x
-
-    return x : 1
+    return test.at(0)
 }

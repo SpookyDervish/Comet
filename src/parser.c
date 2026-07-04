@@ -32,7 +32,7 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_GTE, PRECEDENCE_LESSGREATER},
     {CT_EQ_EQ, PRECEDENCE_EQUALS},
     {CT_NOT_EQ, PRECEDENCE_EQUALS},
-    {CT_DOT, PRECEDENCE_INDEX},
+    {CT_DOT, PRECEDENCE_DOT},
     {CT_HASH, PRECEDENCE_INDEX},
     {CT_EQ, PRECEDENCE_SET},
     {CT_OPEN_PAREN, PRECEDENCE_CALL},
@@ -665,6 +665,11 @@ void printNode(CometASTNode* node) {
             break;
         case AST_BREAKPOINT_STATEMENT:
             printf("breakpoint\n");
+            break;
+
+        case AST_DROP_STATEMENT:
+            printf("drop ");
+            printNode(node->data.AST_DROP_STATEMENT.value);
             break;
 
         default:
@@ -2023,6 +2028,23 @@ ResultType(astNodePtr, ErrorMessage) parseThrowStatement(CometParser* parser) {
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
+ResultType(astNodePtr, ErrorMessage) parseDropStatement(CometParser* parser) {
+    uint32_t lineNumber = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    parserNextToken(parser); // skip "drop"
+
+    ResultType(astNodePtr, ErrorMessage) value = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (value.error)
+        return value;
+
+    CometASTNode* stmt = AST_NODE(AST_DROP_STATEMENT, lineNumber, value.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
+
+    return Success(astNodePtr, ErrorMessage, stmt);
+}
+
 ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -2063,6 +2085,8 @@ ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttr
         return parseTryStatement(parser);
     } else if (strcmp(keyword, "throw") == 0) {
         return parseThrowStatement(parser);
+    } else if (strcmp(keyword, "drop") == 0) {
+        return parseDropStatement(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "Keyword \"%s\" was unexpected.", keyword);

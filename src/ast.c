@@ -62,6 +62,16 @@ void freeNode(CometASTNode* node) {
             freeNode(node->data.AST_WHILE_STATEMENT.program);
             break;
         }
+        case AST_IF_STATEMENT: {
+            freeNode(node->data.AST_IF_STATEMENT.program);
+            freeNode(node->data.AST_IF_STATEMENT.expression);
+            freeNode(node->data.AST_IF_STATEMENT.elseProgram);
+            break;
+        }
+        case AST_DROP_STATEMENT: {
+            freeNode(node->data.AST_DROP_STATEMENT.value);
+            break;
+        }
         case AST_FUNC_CALL: {
             for (size_t i = 0; i < node->data.AST_FUNC_CALL.args.count; i++) {
                 freeNode(*get(node->data.AST_FUNC_CALL.args, i));

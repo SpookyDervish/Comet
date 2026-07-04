@@ -568,6 +568,14 @@ CometOperand buildUninitList(CometCompiler* c) {
     return dest;
     
 }
+
+void buildDropStruct(CometCompiler* c) {
+    buildInst(c, INST_DROP_STRUCT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+}
+void buildDropList(CometCompiler* c) {
+    buildInst(c, INST_DROP_LIST, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+}
+
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && typeIsFloat(after)) {
         buildI2F(c);
@@ -587,8 +595,7 @@ CometLabel* buildLabel(CometCompiler* c) {
     CometLabel* newLabel = malloc(sizeof(CometLabel));
     newLabel->resolved = false;
 
-    c->labels[c->labelCount] = newLabel;
-    c->labelCount++;
+    append(c->currentBlock->labels, newLabel);
 
     return newLabel;
 }
@@ -601,6 +608,7 @@ void resolveLabel(CometCompiler* c, CometLabel* label) {
 Block* startBlock(CometCompiler* c) {
     Block newBlock = {
         .instructions = newList(CometInst),
+        .labels = newList(labelPtr),
         .parent = c->currentBlock
     };
     append(c->blocks, newBlock);
