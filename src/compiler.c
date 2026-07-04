@@ -3616,6 +3616,16 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         structType->vtable[i] = parentStruct->vtable[i];
     }
 
+    CometType* typePtr = malloc(sizeof(CometType));
+
+    CometType resultStructType = {
+        .typeKind = COMET_STRUCT,
+        .structType = structType
+    };
+    *typePtr = resultStructType;
+
+    defineType(c->typeMap, structName, resultStructType);
+
     uint32_t vtableIdx = parentMethodCount;
     uint32_t fieldIdx = parentFieldCount;
     for (size_t i = 0; i < structDef.fieldDefs.count; i++) {
@@ -3752,15 +3762,6 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     if (constructorResult.error)
         return Error(cometTypePtr, ErrorMessage, constructorResult.as.error);
 
-    CometType* typePtr = malloc(sizeof(CometType));
-
-    CometType resultStructType = {
-        .typeKind = COMET_STRUCT,
-        .structType = structType
-    };
-    *typePtr = resultStructType;
-
-    defineType(c->typeMap, structName, resultStructType);
     append(c->structs, structType);
 
     return Success(cometTypePtr, ErrorMessage, typePtr);
