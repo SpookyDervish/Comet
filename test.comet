@@ -1,7 +1,15 @@
-import io
+struct Foo {
+    private int[*] items
 
-func main() -> void {
-    io.println("%n", 10 / 0)
+    init() {
+        self.items = new int[3]
+    }
+}
 
-    return
+func main() -> int {
+    Foo myStruct = new Foo()
+
+    myStruct.items : 0 = 1
+
+    return myStruct.items:0
 }

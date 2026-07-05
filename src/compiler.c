@@ -2295,6 +2295,7 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
 
                     FieldAttribute fieldAttrib = left.as.success.structType->fieldAttribs[fieldIdx];
                     CometStruct* fieldOwner = left.as.success.structType->fieldOwners[fieldIdx];
+
                     ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(c, expr.right, fieldOwner, fieldName, fieldAttrib, false);
                     if (canAccess.error)
                         return Error(CometType, ErrorMessage, canAccess.as.error);
@@ -3818,6 +3819,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     structType->fieldAttribs = calloc(structType->fieldCount, sizeof(FieldAttribute));
     structType->fieldOwners = calloc(structType->fieldCount, sizeof(cometStructPtr));
     structType->vtable = calloc(structType->numMethods, sizeof(CometMethod*));
+    structType->numGenericTypes = 0;
+    structType->numGivenGenericTypes = 0;
 
     CometType generalStructType = {
         .typeKind = COMET_STRUCT,
@@ -3860,6 +3863,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 structType->fieldAttribs[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.attrib;
                 structType->fieldTypes[fieldIdx] = fieldType.as.success;
                 structType->fieldOwners[fieldIdx++] = structType;
+
                 break;
             }
 
