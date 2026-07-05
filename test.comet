@@ -5,15 +5,17 @@ struct Foo {
         return 123
     }
 
-    override func foo() -> bool {
-        return true
-    }
-
     init() {}
 }
 
+struct Bar : Foo {
+    init() {
+        super(self)
+    }
+}
+
 func main() -> int {
-    Foo test = new Foo()
+    Bar test = new Bar()
 
     return test.x
 }

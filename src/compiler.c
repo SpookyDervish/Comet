@@ -4131,8 +4131,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 char* fieldName = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
                 // ensure there aren't duplicate fields
-                for (size_t i = 0; i < fieldIdx; i++) {
-                    if (strcmp(structType->fieldNames[i], fieldName) == 0) {
+                for (size_t duplicateFieldIdx = 0; duplicateFieldIdx < fieldIdx; duplicateFieldIdx++) {
+                    if (strcmp(structType->fieldNames[duplicateFieldIdx], fieldName) == 0) {
                         Estr buffer = CREATE_ESTR("Redefinition of field \"");
                         APPEND_ESTR(buffer, fieldName);
                         APPEND_ESTR(buffer, "\" in struct \"");
@@ -4257,8 +4257,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
 
                 // ensure there aren't duplicate methods
                 char* funcDefName = fieldDef->data.AST_FUNC_DEF_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-                for (size_t i = 0; i < vtableIdx; i++) {
-                    if (strcmp(structType->vtable[i]->name, funcDefName) == 0) {
+                for (size_t duplicateMethodIdx = 0; duplicateMethodIdx < vtableIdx; duplicateMethodIdx++) {
+                    if (strcmp(structType->vtable[duplicateMethodIdx]->name, funcDefName) == 0) {
                         Estr buffer = CREATE_ESTR("Redefinition of method \"");
                         APPEND_ESTR(buffer, funcDefName);
                         APPEND_ESTR(buffer, "\" in struct \"");
