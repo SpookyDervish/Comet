@@ -52,6 +52,11 @@ char* typeToString(CometType type) {
             written += snprintf(buffer + written, remaining, "%s(", f->name);
             remaining = buffsize - written;
 
+            if (f->argCount == 0) {
+                written += snprintf(buffer + written, remaining, ") -> ");
+                remaining = buffsize - written;
+            }
+
             for (size_t i = 0; i < f->argCount; i++) {
                 if (i >= f->argCount-1) // end of args
 
