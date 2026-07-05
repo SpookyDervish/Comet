@@ -1191,11 +1191,15 @@ ResultType(cometTypePtr, ErrorMessage) generateGenericStruct(CometCompiler* c, G
         APPEND_ESTR(genericNameEnding, typeToString(*get(resolvedGenericTypes, i)));
     }
 
+    CometFunction* oldCurrFunc = c->currentFunction;
+    Block* oldCurrBlock = c->currentBlock;
+
     ResultType(cometTypePtr, ErrorMessage) genericStructInstance = visitStructDefStatement(c, structDef.structDefNode, true, genericNameEnding.str);
     if (genericStructInstance.error)
         return Error(cometTypePtr, ErrorMessage, genericStructInstance.as.error);
 
-    
+    c->currentFunction = oldCurrFunc;
+    c->currentBlock = oldCurrBlock;
 
     c->typeMap = destroyTypeMap(c->typeMap);
 
@@ -2290,7 +2294,10 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                     if (canAccess.error)
                         return Error(CometType, ErrorMessage, canAccess.as.error);
 
+                    
+
                     CometType fieldType = left.as.success.structType->fieldTypes[fieldIdx];
+                    printf("%s\n", typeToString(fieldType));
 
                     return Success(CometType, ErrorMessage, fieldType);
                 }
@@ -3113,12 +3120,14 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
     if (returnType.error)
         return Error(CometOperand, ErrorMessage, returnType.as.error);
 
+    
     // build the function start and define the function in the current scope
     CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, false, -1, node);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
     };
+    printf("return type = %s\n", typeToString(getValueType(c, funcValue).functionType->returnType));
     defineVar(c->env, funcName, RECORD_LOCAL, funcValue, funcType, false);
 
     // create the new scope for the function
@@ -3194,6 +3203,12 @@ ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, Co
         ResultType(CometType, ErrorMessage) returnValueType = resolveType(c, returnExpr);
         if (returnValueType.error)
             return Error(CometOperand, ErrorMessage, returnValueType.as.error);
+
+        printNode(returnExpr);
+        printf("\n");
+
+        printf("%s\n", typeToString(returnValueType.as.success));
+        printf("%s\n", typeToString(c->currentFunction->returnType));
 
         if (!typesAreEqual(returnValueType.as.success, c->currentFunction->returnType)) {
             Estr help = CREATE_ESTR("Function has a return type of ");
@@ -4008,13 +4023,6 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
             buildUninitList(c);
         }
 
-        /*CometOperand dimensionsVal = createOperand(CO_IMMEDIATE);
-        dimensionsVal.imm.typeKind = COMET_INT;
-        dimensionsVal.imm.intVal = newStmt.structName->data.AST_TYPE.dimensions;
-
-        CometOperand dimensionsConst = storeConst(c, dimensionsVal);
-        buildPushConst(c, dimensionsConst);
-        buildUninitList(c);*/
         return Success(CometOperand, ErrorMessage, NO_OPERAND);
     }
 
@@ -4052,23 +4060,13 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
     // make new instance
     buildNew(c, idx);
 
-    // push args for constructor
-    List(CometOperand) funcCallArgs = newList(CometOperand);
-    for (size_t argIdx = 0; argIdx < newStmt.args.count; argIdx++) {
-        CometASTNode* argNode = *get(newStmt.args, argIdx);
-
-        ResultType(CometOperand, ErrorMessage) argValue = visitValue(c, argNode);
-        if (argValue.error)
-            return argValue;
-
-        append(funcCallArgs, argValue.as.success);
-    }
-
     // call constructor
     Estr constructorName = CREATE_ESTR(structName);
     APPEND_ESTR(constructorName, "_INIT");
 
-    if (getSymbolIndex(c, constructorName.str) == -1) {
+    int32_t constructorSymbolIdx = getSymbolIndex(c, constructorName.str);
+
+    if (constructorSymbolIdx == -1) {
         Estr buffer = CREATE_ESTR("Could not find constructor for struct \"");
         APPEND_ESTR(buffer, structName);
         APPEND_ESTR(buffer, "\"");
@@ -4083,6 +4081,101 @@ ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, Comet
             node->startCol,
             node->endCol
         );
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
+    CometOperand constructorSymbol = createOperand(CO_SYMBOL);
+    constructorSymbol.symbolIdx = constructorSymbolIdx;
+
+    CometFunction* func = getSymbol(c, constructorSymbol);
+    uint32_t neededArgCount = func->argCount - 1;
+
+    // push args for constructor
+    List(CometOperand) funcCallArgs = newList(CometOperand);
+    for (size_t argIdx = 0; argIdx < newStmt.args.count; argIdx++) {
+        CometASTNode* argNode = *get(newStmt.args, argIdx);
+
+        ResultType(CometOperand, ErrorMessage) argValue = visitValue(c, argNode);
+        if (argValue.error)
+            return argValue;
+
+        ResultType(CometType, ErrorMessage) argType = resolveType(c, argNode);
+        if (argType.error)
+            return Error(CometOperand, ErrorMessage, argType.as.error);
+
+        size_t actualArgIdx = argIdx + 1;
+        if (argIdx < neededArgCount &&
+            !typesAreEqual(argType.as.success, func->argTypes[actualArgIdx]) &&
+            !canImplicitCastType(func->argTypes[actualArgIdx], argType.as.success)) {
+            char* buffer = malloc(128);
+            snprintf(buffer, 128, "Argument %zu in constructor of \"%s\" is the wrong type", actualArgIdx, structName);
+
+            char* help = malloc(256);
+            snprintf(
+                help,
+                256,
+                "Expected %s but got %s. Full constructor signature is %s",
+                typeToString(func->argTypes[actualArgIdx]),
+                typeToString(argType.as.success),
+                typeToString((CometType){ .typeKind = COMET_FUNCTION, .functionType = func })
+            );
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeMismatch",
+                buffer,
+                help,
+                argNode->lineNum,
+                argNode->startCol,
+                argNode->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+
+        append(funcCallArgs, argValue.as.success);
+    }
+
+    if (newStmt.args.count < neededArgCount) {
+        Estr buffer = CREATE_ESTR("Not enough args passed to constructor of \"");
+        APPEND_ESTR(buffer, structName);
+        APPEND_ESTR(buffer, "\"");
+
+        char* help = malloc(64);
+        snprintf(help, 64, "Constructor expects %d args but got %zu.", neededArgCount, newStmt.args.count);
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "NotEnoughArgs",
+            buffer.str,
+            help,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    } else if (newStmt.args.count > neededArgCount && !func->isVarArgs) {
+        Estr buffer = CREATE_ESTR("Too many args passed to constructor of \"");
+        APPEND_ESTR(buffer, structName);
+        APPEND_ESTR(buffer, "\"");
+
+        char* help = malloc(64);
+        snprintf(help, 64, "Constructor expects %d args but got %zu.", neededArgCount, newStmt.args.count);
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "TooManyArgs",
+            buffer.str,
+            help,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
         return Error(CometOperand, ErrorMessage, errMsg);
     }
 

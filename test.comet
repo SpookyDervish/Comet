@@ -1,3 +1,13 @@
+struct Foo <T> {
+    T value
+
+    init(T value) {
+        self.value = value
+    }
+}
+
 func main() -> int {
-    return 0
+    Foo<int> x = new Foo<int>(123)
+
+    return x.value
 }
