@@ -549,7 +549,8 @@ void printNode(CometASTNode* node) {
             break;
         case AST_RETURN_STATEMENT:
             printf("return ");
-            printNode(node->data.AST_RETURN_STATEMENT.expression);
+            if (node->data.AST_RETURN_STATEMENT.expression)
+                printNode(node->data.AST_RETURN_STATEMENT.expression);
             break;
         case AST_IF_STATEMENT:
             printf("if ");
@@ -1687,15 +1688,26 @@ ResultType(astNodePtr, ErrorMessage) parseReturnStatement(CometParser* parser) {
     uint32_t lineNum = parser->currentToken->lineNum;
     uint32_t startCol = parser->currentToken->startCol;
 
+    CometASTNode* stmt = AST_NODE(AST_RETURN_STATEMENT, lineNum, NULL);
+    stmt->startCol = startCol;
+    
+    if (peekTokenIs(parser, CT_CLOSE_CURLY)) {
+        stmt->endCol = parser->currentToken->endCol;
+       
+        return Success(astNodePtr, ErrorMessage, stmt);
+    }
+
     parserNextToken(parser);
+
+    
+
     ResultType(astNodePtr, ErrorMessage) expr = parseExpression(parser, PRECEDENCE_LOWEST);
     if (expr.error) {
         return expr;
     }
+    stmt->data.AST_RETURN_STATEMENT.expression = expr.as.success;
 
-    CometASTNode* stmt = AST_NODE(AST_RETURN_STATEMENT, expr.as.success->lineNum, expr.as.success);
-    stmt->startCol = startCol;
-    stmt->endCol = expr.as.success->endCol;
+    stmt->endCol = parser->currentToken->endCol;
 
     return Success(astNodePtr, ErrorMessage, stmt);
 }

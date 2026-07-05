@@ -169,6 +169,9 @@ ResultType(CometToken, ErrorMessage) lexerParseWord(CometLexer* lexer) {
 
         CometToken boolTok = booleanToken(buffer);
         free(buffer);
+
+        boolTok.startCol = startColumn;
+        boolTok.endCol = lexer->column;
         return Success(CometToken, ErrorMessage, boolTok);
 
     } else {

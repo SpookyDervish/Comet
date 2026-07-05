@@ -3172,13 +3172,54 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, CometASTNode* node) {
+    CometASTNode* returnExpr = node->data.AST_RETURN_STATEMENT.expression;
+    
     c->currentLine = node->lineNum;
     if (c->currentFunction->returnType.typeKind != COMET_VOID) {
-        ResultType(CometOperand, ErrorMessage) returnValue = visitValue(c, node->data.AST_RETURN_STATEMENT.expression);
+        if (!returnExpr) {
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "MissingReturnVale",
+                "You forgot to include a return value when returning from a non-void function",
+                NULL,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+
+        ResultType(CometType, ErrorMessage) returnValueType = resolveType(c, returnExpr);
+        if (returnValueType.error)
+            return Error(CometOperand, ErrorMessage, returnValueType.as.error);
+
+        if (!typesAreEqual(returnValueType.as.success, c->currentFunction->returnType)) {
+            Estr help = CREATE_ESTR("Function has a return type of ");
+            APPEND_ESTR(help, typeToString(c->currentFunction->returnType));
+            APPEND_ESTR(help, " but you are returning ");
+            APPEND_ESTR(help, typeToString(returnValueType.as.success));
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeMismatch",
+                "Return value and function return type don't match",
+                help.str,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+
+        ResultType(CometOperand, ErrorMessage) returnValue = visitValue(c, returnExpr);
         if (returnValue.error)
             return returnValue;
     }
-    
+
     buildReturn(c);
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
