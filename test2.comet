@@ -1,0 +1,11 @@
+enum Colour {
+    Red, Green, Blue
+}
+
+struct Foo {
+    readonly int x
+
+    init(int x) {
+        self.x = x
+    }
+}

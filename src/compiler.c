@@ -1374,6 +1374,18 @@ ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList ch
                     return Error(cometTypePtr, ErrorMessage, errMsg);
                 }
 
+                // for libs written in comet
+                switch (attribRecord->type.typeKind) {
+                    case COMET_ENUM:
+                    case COMET_STRUCT: {
+                        CometType* ptr = malloc(sizeof(CometType));
+                        *ptr = attribRecord->type;
+                        return Success(cometTypePtr, ErrorMessage, ptr);
+                    }
+                    default:
+                        break;
+                }
+
                 if (attribRecord->type.typeKind != COMET_TYPE) {
                     Estr buffer = CREATE_ESTR("Attribute \"");
                     APPEND_ESTR(buffer, attribName);
@@ -3900,7 +3912,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
 
     c->currentStruct = structType;
 
-    char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
+    char* structName = strdup(structDef.ident->data.AST_IDENTIFIER.ident);
 
     if (genericNameEnding) {
         Estr mangledName = CREATE_ESTR(structName);
@@ -4008,6 +4020,37 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
         .structType = structType
     };
 
+    // define the struct as a variable in the current scope so that we can use it from other modules
+    CometOperand structVarType = createOperand(CO_IMMEDIATE);
+    structVarType.imm.typeKind = COMET_TYPE;
+    structVarType.imm.typeVal = generalStructType;
+
+    CometType structTypeWrapper = {
+        .typeKind = COMET_TYPE
+    };
+
+    Record* existingVar = lookup(c->env, structName);
+    if (existingVar) {
+        Estr buffer = CREATE_ESTR("Redefinition of \"");
+        APPEND_ESTR(buffer, structName);
+        APPEND_ESTR(buffer, "\"")
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "VariableRedefinition",
+            buffer.str,
+            NULL,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(cometTypePtr, ErrorMessage, errMsg);
+    }
+
+    defineVar(c->env, structName, RECORD_LOCAL, structVarType, structTypeWrapper, false);
+
     // if we inherit from another struct then pull in its methods and fields
     for (size_t i = 0; i < parentFieldCount; i++) {
         structType->fieldNames[i] = parentStruct->fieldNames[i];
@@ -4040,7 +4083,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 if (fieldType.error)
                     return Error(cometTypePtr, ErrorMessage, fieldType.as.error);
 
-                structType->fieldNames[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+                structType->fieldNames[fieldIdx] = strdup(fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident);
                 structType->fieldAttribs[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.attrib;
                 structType->fieldTypes[fieldIdx] = fieldType.as.success;
                 structType->fieldOwners[fieldIdx++] = structType;
@@ -4662,7 +4705,7 @@ ResultType(CometOperand, ErrorMessage) visitDropStatement(CometCompiler* c, Come
 
 ResultType(CometOperand, ErrorMessage) visitEnumDefStatement(CometCompiler* c, CometASTNode* node) {
     struct AST_ENUM_DEF enumDef = node->data.AST_ENUM_DEF;
-    char* enumName = enumDef.ident->data.AST_IDENTIFIER.ident;
+    char* enumName = strdup(enumDef.ident->data.AST_IDENTIFIER.ident);
 
     CometEnumType* enumType = malloc(sizeof(CometEnumType));
     enumType->enumName = enumName;
@@ -4699,7 +4742,7 @@ ResultType(CometOperand, ErrorMessage) visitEnumDefStatement(CometCompiler* c, C
             }
         }
 
-        append(enumItemNames, itemName);
+        append(enumItemNames, strdup(itemName));
     }
 
     enumType->valueNames = enumItemNames.pointer;

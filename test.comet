@@ -1,13 +1,10 @@
-enum Colour {
-    Red,
-    Green,
-    Blue
-}
-
-enum Colour {
-    Orange
-}
+import test2
 
 func main() -> int {
-    return Colour.Red + 1 == Colour.Green
+    test2.Colour someColour = test2.Colour.Red
+
+    test2.Foo x = new test2.Foo(123)
+    x.x = 50
+
+    return x.x
 }
