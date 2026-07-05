@@ -8,7 +8,7 @@ struct Foo {
     }
 
     as string {
-        return "hello"
+        return io as string
     }
 }
 
