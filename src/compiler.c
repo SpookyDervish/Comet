@@ -2297,7 +2297,6 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                     
 
                     CometType fieldType = left.as.success.structType->fieldTypes[fieldIdx];
-                    printf("%s\n", typeToString(fieldType));
 
                     return Success(CometType, ErrorMessage, fieldType);
                 }
@@ -3127,7 +3126,7 @@ ResultType(CometOperand, ErrorMessage) visitFuncDefStatement(CometCompiler* c, C
         .typeKind = COMET_FUNCTION,
         .functionType = getValueType(c, funcValue).functionType
     };
-    printf("return type = %s\n", typeToString(getValueType(c, funcValue).functionType->returnType));
+
     defineVar(c->env, funcName, RECORD_LOCAL, funcValue, funcType, false);
 
     // create the new scope for the function
@@ -3203,12 +3202,6 @@ ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, Co
         ResultType(CometType, ErrorMessage) returnValueType = resolveType(c, returnExpr);
         if (returnValueType.error)
             return Error(CometOperand, ErrorMessage, returnValueType.as.error);
-
-        printNode(returnExpr);
-        printf("\n");
-
-        printf("%s\n", typeToString(returnValueType.as.success));
-        printf("%s\n", typeToString(c->currentFunction->returnType));
 
         if (!typesAreEqual(returnValueType.as.success, c->currentFunction->returnType)) {
             Estr help = CREATE_ESTR("Function has a return type of ");
