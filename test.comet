@@ -1,10 +1,18 @@
-import test2
+struct Foo {
+    readonly int x = 123
+
+    init() {}
+}
+
+struct Bar : Foo {
+    init() {
+        super(self)
+        self.x = 5
+    }
+}
 
 func main() -> int {
-    test2.Colour someColour = test2.Colour.Red
+    Bar test = new Bar()
 
-    test2.Foo x = new test2.Foo(123)
-    x.x = 50
-
-    return x.x
+    return test.x
 }

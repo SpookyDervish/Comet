@@ -202,7 +202,7 @@ ResultType(voidPtr, ErrorMessage) checkFieldPerms(CometCompiler* c, CometASTNode
 
         return Error(voidPtr, ErrorMessage, errMsg);
     } else if (fieldAttrib == FIELD_PROTECTED) {
-        if (!c->currentStruct || !typesAreEqual(fieldOwnerType, currStructType)) {
+        if (!c->currentStruct || !typesAreEqual(currStructType, fieldOwnerType)) {
             Estr buffer = CREATE_ESTR("The field \"");
             APPEND_ESTR(buffer, fieldName);
             APPEND_ESTR(buffer, "\" in the struct \"");
@@ -223,7 +223,7 @@ ResultType(voidPtr, ErrorMessage) checkFieldPerms(CometCompiler* c, CometASTNode
             return Error(voidPtr, ErrorMessage, errMsg);
         }
     } else if (fieldAttrib == FIELD_READ_ONLY) {
-        if (writing && (!c->currentStruct || !typesAreEqual(fieldOwnerType, currStructType))) {
+        if (writing && (!c->currentStruct || !typesAreEqual(currStructType, fieldOwnerType))) {
             Estr buffer = CREATE_ESTR("The field \"");
             APPEND_ESTR(buffer, fieldName);
             APPEND_ESTR(buffer, "\" in the struct \"");
@@ -3630,7 +3630,7 @@ ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, Comet
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
-ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct) {
+ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompiler* c, CometASTNode* node, char* constructorName, CometType structType, CometStruct* parentStruct, CometASTNode** defaultFieldValues, size_t numDefaultValues) {
     c->currentLine = node->lineNum;
     struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
 
@@ -3713,6 +3713,52 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
             superValType,
             false
         );
+    }
+
+    // build default values
+    if (numDefaultValues > 0) {
+        for (size_t fieldIdx = 0; fieldIdx < structType.structType->fieldCount; fieldIdx++) {
+            if (!defaultFieldValues[fieldIdx]) continue;
+
+            CometType fieldType = structType.structType->fieldTypes[fieldIdx];
+
+            CometASTNode* defaultValueNode = defaultFieldValues[fieldIdx];
+
+            // resolve default value and then set the field
+            ResultType(CometType, ErrorMessage) defaultValueType = resolveType(c, defaultValueNode);
+            if (defaultValueType.error)
+                return Error(CometOperand, ErrorMessage, defaultValueType.as.error);
+
+            if (!typesAreEqual(defaultValueType.as.success, fieldType) &&
+                !canImplicitCastType(fieldType, defaultValueType.as.success)) {
+                
+                Estr help = CREATE_ESTR("Field is type ");
+                APPEND_ESTR(help, typeToString(fieldType));
+                APPEND_ESTR(help, " but expression is type ");
+                APPEND_ESTR(help, typeToString(defaultValueType.as.success));
+
+                ErrorMessage errMsg = createError(
+                    c->inputFilePath,
+                    c->sourceCode,
+                    "TypeMismatch",
+                    "Field type and expression type don't match in assignment.",
+                    help.str,
+                    defaultValueNode->lineNum,
+                    defaultValueNode->startCol,
+                    defaultValueNode->endCol
+                );
+
+                return Error(CometOperand, ErrorMessage, errMsg);
+            }
+
+            ResultType(CometOperand, ErrorMessage) defaultValue = visitValue(c, defaultFieldValues[fieldIdx]);
+            if (defaultValue.error)
+                return Error(CometOperand, ErrorMessage, defaultValue.as.error);
+
+            buildLoadArg(c, selfIdx);
+
+            buildSetField(c, fieldIdx);
+        }
     }
 
     // build the functions body
@@ -4015,6 +4061,9 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     structType->numGenericTypes = 0;
     structType->numGivenGenericTypes = 0;
 
+    CometASTNode** defaultFieldValues = calloc(structType->fieldCount, sizeof(CometASTNode*));
+    size_t numDefaultValues = 0;
+
     CometType generalStructType = {
         .typeKind = COMET_STRUCT,
         .structType = structType
@@ -4083,10 +4132,16 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 if (fieldType.error)
                     return Error(cometTypePtr, ErrorMessage, fieldType.as.error);
 
+                defaultFieldValues[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.expression;
+                if (defaultFieldValues[fieldIdx])
+                    numDefaultValues++;
+
                 structType->fieldNames[fieldIdx] = strdup(fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident);
                 structType->fieldAttribs[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.attrib;
                 structType->fieldTypes[fieldIdx] = fieldType.as.success;
                 structType->fieldOwners[fieldIdx++] = structType;
+
+                
 
                 break;
             }
@@ -4225,7 +4280,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     Estr constructorName = CREATE_ESTR(strdup(structName));
     APPEND_ESTR(constructorName, "_INIT");
 
-    ResultType(CometOperand, ErrorMessage) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct);
+    ResultType(CometOperand, ErrorMessage) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct, defaultFieldValues, numDefaultValues);
     if (constructorResult.error)
         return Error(cometTypePtr, ErrorMessage, constructorResult.as.error);
 
