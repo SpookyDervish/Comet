@@ -4,6 +4,10 @@ enum Colour {
     Blue
 }
 
+enum Colour {
+    Orange
+}
+
 func main() -> int {
     return Colour.Red + 1 == Colour.Green
 }

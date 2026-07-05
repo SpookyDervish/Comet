@@ -4715,6 +4715,26 @@ ResultType(CometOperand, ErrorMessage) visitEnumDefStatement(CometCompiler* c, C
     enumValue.imm.typeKind = COMET_TYPE;
     enumValue.imm.typeVal = enumTypeWrapper;
 
+    Record* existingVar = lookup(c->env, enumName);
+    if (existingVar) {
+        Estr buffer = CREATE_ESTR("Redefinition of \"");
+        APPEND_ESTR(buffer, enumName);
+        APPEND_ESTR(buffer, "\"")
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "VariableRedefinition",
+            buffer.str,
+            NULL,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
     defineVar(c->env, enumName, RECORD_LOCAL, enumValue, enumTypeWrapper, false);
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
