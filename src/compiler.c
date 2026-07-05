@@ -160,6 +160,85 @@ bool methodIsGeneric(CometCompiler* c, CometMethod* method) {
     return false;
 }
 
+ResultType(voidPtr, ErrorMessage) checkFieldPerms(CometCompiler* c, CometASTNode* fieldNode, CometStruct* fieldOwner, char* fieldName, FieldAttribute fieldAttrib, bool writing) {
+    CometType currStructType = {
+        .typeKind = COMET_STRUCT,
+        .structType = c->currentStruct
+    };
+
+    CometType fieldOwnerType = {
+        .typeKind = COMET_STRUCT,
+        .structType = fieldOwner
+    };
+
+    if (fieldAttrib == FIELD_PRIVATE && (!c->currentStruct || c->currentStruct != fieldOwner)) {
+        
+
+        Estr buffer = CREATE_ESTR("The field \"");
+        APPEND_ESTR(buffer, fieldName);
+        APPEND_ESTR(buffer, "\" in the struct \"");
+        APPEND_ESTR(buffer, typeToString(fieldOwnerType));
+        APPEND_ESTR(buffer, "\" is private.");
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "CantAccessField",
+            buffer.str,
+            NULL,
+            fieldNode->lineNum,
+            fieldNode->startCol,
+            fieldNode->endCol
+        );
+
+        return Error(voidPtr, ErrorMessage, errMsg);
+    } else if (fieldAttrib == FIELD_PROTECTED) {
+        if (!c->currentStruct || !typesAreEqual(fieldOwnerType, currStructType)) {
+            Estr buffer = CREATE_ESTR("The field \"");
+            APPEND_ESTR(buffer, fieldName);
+            APPEND_ESTR(buffer, "\" in the struct \"");
+            APPEND_ESTR(buffer, typeToString(fieldOwnerType));
+            APPEND_ESTR(buffer, "\" is protected.");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "CantAccessField",
+                buffer.str,
+                NULL,
+                fieldNode->lineNum,
+                fieldNode->startCol,
+                fieldNode->endCol
+            );
+
+            return Error(voidPtr, ErrorMessage, errMsg);
+        }
+    } else if (fieldAttrib == FIELD_READ_ONLY) {
+        if (writing && (!c->currentStruct || !typesAreEqual(fieldOwnerType, currStructType))) {
+            Estr buffer = CREATE_ESTR("The field \"");
+            APPEND_ESTR(buffer, fieldName);
+            APPEND_ESTR(buffer, "\" in the struct \"");
+            APPEND_ESTR(buffer, typeToString(fieldOwnerType));
+            APPEND_ESTR(buffer, "\" is read-only.");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "CantAccessField",
+                buffer.str,
+                NULL,
+                fieldNode->lineNum,
+                fieldNode->startCol,
+                fieldNode->endCol
+            );
+
+            return Error(voidPtr, ErrorMessage, errMsg);
+        }
+    }
+
+    return Success(voidPtr, ErrorMessage, NULL);
+}
+
 CometType* resolveGenericType(char* genericValTypeName, List(GenericTypeMapping) resolvedGenericTypes) {
     for (size_t genericIdx = 0; genericIdx < resolvedGenericTypes.count; genericIdx++) {
         GenericTypeMapping* resolvedGeneric = get(resolvedGenericTypes, genericIdx);
@@ -923,6 +1002,13 @@ ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, Co
                 return Error(CometFunctionTypeInfo, ErrorMessage, errMsg);
             }
 
+            // check if we're able to get the method
+            CometMethod* method = structType.as.success.structType->vtable[methodIdx];
+            
+            ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(c, expr.right, method->owner, method->name, method->attrib, false);
+            if (canAccess.error) 
+                return Error(CometFunctionTypeInfo, ErrorMessage, canAccess.as.error);
+
             CometOperand funcValue = createOperand(CO_SYMBOL);
             funcValue.symbolIdx = structType.as.success.structType->vtable[methodIdx]->symbolIdx;
 
@@ -1521,6 +1607,12 @@ ResultType(voidPtr, ErrorMessage) visitLValue(CometCompiler* c, CometASTNode* no
 
                         return Error(voidPtr, ErrorMessage, errMsg);
                     }
+
+                    FieldAttribute fieldAttrib = leftType.as.success.structType->fieldAttribs[fieldIndex];
+                    CometStruct* fieldOwner = leftType.as.success.structType->fieldOwners[fieldIndex];
+                    ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(c, expr.right, fieldOwner, fieldName, fieldAttrib, true);
+                    if (canAccess.error)
+                        return canAccess;
 
                     buildGetField(c, fieldIndex);
                     break;
@@ -2166,6 +2258,9 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                         return Success(CometType, ErrorMessage, funcType);
                     }
 
+                    if (getMethodIndex(left.as.success.structType, fieldName) != -1) {
+                        return Error(CometType, ErrorMessage, funcInfo.as.error);
+                    }
                     
                     int32_t fieldIdx = getFieldIndex(left.as.success.structType, fieldName);
                     if (fieldIdx == -1) {
@@ -2188,6 +2283,12 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
 
                         return Error(CometType, ErrorMessage, errMsg);
                     }
+
+                    FieldAttribute fieldAttrib = left.as.success.structType->fieldAttribs[fieldIdx];
+                    CometStruct* fieldOwner = left.as.success.structType->fieldOwners[fieldIdx];
+                    ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(c, expr.right, fieldOwner, fieldName, fieldAttrib, false);
+                    if (canAccess.error)
+                        return Error(CometType, ErrorMessage, canAccess.as.error);
 
                     CometType fieldType = left.as.success.structType->fieldTypes[fieldIdx];
 
@@ -2376,7 +2477,36 @@ ResultType(CometOperand, ErrorMessage) visitFieldReassignStatement(CometCompiler
         return Error(CometOperand, ErrorMessage, errMsg);
     }
 
-    int32_t fieldIndex = getFieldIndex(structType.as.success.structType, expr.right->data.AST_IDENTIFIER.ident);
+    char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
+    int32_t fieldIndex = getFieldIndex(structType.as.success.structType, fieldName);
+
+    if (fieldIndex == -1) {
+        Estr buffer = CREATE_ESTR("Struct \"");
+        APPEND_ESTR(buffer, typeToString(structType.as.success));
+        APPEND_ESTR(buffer, "\" doesn't have a field named \"");
+        APPEND_ESTR(buffer, fieldName);
+        APPEND_ESTR(buffer, "\"");
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "FieldNotFound",
+            buffer.str,
+            NULL,
+            expr.right->lineNum,
+            expr.right->startCol,
+            expr.right->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
+    FieldAttribute fieldAttrib = structType.as.success.structType->fieldAttribs[fieldIndex];
+    CometStruct* fieldOwner = structType.as.success.structType->fieldOwners[fieldIndex];
+    ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(c, expr.right, fieldOwner, fieldName, fieldAttrib, true);
+    if (canAccess.error)
+        return Error(CometOperand, ErrorMessage, canAccess.as.error);
+
     ResultType(CometType, ErrorMessage) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
     if (exprType.error)
         return Error(CometOperand, ErrorMessage, exprType.as.error);
@@ -2733,6 +2863,7 @@ ResultType(CometOperand, ErrorMessage) getField(CometCompiler* c, CometASTNode* 
         return structValue;
 
     int32_t fieldIdx = getFieldIndex(structType.as.success.structType, fieldName);
+
     if (fieldIdx == -1) {
         Estr buffer = CREATE_ESTR("Struct \"");
         APPEND_ESTR(buffer, typeToString(structType.as.success));
@@ -2753,6 +2884,12 @@ ResultType(CometOperand, ErrorMessage) getField(CometCompiler* c, CometASTNode* 
 
         return Error(CometOperand, ErrorMessage, errMsg);
     }
+
+    FieldAttribute fieldAttrib = structType.as.success.structType->fieldAttribs[fieldIdx];
+    CometStruct* fieldOwner = structType.as.success.structType->fieldOwners[fieldIdx];
+    ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(c, field, fieldOwner, fieldName, fieldAttrib, false);
+    if (canAccess.error)
+        return Error(CometOperand, ErrorMessage, canAccess.as.error);
 
     CometOperand dest = buildGetField(c, fieldIdx);
 
@@ -3514,6 +3651,9 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     }
 
     CometStruct* structType = malloc(sizeof(CometStruct));
+
+    c->currentStruct = structType;
+
     char* structName = structDef.ident->data.AST_IDENTIFIER.ident;
 
     if (genericNameEnding) {
@@ -3611,6 +3751,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     structType->numMethods = methodCount;
     structType->fieldNames = calloc(structType->fieldCount, sizeof(char*));
     structType->fieldTypes = calloc(structType->fieldCount, sizeof(CometType));
+    structType->fieldAttribs = calloc(structType->fieldCount, sizeof(FieldAttribute));
+    structType->fieldOwners = calloc(structType->fieldCount, sizeof(cometStructPtr));
     structType->vtable = calloc(structType->numMethods, sizeof(CometMethod*));
 
     CometType generalStructType = {
@@ -3622,9 +3764,10 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     for (size_t i = 0; i < parentFieldCount; i++) {
         structType->fieldNames[i] = parentStruct->fieldNames[i];
         structType->fieldTypes[i] = parentStruct->fieldTypes[i];
+        structType->fieldAttribs[i] = parentStruct->fieldAttribs[i];
+        structType->fieldOwners[i] = parentStruct->fieldOwners[i];
     }
-    for (size_t i = 0; i < parentMethodCount; i++) {
-        
+    for (size_t i = 0; i < parentMethodCount; i++) {   
         structType->vtable[i] = parentStruct->vtable[i];
     }
 
@@ -3650,7 +3793,9 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                     return Error(cometTypePtr, ErrorMessage, fieldType.as.error);
 
                 structType->fieldNames[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-                structType->fieldTypes[fieldIdx++] = fieldType.as.success;
+                structType->fieldAttribs[fieldIdx] = fieldDef->data.AST_ASSIGN_STATEMENT.attrib;
+                structType->fieldTypes[fieldIdx] = fieldType.as.success;
+                structType->fieldOwners[fieldIdx++] = structType;
                 break;
             }
 
@@ -3664,7 +3809,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                     ErrorMessage errMsg = createError(
                         c->inputFilePath,
                         c->sourceCode,
-                        "SemanticError",
+                        "CantOverrideMethod",
                         buffer.str,
                         NULL,
                         node->lineNum,
@@ -3675,7 +3820,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                     return Error(cometTypePtr, ErrorMessage, errMsg);
                 }
 
-                ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef, generalStructType);
+                CometASTNode* funcDef = fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef;
+                ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, funcDef, generalStructType);
                 if (result.error)
                     return Error(cometTypePtr, ErrorMessage, result.as.error);
 
@@ -3702,6 +3848,19 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                     return Error(cometTypePtr, ErrorMessage, errMsg);
                 }
 
+                
+                CometMethod* parentMethod = parentStruct->vtable[parentMethodIdx];
+                ResultType(voidPtr, ErrorMessage) canAccess = checkFieldPerms(
+                    c,
+                    fieldDef,
+                    parentMethod->owner,
+                    function->name,
+                    parentMethod->attrib,
+                    true
+                );
+                if (canAccess.error)
+                    return Error(cometTypePtr, ErrorMessage, canAccess.as.error);
+
                 Estr newFuncName = CREATE_ESTR(structName);
                 APPEND_ESTR(newFuncName, "_");
                 APPEND_ESTR(newFuncName, function->name);
@@ -3712,6 +3871,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 newMethod->argCount = function->argCount;
                 newMethod->blockIdx = function->blockIdx,
                 newMethod->symbolIdx = result.as.success.symbolIdx;
+                newMethod->attrib = parentMethod->attrib;
+                newMethod->owner = parentMethod->owner;
 
                 DESTROY_ESTR(newFuncName);
 
@@ -3737,6 +3898,8 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 newMethod->argCount = function->argCount;
                 newMethod->blockIdx = function->blockIdx,
                 newMethod->symbolIdx = result.as.success.symbolIdx;
+                newMethod->owner = structType;
+                newMethod->attrib = fieldDef->data.AST_FUNC_DEF_STATEMENT.attrib;
 
                 DESTROY_ESTR(newFuncName);
 
@@ -3774,6 +3937,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     if (constructorResult.error)
         return Error(cometTypePtr, ErrorMessage, constructorResult.as.error);
 
+    c->currentStruct = NULL;
     append(c->structs, structType);
 
     return Success(cometTypePtr, ErrorMessage, typePtr);
@@ -4239,12 +4403,7 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         fwrite(&serializedStruct->numFields, 1, sizeof(uint32_t), file);
         fwrite(&serializedStruct->numMethods, 1, sizeof(uint32_t), file);
         fwrite(serializedStruct->vtable, sizeof(uint32_t), serializedStruct->numMethods, file);
-        fwrite(&serializedStruct->numGenericTypes, sizeof(uint32_t), 1, file);
         fwrite(&serializedStruct->structIdx, sizeof(uint32_t), 1, file);
-
-        if (serializedStruct->numGenericTypes > 0) {
-            fwrite(serializedStruct->genericTypes, sizeof(CometType), serializedStruct->numGenericTypes, file);
-        }
     }
 
 
@@ -4360,6 +4519,7 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     newCompiler->typeMap = newTypemap(NULL);
     newCompiler->libs = newList(charptr);
     newCompiler->currentFunction = NULL;
+    newCompiler->currentStruct = NULL;
     newCompiler->inputFilePath = inputFilePath;
     newCompiler->sourceCode = sourceCode;
     newCompiler->currentLine = 0;

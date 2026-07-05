@@ -845,18 +845,6 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
             sizeof(uint32_t) * numMethods);
         cursor += sizeof(uint32_t) * numMethods;
 
-        uint32_t numGenericTypes = 0;
-        memcpy(&numGenericTypes, cursor, sizeof(uint32_t));
-        newVM->structs[i].numGenericTypes = numGenericTypes;
-        cursor += sizeof(uint32_t);
-
-        if (numGenericTypes > 0) {
-            CometType* genericTypes = malloc(sizeof(CometType) * numGenericTypes);
-            memcpy(genericTypes, cursor, sizeof(CometType) * numGenericTypes);
-            newVM->structs[i].genericTypes = genericTypes;
-            cursor += sizeof(CometType) * numGenericTypes;
-        }
-
         memcpy(&newVM->structs[i].structIdx, cursor, sizeof(uint32_t));
         cursor += sizeof(uint32_t);
     }

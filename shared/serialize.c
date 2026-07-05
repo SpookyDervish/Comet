@@ -43,11 +43,6 @@ CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruc
         serialized->vtable[i] = method->symbolIdx;
     }
 
-    serialized->numGenericTypes = structType->numGivenGenericTypes;
-    if (structType->numGivenGenericTypes > 0) {
-        serialized->genericTypes = structType->givenGenericTypes;
-    }
-
     serialized->structIdx = idx;
 
     return serialized;

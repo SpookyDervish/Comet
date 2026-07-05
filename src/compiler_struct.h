@@ -49,6 +49,7 @@ typedef struct {
     CometOperand consts[512];
     CometFunction* functions[128];
     CometFunction* currentFunction;
+    CometStruct* currentStruct;
     CometEnvironment* env;
     CometTypeMap* typeMap;
     List(cometStructPtr) structs;

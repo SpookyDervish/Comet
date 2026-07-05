@@ -22,6 +22,8 @@ struct CometStruct {
     uint32_t fieldCount;
     char** fieldNames;
     CometType* fieldTypes;
+    FieldAttribute* fieldAttribs;
+    CometStruct** fieldOwners;
     char* name;
     CometStruct* parent;
 

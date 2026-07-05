@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "list.h"
+#include "struct.h"
 
 #define MAX_ARRAY_DEPTH 8
 
@@ -64,6 +65,8 @@ struct CometMethod {
     uint32_t argCount;
     uint32_t symbolIdx;
     CometType returnType;
+    CometStruct* owner;
+    FieldAttribute attrib;
 };
 
 typedef enum {
