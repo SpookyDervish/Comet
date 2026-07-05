@@ -1,4 +1,4 @@
-#include "typemap.h"
+#include "../include/typemap.h"
 
 CometTypeMap* newTypemap(CometTypeMap* parent) {
     CometTypeMap* newMap = malloc(sizeof(CometTypeMap));

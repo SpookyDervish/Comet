@@ -543,8 +543,11 @@ CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOpe
 void buildBreakpoint(CometCompiler* c) {
     buildInst(c, INST_BREAKPOINT, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
-void buildTry(CometCompiler* c) {
-    buildInst(c, INST_TRY, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+void buildTry(CometCompiler* c, CometLabel* exceptLabel) {
+    CometOperand labelOperand = createOperand(CO_LABEL);
+    labelOperand.label = exceptLabel;
+
+    buildInst(c, INST_TRY, labelOperand, NO_OPERAND, NO_OPERAND);
 }
 void buildEndTry(CometCompiler* c) {
     buildInst(c, INST_END_TRY, NO_OPERAND, NO_OPERAND, NO_OPERAND);

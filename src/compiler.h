@@ -15,7 +15,7 @@
 #include "../include/util.h"
 #include "../include/debug.h"
 #include "../include/cometlib.h"
-#include "typemap.h"
+#include "../include/typemap.h"
 
 typedef void* voidPtr;
 

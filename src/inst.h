@@ -9,9 +9,9 @@
 #include "../include/function.h"
 #include "../include/debug.h"
 #include "../include/error_message.h"
+#include "../include/typemap.h"
 #include "ast.h"
 #include "compiler_struct.h"
-#include "typemap.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,7 +73,7 @@ CometOperand buildGetField(CometCompiler* c, uint32_t idx);
 void buildSetField(CometCompiler* c, uint32_t idx);
 CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args);
 void buildBreakpoint(CometCompiler* c);
-void buildTry(CometCompiler* c);
+void buildTry(CometCompiler* c, CometLabel* exceptLabel);
 void buildEndTry(CometCompiler* c);
 void buildThrow(CometCompiler* c);
 CometOperand buildListLength(CometCompiler* c);

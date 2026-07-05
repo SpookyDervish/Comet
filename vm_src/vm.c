@@ -21,6 +21,16 @@ Result(voidPtr, charptr);
 #define FORCE_INLINE __attribute__((always_inline)) static inline
 
 
+int32_t getStructIndex(CometVM* vm, char* structName) {
+    for (uint32_t i = 0; i < vm->numStructs; i++) {
+        if (strcmp(vm->structs[i].name, structName) == 0) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 void createBreakpoint(CometVM* vm) {
     vm->breakpoints[vm->currentFrame->ip - 1] = 1;
 }
@@ -229,6 +239,28 @@ void vmThrow(CometVM* vm, char* errName, char* msg, CometObject* errPtr) {
 
         
         exit(1);
+    }
+
+    if (errPtr == NULL) {
+        int32_t exceptStructIdx = getStructIndex(vm, "Exception");
+
+        CometSerializedStruct exceptStruct = vm->structs[exceptStructIdx];
+        CometObject* newObj = malloc(sizeof(CometObject));
+
+        newObj->vtable = exceptStruct.vtable;
+        newObj->fields = calloc(exceptStruct.numFields, sizeof(int64_t));
+        newObj->structIdx = exceptStructIdx;
+
+        CometOperand nameArray = CArrayToCometArray(errName, strlen(errName) + 1, cometTypeSmall);
+        int64_t serializedName = cometSerializeValue(nameArray);
+
+        CometOperand messageArray = CArrayToCometArray(msg, strlen(msg) + 1, cometTypeSmall);
+        int64_t serializedMessage = cometSerializeValue(messageArray);
+
+        newObj->fields[0] = serializedName;
+        newObj->fields[1] = serializedMessage;
+
+        errPtr = newObj;
     }
 
     ExceptFrame frame = vm->exceptStack[--vm->currentExcept];
@@ -681,7 +713,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     }
     TRY: {
         vm->exceptStack[vm->currentExcept++] = (ExceptFrame){
-            .handlerIP = popValue(vm),
+            .handlerIP = inst.a,
             .restoredSP = vm->sp
         };
         DISPATCH();
@@ -693,11 +725,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
     THROW: {
         CometObject* exception = (CometObject*)popValue(vm);
 
-        CometSerializedArray* exceptNameArr = (CometSerializedArray*)exception->fields[0];
-        char* exceptName = malloc(exceptNameArr->capacity);
-        for (size_t i = 0; i < exceptNameArr->capacity; i++) {
-            exceptName[i] = exceptNameArr->data[i];
-        }
+        char* exceptName = vm->structs[exception->structIdx].name;
 
         CometSerializedArray* exceptMsgArr = (CometSerializedArray*)exception->fields[1];
         char* exceptMsg = malloc(exceptMsgArr->capacity);

@@ -537,7 +537,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
     }
 
     dlerror();
-    void (*onLibImport)(CometEnvironment* env) = dlsym(handle, "onImport");
+    void (*onLibImport)(CometEnvironment* env, CometTypeMap* typeMap) = dlsym(handle, "onImport");
     if (!onLibImport) {
         dlclose(handle);
 
@@ -571,7 +571,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
 
     CometEnvironment* oldEnv = c->env;
     CometEnvironment* libEnv = newEnvironment("externalLib", c->env, false); 
-    onLibImport(libEnv);
+    onLibImport(libEnv, c->typeMap);
 
     // whenever an external lib creates a function we need to create a symbol for it in the compiler
 
@@ -4363,13 +4363,7 @@ ResultType(CometOperand, ErrorMessage) visitTryStatement(CometCompiler* c, Comet
     resolveLabel(c, tryLabel);
 
     // push except handler onto stack
-    CometOperand exceptPos = createOperand(CO_IMMEDIATE);
-    exceptPos.imm.typeKind = COMET_BIG;
-    exceptPos.imm.bigVal = exceptLabel->pos;
-    CometOperand exceptConst = storeConst(c, exceptPos);
-    buildPushConst(c, exceptConst);
-
-    buildTry(c);
+    buildTry(c, exceptLabel);
 
     ResultType(CometOperand, ErrorMessage) tryBody = compile(c, node->data.AST_TRY_STATEMENT.tryBlock);
     if (tryBody.error)
@@ -4585,44 +4579,6 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
     return Success(voidPtr, ErrorMessage, NULL);
 }
 
-ResultType(int64_t, objectPtr) impl_Exception_INIT(int64_t* args, CometVM* vm) {
-    CometObject* exception = (CometObject*)args[0];
-    exception->fields[0] = args[1];
-    exception->fields[1] = args[2];
-    return Success(int64_t, objectPtr, (int64_t)exception);
-}
-
-void createExceptionType(CometCompiler* c) {
-    List(StructField) fields = newList(StructField);
-    StructField nameField    = { .name = "name",    .type = cometTypeString };
-    StructField messageField = { .name = "message", .type = cometTypeString };
-    append(fields, nameField);
-    append(fields, messageField);
-
-    List(cometFuncPtr) methods = newList(cometFuncPtr);
-
-    CometStruct* exceptionStruct = cometDefineStruct(NULL, "Exception", NULL);
-    cometSetStructFieldsAndMethods(exceptionStruct, fields, methods);
-
-    cometDefineConstructor(NULL, exceptionStruct, 2, false, cometTypeString, cometTypeString);
-
-    append(c->structs, exceptionStruct);
-
-
-    // add to type map
-    CometType exceptionType = {
-        .typeKind = COMET_STRUCT,
-        .structType = exceptionStruct
-    };
-
-    CometTypeMapEntry typeMapEntry = {
-        .name = "Exception",
-        .type = exceptionType
-    };
-
-    defineType(c->typeMap, "Exception", exceptionType);
-}
-
 void createPointerType(CometCompiler* c) {
     CometType ptrType;
 
@@ -4637,6 +4593,21 @@ void createPointerType(CometCompiler* c) {
 
     defineType(c->typeMap, "ptr", ptrType);
 
+}
+
+ResultType(CometOperand, ErrorMessage) importCoreLib(CometCompiler* c) {
+    char* libsPath = getLibsDir();
+    if (libsPath == NULL)
+        libsPath = "";
+
+    char fullPath[256];
+    snprintf(fullPath, 256, "%s/%s.cometlib", libsPath, "core");
+
+    ResultType(CometOperand, ErrorMessage) result = loadExternalLib(c, fullPath, "core");
+    if (result.error)
+        return result;
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
 ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols) {
@@ -4656,7 +4627,8 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     }
 
     newCompiler->stackIdx = 0;
-    newCompiler->env = newEnvironment("root", NULL, false);
+    newCompiler->rootEnv = newEnvironment("root", NULL, false);
+    newCompiler->env = newCompiler->rootEnv;
     newCompiler->structs = newList(cometStructPtr);
     newCompiler->typeMap = newTypemap(NULL);
     newCompiler->libs = newList(charptr);
@@ -4694,9 +4666,22 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     stringType.arrayType = stringArrayType;
 
     defineType(newCompiler->typeMap, "string", stringType);
-
-    createExceptionType(newCompiler);
     createPointerType(newCompiler);
+
+    // import corelib
+    ResultType(CometOperand, ErrorMessage) coreLibResult = importCoreLib(newCompiler);
+    if (coreLibResult.error) {
+        destroyTypeMap(newCompiler->typeMap);
+        destroyEnv(newCompiler->env);
+        destroy(newCompiler->structs);
+        destroy(newCompiler->libs);
+        destroy(newCompiler->debugInstInfo);
+        destroy(newCompiler->cachedGenerics);
+        destroy(newCompiler->genericDefinitions);
+        destroy(newCompiler->blocks);
+        free(newCompiler);
+        return Error(cometCompilerPtr, ErrorMessage, coreLibResult.as.error);
+    }
 
     // return new compiler
     

@@ -2,7 +2,7 @@
 #define TYPEMAP_H
 
 #include <uthash.h>
-#include "../include/type.h"
+#include "type.h"
 
 typedef struct {
     char* name;

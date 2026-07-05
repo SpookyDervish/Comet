@@ -1,3 +1,7 @@
+import io
+
 func main() -> void {
-    drop main
+    io.println("%n", 10 / 0)
+
+    return
 }

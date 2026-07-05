@@ -5,7 +5,7 @@
 #include "../include/comet_operand.h"
 #include "../include/struct.h"
 #include "../include/serialized.h"
-#include "typemap.h"
+#include "../include/typemap.h"
 #include "generic.h"
 #include <stdint.h>
 
@@ -51,6 +51,7 @@ typedef struct {
     CometFunction* currentFunction;
     CometStruct* currentStruct;
     CometEnvironment* env;
+    CometEnvironment* rootEnv;
     CometTypeMap* typeMap;
     List(cometStructPtr) structs;
     List(charptr) libs;

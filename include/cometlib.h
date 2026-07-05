@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "vm.h"
 #include "function.h"
+#include "typemap.h"
 
 #if defined(_WIN32) || defined(__CYGWIN__)
     #define API_EXPORT __declspec(dllexport)
@@ -16,7 +17,7 @@
     #endif
 #endif
 
-#define on_import void onImport(CometEnvironment* env)
+#define on_import void onImport(CometEnvironment* env, CometTypeMap* typeMap)
 
 typedef CometFunction* cometFuncPtr;
 

@@ -1,10 +1,14 @@
+INSTALL_PREFIX ?= /usr/local/bin
+
 SRC=src
 VM_SRC=vm_src
 SHARED=shared
+CORELIB=corelib
 
 SRC_FILES=$(wildcard $(SRC)/*.c)
 VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 SHARED_SRC_FILES=$(wildcard $(SHARED)/*.c)
+CORELIB_FILES=$(wildcard $(CORELIB)/*.c)
 
 CC=gcc
 CXX=g++
@@ -35,3 +39,10 @@ clean:
 install: both
 	sudo mkdir -p /usr/local/include/comet/
 	sudo cp -r include/* /usr/local/include/comet/
+
+	# build the core lib
+	mkdir -p ~/.comet/libs
+	$(CC) $(CORELIB_FILES) -fPIC -shared -Wl,-undefined,symbol_lookup -o ~/.comet/libs/core.cometlib
+
+	sudo cp comet $(INSTALL_PREFIX)
+	sudo cp cometc $(INSTALL_PREFIX)
