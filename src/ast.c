@@ -90,6 +90,10 @@ void freeNode(CometASTNode* node) {
             freeNode(node->data.AST_CONSTRUCTOR_DEF.program);
             break;
         }
+        case AST_DESTRUCTOR_DEF: {
+            freeNode(node->data.AST_DESTRUCTOR_DEF.program);
+            break;
+        }
         case AST_STRUCT_DEF_STATEMENT: {
             for (size_t i = 0; i < node->data.AST_STRUCT_DEF_STATEMENT.fieldDefs.count; i++) {
                 freeNode(*get(node->data.AST_STRUCT_DEF_STATEMENT.fieldDefs, i));
@@ -240,6 +244,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_FOR_STATEMENT";
         case AST_CONSTRUCTOR_DEF:
             return "AST_CONSTRUCTOR_DEF";
+        case AST_DESTRUCTOR_DEF:
+            return "AST_DESTRUCTOR_DEF";
         case AST_STRUCT_DEF_STATEMENT:
             return "AST_STRUCT_DEF_STATEMENT";
         case AST_FUNC_DEF_STATEMENT:

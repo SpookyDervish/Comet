@@ -1733,6 +1733,21 @@ ResultType(astNodePtr, ErrorMessage) parseConstructorDef(CometParser* parser) {
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
+ResultType(astNodePtr, ErrorMessage) parseDestructorDef(CometParser* parser) {
+    uint32_t lineNum = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    ResultType(astNodePtr, ErrorMessage) body = parseBlockStatement(parser);
+    if (body.error)
+        return body;
+
+    CometASTNode* stmt = AST_NODE(AST_DESTRUCTOR_DEF, lineNum, body.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = body.as.success->endCol;
+
+    return Success(astNodePtr, ErrorMessage, stmt);
+}
+
 ResultType(nodeList, ErrorMessage) parseGenericsDef(CometParser* parser) {
     List(astNodePtr) genericTypes = newList(astNodePtr);
 
@@ -1844,6 +1859,7 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
 
     struct AST_PROGRAM blockProgram = block.as.success->data.AST_PROGRAM;
     CometASTNode* constructor = NULL;
+    CometASTNode* destructor = NULL;
 
     for (size_t i = 0; i < blockProgram.numStatements; i++) {
         CometASTNode* statement = blockProgram.statements[i];
@@ -1858,6 +1874,11 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
 
             case AST_CONSTRUCTOR_DEF: {
                 constructor = statement;
+                break;
+            }
+
+            case AST_DESTRUCTOR_DEF: {
+                destructor = statement;
                 break;
             }
 
@@ -1892,7 +1913,7 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
 
         fieldDefs,
         constructor,
-        NULL,
+        destructor,
         parentName
     );
     stmt->startCol = startCol;
@@ -2078,6 +2099,8 @@ ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttr
         return parseStructDefStatement(parser);
     } else if (strcmp(keyword, "init") == 0) {
         return parseConstructorDef(parser);
+    } else if (strcmp(keyword, "destroy") == 0) {
+        return parseDestructorDef(parser);
     } else if (strcmp(keyword, "new") == 0) {
         return parseStructCreateStatement(parser);
     } else if (strcmp(keyword, "mut") == 0       ||

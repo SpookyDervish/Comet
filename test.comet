@@ -1,17 +1,30 @@
+import io
+
 struct Foo {
-    readonly int[*] items
+    int[*] numbers
 
     init() {
-        self.items = new int[3]
+        self.numbers = new int[100]
     }
 
-    destroy() {
-        drop self.items
+    destroy {
+        drop self.numbers
+    }
+}
+
+struct Bar : Foo {
+    init() {
+        super(self)
+    }
+
+    destroy {
+        super(self)
     }
 }
 
 func main() -> int {
-    Foo myStruct = new Foo()
+    Bar myStruct = new Bar()
+    drop myStruct
 
-    return myStruct.items:0
+    return 0
 }

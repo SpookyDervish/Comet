@@ -3605,6 +3605,74 @@ ResultType(CometOperand, ErrorMessage) visitConstructorDefStatement(CometCompile
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
+
+ResultType(CometOperand, ErrorMessage) visitDestructorDefStatement(CometCompiler* c, CometASTNode* node, char* destructorName, CometType structType, CometStruct* parentStruct) {
+    c->currentLine = node->lineNum;
+    struct AST_CONSTRUCTOR_DEF constDef = node->data.AST_CONSTRUCTOR_DEF;
+
+    // get arg types
+    CometType* argTypes = malloc(sizeof(CometType));
+    *argTypes = structType;
+
+    buildFunction(c, destructorName, constDef.args.count + 1, (CometType){ .typeKind = COMET_VOID }, argTypes, false, true, false, -1, node); // add 1 arg for self
+
+    // create the new scope for the function
+    CometEnvironment* funcEnv = newEnvironment(destructorName, c->env, true);
+    c->env = funcEnv;
+
+     // define self
+    CometOperand selfValue = createOperand(CO_IMMEDIATE);
+    selfValue.imm.typeKind = COMET_SMALL;
+    selfValue.imm.smallVal = 0;
+
+    uint32_t selfIdx = defineVar(
+        c->env,
+        "self",
+        RECORD_ARG,
+        selfValue,
+        structType,
+        false
+    );
+
+    // if we inherit from a struct, define parent destructor
+    if (parentStruct != NULL) {
+        Estr parentDestructorName = CREATE_ESTR(parentStruct->name);
+        APPEND_ESTR(parentDestructorName, "_DESTROY");
+
+        CometOperand superVal = createOperand(CO_SYMBOL);
+        superVal.symbolIdx = getSymbolIndex(c, parentDestructorName.str);
+
+        DESTROY_ESTR(parentDestructorName);
+
+        CometType superValType = getValueType(c, superVal);
+        superValType.functionType->isMethod = false;
+
+        defineVar(
+            c->env,
+            "super",
+            RECORD_ARG,
+            superVal,
+            superValType,
+            false
+        );
+    }
+
+    // build the functions body
+    ResultType(CometOperand, ErrorMessage) bodyResult = compile(c, constDef.program);
+    if (bodyResult.error)
+        return bodyResult;
+
+    // build return
+    buildLoadArg(c, selfIdx);
+    buildReturn(c);
+
+    // return back to the parent scope
+    c->env = destroyEnv(funcEnv);
+    endBlock(c);
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType) {
     c->currentLine = node->lineNum;
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
@@ -4004,6 +4072,16 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
     ResultType(CometOperand, ErrorMessage) constructorResult = visitConstructorDefStatement(c, structDef.constructor, constructorName.str, generalStructType, parentStruct);
     if (constructorResult.error)
         return Error(cometTypePtr, ErrorMessage, constructorResult.as.error);
+
+    // build destructor
+    if (structDef.destructor) {
+        Estr destructorName = CREATE_ESTR(strdup(structName));
+        APPEND_ESTR(destructorName, "_DESTROY");
+
+        ResultType(CometOperand, ErrorMessage) destructorResult = visitDestructorDefStatement(c, structDef.destructor, destructorName.str, generalStructType, parentStruct);
+        if (destructorResult.error)
+            return Error(cometTypePtr, ErrorMessage, destructorResult.as.error);
+    }
 
     c->currentStruct = NULL;
     append(c->structs, structType);

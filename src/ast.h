@@ -44,6 +44,7 @@ typedef enum {
     AST_RETURN_STATEMENT,
     AST_STRUCT_DEF_STATEMENT,
     AST_CONSTRUCTOR_DEF,
+    AST_DESTRUCTOR_DEF,
     AST_AS_FUNC_DEV,
     AST_NEW_STATEMENT,
     AST_OVERRIDE_STATEMENT,
@@ -137,6 +138,9 @@ struct CometASTNode {
             CometASTNode* program;
             List(astNodePtr) args;
         } AST_CONSTRUCTOR_DEF;
+        struct AST_DESTRUCTOR_DEF {
+            CometASTNode* program;
+        } AST_DESTRUCTOR_DEF;
         struct AST_AS_FUNC_DEV {
             CometASTNode* program;
             CometASTNode* castType;
