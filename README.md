@@ -38,7 +38,7 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
       - [x] Default values
       - [x] Accessing / setting fields
     - [x] Methods
-    - [ ] Special methods (add, subtract, as, etc...)
+    - [ ] Special methods (as, etc...)
     - [x] Constructor
     - [x] Destructor
   - [x] "new" keyword

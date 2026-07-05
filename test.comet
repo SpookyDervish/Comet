@@ -1,21 +1,20 @@
-struct Foo {
-    readonly int x = 123
+import io
 
-    func foo() -> int {
-        return 123
+struct Foo {
+    int value
+
+    init(int value) {
+        self.value = value
     }
 
-    init() {}
-}
-
-struct Bar : Foo {
-    init() {
-        super(self)
+    as string {
+        return "hello"
     }
 }
 
 func main() -> int {
-    Bar test = new Bar()
+    Foo test = new Foo(10)
+    io.println(test as string)
 
-    return test.x
+    return 0
 }

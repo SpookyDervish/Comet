@@ -54,6 +54,8 @@ typedef enum {
     AST_THROW_STATEMENT,
     AST_DROP_STATEMENT,
     AST_ENUM_DEF,
+    AST_AS_FUNC_DEF,
+    AST_AS_EXPR,
 
     // expressions
     AST_INFIX_EXPRESSION,
@@ -170,6 +172,14 @@ struct CometASTNode {
             CometASTNode* ident;
             List(astNodePtr) items;
         } AST_ENUM_DEF;
+        struct AST_AS_FUNC_DEF {
+            CometASTNode* type;
+            CometASTNode* body;
+        } AST_AS_FUNC_DEF;
+        struct AST_AS_EXPR {
+            CometASTNode* left;
+            CometASTNode* type;
+        } AST_AS_EXPR;
 
     } data;  
 

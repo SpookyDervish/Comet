@@ -41,6 +41,13 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    if (args.as.success.printTokens) {
+        printf(ESC_BOLD "=== TOKENS ===\n" ESC_RESET);
+        for (size_t i = 0; i < tokens.as.success.count; i++) {
+            printf("%s\n", tokenToCStr(*get(tokens.as.success, i)));
+        }
+    }
+
     ResultType(parserPtr, ErrorMessage) parser = newParser(tokens.as.success, filePath, source);
     if (parser.error) {
         printErrorMessage(parser.as.error);

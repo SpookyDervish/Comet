@@ -37,6 +37,7 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_EQ, PRECEDENCE_SET},
     {CT_OPEN_PAREN, PRECEDENCE_CALL},
     {CT_COLON, PRECEDENCE_INDEX},
+    {CT_AS, PRECEDENCE_DOT}
 };
 
 ResultType(astNodePtr, ErrorMessage) parseIntLiteral(CometParser* parser);
@@ -65,6 +66,7 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
 
 ResultType(astNodePtr, ErrorMessage) parseFunctionCall(CometParser* parser, CometASTNode* left);
 ResultType(astNodePtr, ErrorMessage) parseInfixExpression(CometParser* parser, CometASTNode* left);
+ResultType(astNodePtr, ErrorMessage) parseAsExpression(CometParser* parser, CometASTNode* left);
 const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_EQ, parseInfixExpression},
     {CT_PLUS, parseInfixExpression},
@@ -88,6 +90,7 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_DOT, parseInfixExpression},
     {CT_EQ, parseInfixExpression},
     {CT_COLON, parseInfixExpression},
+    {CT_AS, parseAsExpression},
     {CT_OPEN_PAREN, parseFunctionCall}
 };
 
@@ -692,6 +695,13 @@ void printNode(CometASTNode* node) {
             
         }
 
+        case AST_AS_EXPR: {
+            printNode(node->data.AST_AS_EXPR.left);
+            printf(" as ");
+            printNode(node->data.AST_AS_EXPR.type);
+            break;
+        }
+
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
             break;
@@ -784,6 +794,23 @@ ResultType(astNodePtr, ErrorMessage) parseGroupedExpression(CometParser* parser)
     }
 
     return expr;
+}
+
+ResultType(astNodePtr, ErrorMessage) parseAsExpression(CometParser* parser, CometASTNode* left) {
+    CometASTNode* expr = AST_NODE(AST_AS_EXPR, left->lineNum, left, NULL);
+    expr->startCol = left->startCol;
+
+    parserNextToken(parser);
+
+    ResultType(astNodePtr, ErrorMessage) right = parseType(parser);
+    if (right.error)
+        return right;
+
+    expr->data.AST_AS_EXPR.type = right.as.success;
+
+    expr->endCol = parser->currentToken->endCol;
+
+    return Success(astNodePtr, ErrorMessage, expr);
 }
 
 ResultType(argList, ErrorMessage) parseFunctionDefArgs(CometParser* parser) {
@@ -1068,7 +1095,6 @@ ResultType(ParsedBaseType, ErrorMessage) parseBaseType(CometParser* parser) {
         parserNextToken(parser); // consume type name
         parserNextToken(parser); // consume dot
     }
-
     ParsedBaseType baseType = {
         .chain = typeChain,
     };
@@ -1811,9 +1837,6 @@ ResultType(nodeList, ErrorMessage) parseGenericsDef(CometParser* parser) {
 
             return Error(nodeList, ErrorMessage, errMsg);
         }
-
-        printf("current tok = %s\n", tokenToCStr(*parser->currentToken));
-        printf("peek tok = %s\n", tokenToCStr(*parser->peekToken));
     }
 
     return Success(nodeList, ErrorMessage, genericTypes);
@@ -1886,6 +1909,7 @@ ResultType(astNodePtr, ErrorMessage) parseStructDefStatement(CometParser* parser
         switch (statement->nodeType) {
             case AST_ASSIGN_STATEMENT:
             case AST_FUNC_DEF_STATEMENT:
+            case AST_AS_FUNC_DEF:
             case AST_OVERRIDE_STATEMENT: {
                 append(fieldDefs, statement);
                 break;
@@ -2143,6 +2167,25 @@ ResultType(astNodePtr, ErrorMessage) parseEnumDefStatement(CometParser* parser) 
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
+ResultType(astNodePtr, ErrorMessage) parseAsFuncDef(CometParser* parser) {
+    uint32_t lineNumber = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    parserNextToken(parser); // skip 'as'
+
+    ResultType(astNodePtr, ErrorMessage) type = parseType(parser);
+    if (type.error)
+        return type;
+    
+    ResultType(astNodePtr, ErrorMessage) body = parseBlockStatement(parser);
+    if (body.error)
+        return body;
+
+    CometASTNode* stmt = AST_NODE(AST_AS_FUNC_DEF, lineNumber, type.as.success, body.as.success);
+
+    return Success(astNodePtr, ErrorMessage, stmt);
+}
+
 ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -2216,6 +2259,9 @@ ResultType(astNodePtr, ErrorMessage) parseStatement(CometParser* parser, bool is
 
         case CT_KEYWORD:
             return parseKeyword(parser, fieldAttrib);
+
+        case CT_AS:
+            return parseAsFuncDef(parser);
 
         default:
             return parseExpressionStatement(parser);

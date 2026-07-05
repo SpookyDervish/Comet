@@ -175,7 +175,10 @@ ResultType(CometToken, ErrorMessage) lexerParseWord(CometLexer* lexer) {
         return Success(CometToken, ErrorMessage, boolTok);
 
     } else {
-        tok.type = CT_IDENT;
+        if (strcmp(buffer, "as") == 0)
+            tok.type = CT_AS;
+        else
+            tok.type = CT_IDENT;
     }
 
     tok.value.literal = buffer;

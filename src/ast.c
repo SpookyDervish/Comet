@@ -209,6 +209,18 @@ void freeNode(CometASTNode* node) {
             break;
         }
 
+        case AST_AS_FUNC_DEF: {
+            freeNode(node->data.AST_AS_FUNC_DEF.type);
+            freeNode(node->data.AST_AS_FUNC_DEF.body);
+            break;
+        }
+
+        case AST_AS_EXPR: {
+            free(node->data.AST_AS_EXPR.left);
+            free(node->data.AST_AS_EXPR.type);
+            break;
+        }
+
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));
             break;
@@ -271,6 +283,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_TRY_STATEMENT";
         case AST_THROW_STATEMENT:
             return "AST_THROW_STATEMENT";
+        case AST_AS_FUNC_DEF:
+            return "AST_AS_FUNC_DEF";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";

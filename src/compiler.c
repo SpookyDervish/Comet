@@ -739,6 +739,7 @@ ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, Co
 ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitNewStatement(CometCompiler* c, CometASTNode* node);
+ResultType(CometOperand, ErrorMessage) visitAsExpr(CometCompiler* c, CometASTNode* node);
 ResultType(CometOperand, ErrorMessage) visitValue(CometCompiler* c, CometASTNode* node) {
     c->currentLine = node->lineNum;
 
@@ -751,6 +752,9 @@ ResultType(CometOperand, ErrorMessage) visitValue(CometCompiler* c, CometASTNode
 
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);
+
+        case AST_AS_EXPR:
+            return visitAsExpr(c, node);
 
         case AST_INT: {
             CometOperand new = createOperand(CO_IMMEDIATE);
@@ -2215,6 +2219,10 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
             return Success(CometType, ErrorMessage, structType);
         }
 
+        case AST_AS_EXPR: {
+            return getType(c, node->data.AST_AS_EXPR.type);
+        }
+
         case AST_PREFIX_EXPRESSION: {
             struct AST_PREFIX_EXPRESSION expr = node->data.AST_PREFIX_EXPRESSION;
 
@@ -3026,6 +3034,83 @@ ResultType(CometOperand, ErrorMessage) getEnumValue(CometCompiler* c, CometType 
     );
 
     return Error(CometOperand, ErrorMessage, errMsg);
+}
+
+ResultType(CometOperand, ErrorMessage) visitAsExpr(CometCompiler* c, CometASTNode* node) {
+    ResultType(CometType, ErrorMessage) leftType = resolveType(c, node->data.AST_AS_EXPR.left);
+    if (leftType.error)
+        return Error(CometOperand, ErrorMessage, leftType.as.error);
+
+    ResultType(CometType, ErrorMessage) rightType = getType(c, node->data.AST_AS_EXPR.type);
+    if (rightType.error)
+        return Error(CometOperand, ErrorMessage, rightType.as.error);
+
+    char* rightTypeString = typeToString(rightType.as.success);
+
+    switch (leftType.as.success.typeKind) {
+        case COMET_STRUCT: {
+            // look for a function
+            Estr funcName = CREATE_ESTR(leftType.as.success.structType->name);
+            APPEND_ESTR(funcName, "_AS_");
+            APPEND_ESTR(funcName, rightTypeString);
+
+            int32_t funcIdx = getSymbolIndex(c, funcName.str);
+            if (funcIdx == -1) {
+                Estr buffer = CREATE_ESTR("No \"as\" method was found to convert struct \"");
+                APPEND_ESTR(buffer, leftType.as.success.structType->name);
+                APPEND_ESTR(buffer, "\" to type");
+                APPEND_ESTR(buffer, rightTypeString);
+
+                ErrorMessage errMsg = createError(
+                    c->inputFilePath,
+                    c->sourceCode,
+                    "NoAsMethod",
+                    buffer.str,
+                    NULL,
+                    node->lineNum,
+                    node->startCol,
+                    node->endCol
+                );
+
+                return Error(CometOperand, ErrorMessage, errMsg);
+            }
+
+            // call the function
+            ResultType(CometOperand, ErrorMessage) leftValue = visitValue(c, node->data.AST_AS_EXPR.left);
+            if (leftValue.error)
+                return leftValue;
+
+            List(CometOperand) args = newList(CometOperand);
+            append(args, leftValue.as.success);
+
+            buildCall(c, funcName.str, args);
+
+            destroy(args);
+            break;
+        }
+
+        default: {
+            Estr buffer = CREATE_ESTR("Cannot convert type ");
+            APPEND_ESTR(buffer, typeToString(leftType.as.success));
+            APPEND_ESTR(buffer, " to type");
+            APPEND_ESTR(buffer, rightTypeString);
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "NoAsMethod",
+                buffer.str,
+                NULL,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CometOperand, ErrorMessage, errMsg);
+        }
+    }
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
 ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
@@ -3938,6 +4023,63 @@ ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c,
 
     return Success(CometOperand, ErrorMessage, funcValue);
 }
+
+ResultType(CometOperand, ErrorMessage) visitAsFuncDef(CometCompiler* c, CometASTNode* node, CometType structType) {
+    c->currentLine = node->lineNum;
+
+    struct AST_AS_FUNC_DEF funcDef = node->data.AST_AS_FUNC_DEF;
+
+    // we only have self cause this is a special function
+    CometType* argTypes = malloc(sizeof(CometType));
+    *argTypes = structType;
+
+    // get type we are gonna cast to
+    ResultType(CometType, ErrorMessage) returnType = getType(c, funcDef.type);
+    if (returnType.error)
+        return Error(CometOperand, ErrorMessage, returnType.as.error);
+
+    // get new func name
+    Estr funcName = CREATE_ESTR(structType.structType->name);
+    APPEND_ESTR(funcName, "_AS_");
+    APPEND_ESTR(funcName, typeToString(returnType.as.success));
+
+    // build the function start
+    CometOperand funcValue = buildFunction(c, funcName.str, 1, returnType.as.success, argTypes, false, true, false, -1, node);
+    CometType funcType = {
+        .typeKind = COMET_FUNCTION,
+        .functionType = getValueType(c, funcValue).functionType
+    };
+
+    // create the new scope for the function
+    CometEnvironment* funcEnv = newEnvironment(funcName.str, c->env, true);
+    c->env = funcEnv;
+
+    // get self
+    CometOperand selfVal = createOperand(CO_IMMEDIATE);
+    selfVal.imm.typeKind = COMET_SMALL;
+    selfVal.imm.smallVal = 0;
+
+    defineVar(
+        c->env,
+        "self",
+        RECORD_ARG,
+        selfVal,
+        structType,
+        false
+    );
+
+    // build the functions body
+    ResultType(CometOperand, ErrorMessage) bodyResult = compile(c, funcDef.body);
+    if (bodyResult.error)
+        return bodyResult;
+
+    // return back to the parent scope
+    c->env = destroyEnv(c->env);
+    endBlock(c);
+
+    return Success(CometOperand, ErrorMessage, funcValue);
+}
+
 ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c, CometASTNode* node, bool isGenericInstantiation, char* genericNameEnding) {
     c->currentLine = node->lineNum;
     struct AST_STRUCT_DEF_STATEMENT structDef = node->data.AST_STRUCT_DEF_STATEMENT;
@@ -4025,6 +4167,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 myMethodCount++;
                 break;
 
+            case AST_AS_FUNC_DEF:
             case AST_OVERRIDE_STATEMENT:
                 break;
 
@@ -4250,6 +4393,14 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 DESTROY_ESTR(newFuncName);
 
                 structType->vtable[parentMethodIdx] = newMethod;
+                break;
+            }
+
+            case AST_AS_FUNC_DEF: {
+                ResultType(CometOperand, ErrorMessage) result = visitAsFuncDef(c, fieldDef, generalStructType);
+                if (result.error)
+                    return Error(cometTypePtr, ErrorMessage, result.as.error);
+
                 break;
             }
 
@@ -5160,6 +5311,8 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitInfixExpression(c, node);
         case AST_PREFIX_EXPRESSION:
             return visitPrefixExpression(c, node);
+        case AST_AS_EXPR:
+            return visitAsExpr(c, node);
         
         default: {
             Estr buffer = CREATE_ESTR("No compiler visit method for \"");
