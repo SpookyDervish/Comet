@@ -1,20 +1,43 @@
-import io
+struct String {
+    string value
 
-struct Foo {
-    int value
+    init(string value) {
+        self.value = value
+    }
 
-    init(int value) {
+    func append(string other) -> String {
+        string newStr = new small[#self.value + #other.value]
+        drop self.value
+        self.value = newStr
+    }
+}
+
+struct Integer {
+    big value
+
+    init(big value) {
         self.value = value
     }
 
     as string {
-        return io as string
+        if self.value == 0 {
+            return "0"
+        }
+
+        
+
+        big number = self.value
+
+        bool isNegative = false
+        if number < 0 {
+            isNegative = true
+            number *= -1
+        }
+
+        String output = new String("")
+        while number > 0 {
+            small digit = output % 10
+            output.append(digit + "0":0)
+        }
     }
-}
-
-func main() -> int {
-    Foo test = new Foo(10)
-    io.println(test as string)
-
-    return 0
 }
