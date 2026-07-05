@@ -4128,6 +4128,32 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
 
         switch (fieldDef->nodeType) {
             case AST_ASSIGN_STATEMENT: {
+                char* fieldName = fieldDef->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+
+                // ensure there aren't duplicate fields
+                for (size_t i = 0; i < fieldIdx; i++) {
+                    if (strcmp(structType->fieldNames[i], fieldName) == 0) {
+                        Estr buffer = CREATE_ESTR("Redefinition of field \"");
+                        APPEND_ESTR(buffer, fieldName);
+                        APPEND_ESTR(buffer, "\" in struct \"");
+                        APPEND_ESTR(buffer, structName);
+                        APPEND_ESTR(buffer, "\"");
+
+                        ErrorMessage errMsg = createError(
+                            c->inputFilePath,
+                            c->sourceCode,
+                            "VariableRedefinition",
+                            buffer.str,
+                            NULL,
+                            fieldDef->lineNum,
+                            fieldDef->startCol,
+                            fieldDef->endCol
+                        );
+
+                        return Error(cometTypePtr, ErrorMessage, errMsg);
+                    }
+                }
+
                 ResultType(CometType, ErrorMessage) fieldType = getType(c, fieldDef->data.AST_ASSIGN_STATEMENT.type);
                 if (fieldType.error)
                     return Error(cometTypePtr, ErrorMessage, fieldType.as.error);
@@ -4159,9 +4185,9 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                         "CantOverrideMethod",
                         buffer.str,
                         NULL,
-                        node->lineNum,
-                        node->startCol,
-                        node->endCol
+                        fieldDef->lineNum,
+                        fieldDef->startCol,
+                        fieldDef->endCol
                     );
 
                     return Error(cometTypePtr, ErrorMessage, errMsg);
@@ -4187,9 +4213,9 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                         "SemanticError",
                         buffer.str,
                         NULL,
-                        node->lineNum,
-                        node->startCol,
-                        node->endCol
+                        fieldDef->lineNum,
+                        fieldDef->startCol,
+                        fieldDef->endCol
                     );
 
                     return Error(cometTypePtr, ErrorMessage, errMsg);
@@ -4228,6 +4254,31 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
             }
 
             case AST_FUNC_DEF_STATEMENT: {
+
+                // ensure there aren't duplicate methods
+                char* funcDefName = fieldDef->data.AST_FUNC_DEF_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+                for (size_t i = 0; i < vtableIdx; i++) {
+                    if (strcmp(structType->vtable[i]->name, funcDefName) == 0) {
+                        Estr buffer = CREATE_ESTR("Redefinition of method \"");
+                        APPEND_ESTR(buffer, funcDefName);
+                        APPEND_ESTR(buffer, "\" in struct \"");
+                        APPEND_ESTR(buffer, structName);
+                        APPEND_ESTR(buffer, "\"");
+
+                        ErrorMessage errMsg = createError(
+                            c->inputFilePath,
+                            c->sourceCode,
+                            "VariableRedefinition",
+                            buffer.str,
+                            " Did you forget to use \"override\"?",
+                            fieldDef->lineNum,
+                            fieldDef->startCol,
+                            fieldDef->endCol
+                        );
+
+                        return Error(cometTypePtr, ErrorMessage, errMsg);
+                    }
+                }
 
                 ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, fieldDef, generalStructType);
                 if (result.error)

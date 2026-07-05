@@ -1,18 +1,19 @@
 struct Foo {
     readonly int x = 123
 
+    func foo() -> int {
+        return 123
+    }
+
+    override func foo() -> bool {
+        return true
+    }
+
     init() {}
 }
 
-struct Bar : Foo {
-    init() {
-        super(self)
-        self.x = 5
-    }
-}
-
 func main() -> int {
-    Bar test = new Bar()
+    Foo test = new Foo()
 
     return test.x
 }
