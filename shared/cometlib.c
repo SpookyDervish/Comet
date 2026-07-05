@@ -48,38 +48,6 @@ int64_t cometSerializeString(char* cString) {
     return cometSerializeValue(cometArray);
 }
 
-int64_t Exception_INIT(int64_t* args, CometVM* vm) {
-    CometObject* exception = (CometObject*)args[0];
-    cometSetField(exception, 0, args[1]);
-    cometSetField(exception, 1, args[2]);
-    return (int64_t)exception;
-}
-
-CometStruct* cometGetExceptionStruct(CometEnvironment* env) {
-    if (exceptStruct != NULL)
-        return exceptStruct;
-
-    CometStruct* exceptStruct = cometDefineStruct(env, "Exception", NULL);
-
-    List(StructField) fields = newList(StructField);
-    StructField typeField = { .name = "type",    .type = cometTypeString };
-    StructField msgField  = { .name = "message", .type = cometTypeString };
-
-    List(cometFuncPtr) methods = newList(cometFuncPtr);
-
-    cometSetStructFieldsAndMethods(exceptStruct, fields, methods);
-    cometDefineConstructor(env, exceptStruct, 2, false, cometTypeString, cometTypeString);
-
-    return exceptStruct;
-}
-
-CometType cometGenericType(char* name) {
-    return (CometType){
-        .typeKind = COMET_GENERIC,
-        .genericParamName = strdup(name)
-    };
-}
-
 void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
     size_t fieldCount  = cometStruct->parent == NULL ? fields.count : fields.count + cometStruct->parent->fieldCount;
     size_t methodCount = cometStruct->parent == NULL ? methods.count : methods.count + cometStruct->parent->numMethods;
@@ -121,19 +89,6 @@ void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) 
     cometStruct->fieldCount = fields.count;
     cometStruct->numMethods = methods.count;
     cometStruct->vtable = (CometMethod**)methodsArr;
-}
-
-CometStruct* cometDefineGenericStruct(CometEnvironment* env, char* name, CometStruct* parent, List(charptr) genericTypeNames) {
-    CometStruct* baseStruct = cometDefineStruct(env, name, parent);
-
-    for (size_t i = 0; i < genericTypeNames.count; i++) {
-        genericTypeNames.pointer[i] = strdup(genericTypeNames.pointer[i]);
-    }
-
-    baseStruct->genericTypeNames = genericTypeNames.pointer;
-    baseStruct->numGenericTypes = genericTypeNames.count;
-
-    return baseStruct;
 }
 
 CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* parent) {
@@ -337,6 +292,49 @@ void cometDefineConstructor(
 
     if (env)
         defineVar(env, constructorName, RECORD_LOCAL, funcVal, type, false);
+}
+
+void cometDefineDestructor(
+    CometEnvironment* env,
+    CometStruct* cometStruct
+) {
+    CometType structType = {
+        .typeKind = COMET_STRUCT,
+        .structType = cometStruct
+    };
+
+    char* destructorName = malloc(32);
+    snprintf(destructorName, 32, "%s_DESTROY", cometStruct->name);
+
+    CometFunction* func = malloc(sizeof(CometFunction));
+    memcpy(func->name, destructorName, 32);
+    func->argCount = 1;
+    func->isMethod = false;
+    func->returnType = structType;
+    func->blockIdx = 0;
+    func->isExternal = true;
+    func->isVarArgs = false;
+    func->funcDef = NULL;
+    
+    CometType type = {
+        .typeKind = COMET_FUNCTION,
+        .functionType = func
+    };
+
+    CometOperand funcVal = {
+        .type = CO_IMMEDIATE,
+        .imm = {
+            .typeKind = COMET_FUNCTION,
+            .bigVal = (int64_t)func
+        }
+    };
+
+    CometType* argTypes = malloc(sizeof(CometType));
+    *argTypes = structType;
+    func->argTypes = argTypes;
+
+    if (env)
+        defineVar(env, destructorName, RECORD_LOCAL, funcVal, type, false);
 }
 
 CometOperand cometValue(CometValueTypeKind valueType, ...) {

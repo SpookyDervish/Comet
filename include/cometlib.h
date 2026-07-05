@@ -31,8 +31,6 @@ UseList(CometSerializedFunc);
 UseList(cometFuncPtr);
 UseList(StructField);
 
-API_EXPORT CometStruct* cometGetExceptionStruct(CometEnvironment* env);
-
 CometType cometCreateArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
 
 API_EXPORT CometSerializedFunc cometSerializeFunction(
@@ -54,8 +52,6 @@ API_EXPORT bool cometArgBool(int64_t argVal);
 API_EXPORT char* cometArgString(int64_t argVal);
 API_EXPORT uintptr_t cometArgPointer(int64_t argVal);
 API_EXPORT int64_t cometSerializeString(char* cString);
-
-API_EXPORT CometType cometGenericType(char* name);
 
 API_EXPORT CometFunction* cometDefineFunc(
     CometEnvironment* env,
@@ -80,7 +76,6 @@ API_EXPORT StructField cometCreateField(char* name, CometType type, FieldAttribu
 API_EXPORT void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods);
 
 API_EXPORT CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* parent);
-API_EXPORT CometStruct* cometDefineGenericStruct(CometEnvironment* env, char* name, CometStruct* parent, List(charptr) genericTypeNames);
 
 API_EXPORT void cometDefineConstructor(
     CometEnvironment* env,
@@ -89,6 +84,11 @@ API_EXPORT void cometDefineConstructor(
     bool isVarArgs,
     ...
 );
+API_EXPORT void cometDefineDestructor(
+    CometEnvironment* env,
+    CometStruct* structType
+);
+
 API_EXPORT void cometSetField(CometObject* object, uint32_t index, int64_t value);
 
 API_EXPORT CometSerializedStruct* cometVMGetStruct(CometVM* vm, char* structName);
