@@ -84,10 +84,10 @@ void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) 
     size_t fieldCount  = cometStruct->parent == NULL ? fields.count : fields.count + cometStruct->parent->fieldCount;
     size_t methodCount = cometStruct->parent == NULL ? methods.count : methods.count + cometStruct->parent->numMethods;
 
-    
-
     char** fieldNames = calloc(fieldCount, sizeof(char*));
     CometType* fieldTypes = calloc(fieldCount, sizeof(CometType));
+    CometStruct** fieldOwners = calloc(fieldCount, sizeof(CometStruct*));
+    FieldAttribute* fieldAttribs = calloc(fieldCount, sizeof(FieldAttribute));
 
     CometFunction** methodsArr = calloc(methodCount, sizeof(CometFunction*));
     size_t methodIdx = 0;
@@ -98,6 +98,8 @@ void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) 
 
         memcpy(fieldNames, cometStruct->parent->fieldNames, sizeof(char*) * cometStruct->parent->fieldCount);
         memcpy(fieldTypes, cometStruct->parent->fieldTypes, sizeof(CometType) * cometStruct->parent->fieldCount);
+        memcpy(fieldOwners, cometStruct->parent->fieldOwners, sizeof(CometStruct*) * cometStruct->parent->fieldCount);
+        memcpy(fieldAttribs, cometStruct->parent->fieldAttribs, sizeof(FieldAttribute) * cometStruct->parent->fieldCount);
     }
 
     for (methodIdx = methodIdx; methodIdx < methods.count; methodIdx++) {
@@ -108,10 +110,14 @@ void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) 
         StructField field = *get(fields, fieldIdx);
         fieldNames[fieldIdx] = strdup(field.name); // we strdup it or else it might go out of scope and become invalid
         fieldTypes[fieldIdx] = field.type;
+        fieldOwners[fieldIdx] = cometStruct;
+        fieldAttribs[fieldIdx] = field.attribute;
     }
 
     cometStruct->fieldNames = fieldNames;
     cometStruct->fieldTypes = fieldTypes;
+    cometStruct->fieldOwners = fieldOwners;
+    cometStruct->fieldAttribs = fieldAttribs;
     cometStruct->fieldCount = fields.count;
     cometStruct->numMethods = methods.count;
     cometStruct->vtable = (CometMethod**)methodsArr;
@@ -270,10 +276,11 @@ CometFunction* cometDefineMethod(
     return func;
 }
 
-StructField cometCreateField(char* name, CometType type) {
+StructField cometCreateField(char* name, CometType type, FieldAttribute attribute) {
     return (StructField){
         .name = strdup(name),
-        .type = type
+        .type = type,
+        .attribute = attribute
     };
 }
 

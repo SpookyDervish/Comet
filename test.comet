@@ -1,0 +1,8 @@
+import testlib
+
+func main() -> int {
+    testlib.Foo x = new testlib.Foo(12)
+    x.x = 3
+
+    return x.x
+}

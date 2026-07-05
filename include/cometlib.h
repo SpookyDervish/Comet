@@ -23,6 +23,7 @@ typedef CometFunction* cometFuncPtr;
 typedef struct {
     char* name;
     CometType type;
+    FieldAttribute attribute;
 } StructField;
 
 UseList(CometSerializedFunc);
@@ -73,7 +74,7 @@ API_EXPORT CometFunction* cometDefineMethod(
     ...
 );
 
-API_EXPORT StructField cometCreateField(char* name, CometType type);
+API_EXPORT StructField cometCreateField(char* name, CometType type, FieldAttribute attribute);
 
 API_EXPORT void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods);
 
