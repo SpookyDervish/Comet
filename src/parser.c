@@ -2119,7 +2119,7 @@ ResultType(astNodePtr, ErrorMessage) parseEnumDefStatement(CometParser* parser) 
         if (expectItem.error)
             return Error(astNodePtr, ErrorMessage, expectItem.as.error);
 
-        CometASTNode* item = AST_NODE(AST_IDENTIFIER, lineNumber, parser->currentToken->value.literal);
+        CometASTNode* item = AST_NODE(AST_IDENTIFIER, parser->currentToken->lineNum, parser->currentToken->value.literal);
         item->startCol = parser->currentToken->startCol;
         item->endCol = parser->currentToken->endCol;
 

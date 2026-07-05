@@ -143,6 +143,10 @@ char* typeToString(CometType type) {
             return buffer.str;
         }
 
+        case COMET_ENUM: {
+            return type.enumType->enumName;
+        }
+
         default: return "unkown";
     }
 }
@@ -1971,6 +1975,57 @@ ResultType(CometType, ErrorMessage) getModuleAttribType(CometCompiler* c, CometA
     return Error(CometType, ErrorMessage, errMsg);
 }
 
+ResultType(CometType, ErrorMessage) getEnumValueType(CometCompiler* c, CometType enumType, CometASTNode* valueIdent) {
+
+    if (valueIdent->nodeType != AST_IDENTIFIER) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "InvalidSyntax",
+            "Expected identifier.",
+            NULL,
+            valueIdent->lineNum,
+            valueIdent->startCol,
+            valueIdent->endCol
+        );
+
+        return Error(CometType, ErrorMessage, errMsg);
+    }
+
+    char* valueName = valueIdent->data.AST_IDENTIFIER.ident;
+
+    bool found = false;
+    for (size_t i = 0; i < enumType.enumType->numItems; i++) {
+        if (strcmp(enumType.enumType->valueNames[i], valueName) == 0) {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        Estr buffer = CREATE_ESTR("No item \"");
+        APPEND_ESTR(buffer, valueName);
+        APPEND_ESTR(buffer, "\" found in enum \"");
+        APPEND_ESTR(buffer, enumType.enumType->enumName);
+        APPEND_ESTR(buffer, "\"");
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "EnumItemNotFound",
+            buffer.str,
+            NULL,
+            valueIdent->lineNum,
+            valueIdent->startCol,
+            valueIdent->endCol
+        );
+
+        return Error(CometType, ErrorMessage, errMsg);
+    }
+
+    return Success(CometType, ErrorMessage, enumType);
+}
+
 CometType getTopArrayElemType(CometArrayType* arrayType) {
     
 
@@ -2214,7 +2269,9 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                 case CT_DOT: { // get type of field
                     if (left.as.success.typeKind == COMET_MODULE)
                         return getModuleAttribType(c, node);
-                    else if (left.as.success.typeKind != COMET_STRUCT) {
+                    else if (left.as.success.typeKind == COMET_ENUM) {
+                        return getEnumValueType(c, left.as.success, expr.right);
+                    } else if (left.as.success.typeKind != COMET_STRUCT) {
                         ErrorMessage errMsg = createError(
                             c->inputFilePath,
                             c->sourceCode,
@@ -2907,6 +2964,58 @@ ResultType(CometOperand, ErrorMessage) getField(CometCompiler* c, CometASTNode* 
 
     return Success(CometOperand, ErrorMessage, dest);
 }
+
+ResultType(CometOperand, ErrorMessage) getEnumValue(CometCompiler* c, CometType enumType, CometASTNode* right) {
+    if (right->nodeType != AST_IDENTIFIER) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "InvalidSyntax",
+            "Expected identifier.",
+            NULL,
+            right->lineNum,
+            right->startCol,
+            right->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
+    char* valueName = right->data.AST_IDENTIFIER.ident;
+    
+    for (size_t i = 0; i < enumType.enumType->numItems; i++) {
+        if (strcmp(enumType.enumType->valueNames[i], valueName) == 0) {
+            CometOperand value = createOperand(CO_IMMEDIATE);
+            value.imm.typeKind = COMET_SMALL;
+            value.imm.smallVal = i;
+
+            CometOperand constValue = storeConst(c, value);
+            buildPushConst(c, constValue);
+
+            return Success(CometOperand, ErrorMessage, constValue);
+        }
+    }
+
+    Estr buffer = CREATE_ESTR("No item \"");
+    APPEND_ESTR(buffer, valueName);
+    APPEND_ESTR(buffer, "\" found in enum \"");
+    APPEND_ESTR(buffer, enumType.enumType->enumName);
+    APPEND_ESTR(buffer, "\"");
+
+    ErrorMessage errMsg = createError(
+        c->inputFilePath,
+        c->sourceCode,
+        "EnumItemNotFound",
+        buffer.str,
+        NULL,
+        right->lineNum,
+        right->startCol,
+        right->endCol
+    );
+
+    return Error(CometOperand, ErrorMessage, errMsg);
+}
+
 ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
     c->currentLine = node->lineNum;
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
@@ -2918,6 +3027,8 @@ ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, Co
     if (expr.op.type == CT_DOT) { // getting a field
         if (leftType.as.success.typeKind == COMET_MODULE)
             return getModuleValue(c, node);
+        else if (leftType.as.success.typeKind == COMET_ENUM)
+            return getEnumValue(c, leftType.as.success, expr.right);
 
         return getField(c, expr.left, expr.right);
     }
@@ -3209,7 +3320,9 @@ ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, Co
         if (returnValueType.error)
             return Error(CometOperand, ErrorMessage, returnValueType.as.error);
 
-        if (!typesAreEqual(returnValueType.as.success, c->currentFunction->returnType)) {
+        if (!typesAreEqual(returnValueType.as.success, c->currentFunction->returnType) &&
+            !canImplicitCastType(c->currentFunction->returnType, returnValueType.as.success)) {
+
             Estr help = CREATE_ESTR("Function has a return type of ");
             APPEND_ESTR(help, typeToString(c->currentFunction->returnType));
             APPEND_ESTR(help, " but you are returning ");
@@ -4547,6 +4660,66 @@ ResultType(CometOperand, ErrorMessage) visitDropStatement(CometCompiler* c, Come
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
+ResultType(CometOperand, ErrorMessage) visitEnumDefStatement(CometCompiler* c, CometASTNode* node) {
+    struct AST_ENUM_DEF enumDef = node->data.AST_ENUM_DEF;
+    char* enumName = enumDef.ident->data.AST_IDENTIFIER.ident;
+
+    CometEnumType* enumType = malloc(sizeof(CometEnumType));
+    enumType->enumName = enumName;
+    enumType->numItems = 0;
+
+    List(charptr) enumItemNames = newList(charptr);
+
+    for (size_t i = 0; i < enumDef.items.count; i++) {
+        CometASTNode* itemNode = *get(enumDef.items, i);
+        char* itemName = itemNode->data.AST_IDENTIFIER.ident;
+        enumType->numItems++;
+
+        // check it doesnt already exist
+        for (size_t j = 0; j < enumItemNames.count; j++) {
+            if (strcmp(*get(enumItemNames, j), itemName) == 0) {
+                Estr buffer = CREATE_ESTR("Duplicate item \"");
+                APPEND_ESTR(buffer, itemName);
+                APPEND_ESTR(buffer, "\" in enum \"");
+                APPEND_ESTR(buffer, enumName);
+                APPEND_ESTR(buffer, "\"");
+
+                ErrorMessage errMsg = createError(
+                    c->inputFilePath,
+                    c->sourceCode,
+                    "DuplicateEnumItem",
+                    buffer.str,
+                    NULL,
+                    itemNode->lineNum,
+                    itemNode->startCol,
+                    itemNode->endCol
+                );
+
+                return Error(CometOperand, ErrorMessage, errMsg);
+            }
+        }
+
+        append(enumItemNames, itemName);
+    }
+
+    enumType->valueNames = enumItemNames.pointer;
+
+    CometType enumTypeWrapper = {
+        .typeKind = COMET_ENUM,
+        .enumType = enumType
+    };
+
+    defineType(c->typeMap, enumName, enumTypeWrapper);
+
+    CometOperand enumValue = createOperand(CO_IMMEDIATE);
+    enumValue.imm.typeKind = COMET_TYPE;
+    enumValue.imm.typeVal = enumTypeWrapper;
+
+    defineVar(c->env, enumName, RECORD_LOCAL, enumValue, enumTypeWrapper, false);
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 // -- MAIN -- //
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols) {
     FILE* file = fopen(filePath, "wb");
@@ -4809,6 +4982,8 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitThrowStatement(c, node);
         case AST_DROP_STATEMENT:
             return visitDropStatement(c, node);
+        case AST_ENUM_DEF:
+            return visitEnumDefStatement(c, node);
         
         case AST_FUNC_CALL:
             return visitFuncCall(c, node);

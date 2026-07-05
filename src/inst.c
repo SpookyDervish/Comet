@@ -158,6 +158,7 @@ bool typeIsInt(CometType type) {
         case COMET_INT:
         case COMET_BIG:
         case COMET_BOOL:
+        case COMET_ENUM:
             return true;
         default:
             return false;

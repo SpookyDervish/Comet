@@ -44,7 +44,9 @@ struct CometArrayType {
 };
 
 typedef struct {
-    char* valueNames;
+    char** valueNames;
+    char* enumName;
+    size_t numItems;
 } CometEnumType;
 
 struct CometType {
