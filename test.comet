@@ -1,8 +1,5 @@
-import testlib
-
-func main() -> void {
-    testlib.Test x = new testlib.Test()
-    drop x
-
-    return
+enum Colour {
+    Red,
+    Green,
+    Blue
 }

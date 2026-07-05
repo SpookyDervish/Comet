@@ -673,6 +673,25 @@ void printNode(CometASTNode* node) {
             printNode(node->data.AST_DROP_STATEMENT.value);
             break;
 
+        case AST_ENUM_DEF: {
+            printf("enum ");
+            printNode(node->data.AST_ENUM_DEF.ident);
+            printf(" {\n");
+
+            List(astNodePtr) items = node->data.AST_ENUM_DEF.items;
+            for (size_t i = 0; i < items.count; i++) {
+                printf("           ");
+                printNode(*get(items, i));
+
+                if (i < items.count-1)
+                    printf(",\n");
+                else
+                    printf("\n       }");
+            }
+            break;
+            
+        }
+
         default:
             printf("reached unkown node type (got %d)\n", node->nodeType);
             break;
@@ -2078,6 +2097,52 @@ ResultType(astNodePtr, ErrorMessage) parseDropStatement(CometParser* parser) {
     return Success(astNodePtr, ErrorMessage, stmt);
 }
 
+ResultType(astNodePtr, ErrorMessage) parseEnumDefStatement(CometParser* parser) {
+    uint32_t lineNumber = parser->currentToken->lineNum;
+    uint32_t startCol = parser->currentToken->startCol;
+
+    ResultType(int, ErrorMessage) expectIdent = expectPeek(parser, CT_IDENT);
+    if (expectIdent.error)
+        return Error(astNodePtr, ErrorMessage, expectIdent.as.error);
+
+    CometASTNode* ident = AST_NODE(AST_IDENTIFIER, lineNumber, parser->currentToken->value.literal);
+    ident->startCol = startCol;
+    ident->endCol = parser->currentToken->endCol;
+
+    ResultType(int, ErrorMessage) expectOpenCurly = expectPeek(parser, CT_OPEN_CURLY);
+    if (expectOpenCurly.error)
+        return Error(astNodePtr, ErrorMessage, expectOpenCurly.as.error);
+
+    List(astNodePtr) items = newList(astNodePtr);
+    while (true) {
+        ResultType(int, ErrorMessage) expectItem = expectPeek(parser, CT_IDENT);
+        if (expectItem.error)
+            return Error(astNodePtr, ErrorMessage, expectItem.as.error);
+
+        CometASTNode* item = AST_NODE(AST_IDENTIFIER, lineNumber, parser->currentToken->value.literal);
+        item->startCol = parser->currentToken->startCol;
+        item->endCol = parser->currentToken->endCol;
+
+        append(items, item);
+
+        if (peekTokenIs(parser, CT_CLOSE_CURLY)) {
+            break;
+        }
+
+        ResultType(int, ErrorMessage) expectComma = expectPeek(parser, CT_COMMA);
+        if (expectComma.error)
+            return Error(astNodePtr, ErrorMessage, expectComma.as.error);
+    }
+
+    parserNextToken(parser); // skip '}'
+
+    CometASTNode* stmt = AST_NODE(AST_ENUM_DEF, lineNumber, ident, items);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
+
+    return Success(astNodePtr, ErrorMessage, stmt);
+}
+
 ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttribute fieldAttrib) {
     char* keyword = parser->currentToken->value.literal;
 
@@ -2122,6 +2187,8 @@ ResultType(astNodePtr, ErrorMessage) parseKeyword(CometParser* parser, FieldAttr
         return parseThrowStatement(parser);
     } else if (strcmp(keyword, "drop") == 0) {
         return parseDropStatement(parser);
+    } else if (strcmp(keyword, "enum") == 0) {
+        return parseEnumDefStatement(parser);
     } else {
         char* buffer = malloc(128);
         sprintf(buffer, "Keyword \"%s\" was unexpected.", keyword);

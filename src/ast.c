@@ -198,6 +198,17 @@ void freeNode(CometASTNode* node) {
             break;
         }
 
+        case AST_ENUM_DEF: {
+            freeNode(node->data.AST_ENUM_DEF.ident);
+
+            for (size_t i = 0; i < node->data.AST_ENUM_DEF.items.count; i++) {
+                freeNode(*get(node->data.AST_ENUM_DEF.items, i));
+            }
+
+            destroy(node->data.AST_ENUM_DEF.items);
+            break;
+        }
+
         default: {
             printf("WARNING: Unhandled AST node type in freeNode: %s\n", ASTNodeTypeToCStr(node->nodeType));
             break;
@@ -271,6 +282,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_ARG_DEF";
         case AST_NEW_STATEMENT:
             return "AST_NEW_STATEMENT";
+        case AST_ENUM_DEF:
+            return "AST_ENUM_DEF";
 
         default:
             return "AST_UNKOWN (FIXME)";

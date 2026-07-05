@@ -22,12 +22,13 @@ typedef enum {
     COMET_STRUCT,
     COMET_FUNCTION,
     COMET_ARRAY,
+    COMET_ENUM,
     COMET_MODULE,   // not actually represented in assembly but this is used so
                     // we can resolve imported values
 
     COMET_TYPE,     // this is also not actually represented in the asm
 
-    COMET_GENERIC
+    COMET_GENERIC,
 } CometValueTypeKind;
 
 typedef struct CometStruct CometStruct;
@@ -42,12 +43,17 @@ struct CometArrayType {
     uint8_t dims;
 };
 
+typedef struct {
+    char* valueNames;
+} CometEnumType;
+
 struct CometType {
     CometValueTypeKind typeKind;
     union {
         CometStruct* structType;
         CometFunction* functionType;
         CometArrayType* arrayType;
+        CometEnumType* enumType;
         char* genericParamName;
     };
 };
