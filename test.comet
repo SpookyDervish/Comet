@@ -1,15 +1,17 @@
 struct Foo {
-    private int[*] items
+    readonly int[*] items
 
     init() {
         self.items = new int[3]
+    }
+
+    destroy() {
+        drop self.items
     }
 }
 
 func main() -> int {
     Foo myStruct = new Foo()
-
-    myStruct.items : 0 = 1
 
     return myStruct.items:0
 }
