@@ -1,0 +1,22 @@
+enum TokenType {
+    IntLiteral,
+    FloatLiteral,
+    StringLiteral,
+
+    Func,
+
+    Plus, Minus, Times, Divide,
+
+    OpenCurly, CloseCurly
+}
+
+struct Token {
+    TokenType type
+    string literalVal
+    big intVal
+    double doubleVal
+
+    init(TokenType type) {
+        self.type = type
+    }
+}

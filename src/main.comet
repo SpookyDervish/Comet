@@ -1,0 +1,9 @@
+import src.lexer
+
+func main() -> int {
+    string source = "func main() -> int {\n    return 2 + 2}"
+
+    lexer.Lexer newLexer = new lexer.Lexer(source)
+
+    return 0
+}

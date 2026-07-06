@@ -1,17 +1,15 @@
-INSTALL_PREFIX ?= /usr/local/bin
-
 SRC=src
 VM_SRC=vm_src
 SHARED=shared
 CORELIB=corelib
 
-SRC_FILES=$(wildcard $(SRC)/*.c)
+SRC_FILES=src/main.comet
 VM_SRC_FILES=$(wildcard $(VM_SRC)/*.c)
 SHARED_SRC_FILES=$(wildcard $(SHARED)/*.c)
 CORELIB_FILES=$(wildcard $(CORELIB)/*.c)
 
 CC=gcc
-CXX=g++
+COMETC=cometc
 CFLAGS=-Wall -Wextra -Wno-trigraphs -O3 -rdynamic
 LDFLAGS=
 LDLIBS=-lm
@@ -22,8 +20,8 @@ VM_TARGET=comet
 
 both: $(COMPILER_TARGET) $(VM_TARGET)
 
-$(COMPILER_TARGET): $(SRC_FILES) $(SHARED_SRC_FILES)
-	$(CC) $(SRC_FILES) $(SHARED_SRC_FILES) -o $(COMPILER_TARGET) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
+$(COMPILER_TARGET): $(SRC_FILES)
+	$(COMETC) $(SRC_FILES) -o $(COMPILER_TARGET)
 
 $(VM_TARGET): $(VM_SRC_FILES) $(SHARED_SRC_FILES)
 	$(CC) $(VM_SRC_FILES) $(SHARED_SRC_FILES) -o $(VM_TARGET) $(CFLAGS) $(LDFLAGS) $(LDLIBS)
@@ -35,14 +33,3 @@ debug:
 clean:
 	rm $(VM_TARGET)
 	rm $(COMPILER_TARGET)
-	
-install: both
-	sudo mkdir -p /usr/local/include/comet/
-	sudo cp -r include/* /usr/local/include/comet/
-
-	# build the core lib
-	mkdir -p ~/.comet/libs
-	$(CC) $(CORELIB_FILES) -fPIC -shared -Wl,-undefined,symbol_lookup -o ~/.comet/libs/core.cometlib
-
-	sudo cp comet $(INSTALL_PREFIX)
-	sudo cp cometc $(INSTALL_PREFIX)
