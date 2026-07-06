@@ -426,6 +426,31 @@ ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char st
     return Success(CometToken, ErrorMessage, tok);
 }
 
+ResultType(CometToken, ErrorMessage) lexerParseChar(CometLexer* lexer) {
+    ResultType(CometToken, ErrorMessage) token = lexerParseString(lexer, lexer->currentChar);
+    if (token.error)
+        return token;
+
+    if (strlen(token.as.success.value.literal) > 1) {
+        ErrorMessage errMsg = createError(
+            lexer->filePath,
+            lexer->source,
+            "LiteralCantFit",
+            "Can't fit multiple characters into a single character constant.",
+            NULL,
+            token.as.success.lineNum,
+            token.as.success.startCol,
+            token.as.success.endCol
+        );
+
+        return Error(CometToken, ErrorMessage, errMsg);
+    }
+
+    token.as.success.type = CT_CHAR_LITERAL;
+
+    return Success(CometToken, ErrorMessage, token.as.success);
+}
+
 ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
     List(CometToken) tokens = newList(CometToken);
 
@@ -527,8 +552,7 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
 
                 break; 
             }
-            case '\"':
-            case '\'': {
+            case '\"': {
                 
                 ResultType(CometToken, ErrorMessage) stringTok = lexerParseString(lexer, lexer->currentChar);
 
@@ -539,6 +563,14 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
                 append(tokens, stringTok.as.success);
 
                 break; 
+            }
+            case '\'': {
+                ResultType(CometToken, ErrorMessage) charTok = lexerParseChar(lexer);
+                if (charTok.error)
+                    return Error(tokenList, ErrorMessage, charTok.as.error);
+
+                append(tokens, charTok.as.success);
+                break;
             }
 
             case '+': {

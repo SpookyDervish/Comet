@@ -88,20 +88,20 @@
         },
 
 		"strings": {
-			"name": "string.quoted.double.comet",
-			"begin": "\"",
-			"end": "\"",
-			"patterns": [
-				{
-					"name": "constant.character.escape.comet",
-					"match": "\\\\."
-				},
+            "name": "string.quoted.comet",
+            "begin": "([\"'])",
+            "end": "\\1",
+            "patterns": [
                 {
-					"name": "constant.other.placeholder.comet",
-					"match": "%[a-zA-Z]"
-				}
-			]
-		},
+                    "name": "constant.character.escape.comet",
+                    "match": "\\\\."
+                },
+                {
+                    "name": "constant.other.placeholder.comet",
+                    "match": "%[a-zA-Z]"
+                }
+            ]
+        },
 
         "numbers": {
             "patterns": [

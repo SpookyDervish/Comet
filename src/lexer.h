@@ -46,6 +46,7 @@ ResultType(char, charptr) lexerPeek(CometLexer* lexer);
 ResultType(CometToken, ErrorMessage) lexerParseWord(CometLexer* lexer);
 ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer);
 ResultType(CometToken, ErrorMessage) lexerParseString(CometLexer* lexer, char startingQuote);
+ResultType(CometToken, ErrorMessage) lexerParseChar(CometLexer* lexer);
 
 extern const char* KEYWORDS[];
 

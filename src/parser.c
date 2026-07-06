@@ -45,6 +45,7 @@ ResultType(astNodePtr, ErrorMessage) parseIdentifier(CometParser* parser);
 ResultType(astNodePtr, ErrorMessage) parseFloatLiteral(CometParser* parser);
 ResultType(astNodePtr, ErrorMessage) parseBoolLiteral(CometParser* parser);
 ResultType(astNodePtr, ErrorMessage) parseStringLiteral(CometParser* parser);
+ResultType(astNodePtr, ErrorMessage) parseCharLiteral(CometParser* parser);
 ResultType(astNodePtr, ErrorMessage) parseArrayLiteral(CometParser* parser);
 ResultType(astNodePtr, ErrorMessage) parseType(CometParser* parser);
 ResultType(astNodePtr, ErrorMessage) parseGroupedExpression(CometParser* parser);
@@ -54,6 +55,7 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
     {CT_INT_LITERAL, parseIntLiteral},
     {CT_FLOAT_LITERAL, parseFloatLiteral},
     {CT_STRING_LITERAL, parseStringLiteral},
+    {CT_CHAR_LITERAL, parseCharLiteral},
     {CT_BOOL_LITERAL, parseBoolLiteral},
     {CT_IDENT, parseIdentifier},
     {CT_OPEN_PAREN, parseGroupedExpression},
@@ -394,6 +396,7 @@ void printNode(CometASTNode* node) {
         case AST_BOOL: printf("%s", node->data.AST_BOOL.value ? "true" : "false"); break;
         case AST_DOUBLE: printf("%f", node->data.AST_DOUBLE.number); break;
         case AST_STRING: printf("\"%s\"", node->data.AST_STRING.value); break;
+        case AST_CHAR: printf("'%c'", node->data.AST_CHAR.value); break;
         case AST_IDENTIFIER: printf("%s", node->data.AST_IDENTIFIER.ident); break;
         case AST_ARRAY:
             printf("[");
@@ -943,6 +946,13 @@ ResultType(astNodePtr, ErrorMessage) parseBoolLiteral(CometParser* parser) {
 
 ResultType(astNodePtr, ErrorMessage) parseStringLiteral(CometParser* parser) {
     CometASTNode* node = AST_NODE(AST_STRING, parser->currentToken->lineNum, parser->currentToken->value.literal);
+    node->startCol = parser->currentToken->startCol;
+    node->endCol = parser->currentToken->endCol;
+    return Success(astNodePtr, ErrorMessage, node);
+}
+
+ResultType(astNodePtr, ErrorMessage) parseCharLiteral(CometParser* parser) {
+    CometASTNode* node = AST_NODE(AST_CHAR, parser->currentToken->lineNum, parser->currentToken->value.literal[0]);
     node->startCol = parser->currentToken->startCol;
     node->endCol = parser->currentToken->endCol;
     return Success(astNodePtr, ErrorMessage, node);

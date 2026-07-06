@@ -13,6 +13,7 @@ bool nodeIsALiteral(CometASTNode* node) {
         case AST_BOOL:
         case AST_DOUBLE:
         case AST_STRING:
+        case AST_CHAR:
             return true;
         
         default:
@@ -57,6 +58,8 @@ void freeNode(CometASTNode* node) {
             free(node->data.AST_STRING.value);
             break;
         }
+        case AST_CHAR: break;
+        
         case AST_WHILE_STATEMENT: {
             freeNode(node->data.AST_WHILE_STATEMENT.expression);
             freeNode(node->data.AST_WHILE_STATEMENT.program);

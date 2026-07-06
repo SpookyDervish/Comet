@@ -20,6 +20,7 @@ typedef enum {
     AST_INT,
     AST_DOUBLE,
     AST_STRING,
+    AST_CHAR,
     AST_IDENTIFIER,
     AST_BOOL,
     AST_ARRAY,
@@ -75,6 +76,7 @@ struct CometASTNode {
         struct AST_INT { int64_t number; } AST_INT;
         struct AST_DOUBLE { double number; } AST_DOUBLE;
         struct AST_STRING { char* value; } AST_STRING;
+        struct AST_CHAR { char value; } AST_CHAR;
         struct AST_IDENTIFIER { char* ident; } AST_IDENTIFIER;
         struct AST_BOOL { bool value; } AST_BOOL;
         struct AST_ARRAY { List(astNodePtr) elements; } AST_ARRAY;

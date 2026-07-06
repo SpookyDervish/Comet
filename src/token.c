@@ -14,6 +14,8 @@ char* tokenTypeToCStr(CometTokenType tokType) {
             return "CT_BOOL_LITERAL";
         case CT_STRING_LITERAL:
             return "CT_STRING_LITERAL";
+        case CT_CHAR_LITERAL:
+            return "CT_CHAR_LITERAL";
         case CT_EQ:
             return "CT_EQ";
         case CT_OPEN_CURLY:

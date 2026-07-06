@@ -789,6 +789,17 @@ ResultType(CometOperand, ErrorMessage) visitValue(CometCompiler* c, CometASTNode
             return Success(CometOperand, ErrorMessage, new);
         }
 
+        case AST_CHAR: {
+            CometOperand new = createOperand(CO_IMMEDIATE);
+            new.imm.typeKind = COMET_SMALL;
+            new.imm.smallVal = node->data.AST_CHAR.value;
+
+            CometOperand idx = storeConst(c, new);
+            buildPushConst(c, idx);
+
+            return Success(CometOperand, ErrorMessage, new);
+        }
+
         case AST_STRING: {
             for (size_t i = 0; i < strlen(node->data.AST_STRING.value); i++) {
                 CometOperand charVal = createOperand(CO_IMMEDIATE);
@@ -2077,6 +2088,8 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
         case AST_STRING: {
             return getTypeByName(c, "string", node);
         }
+
+        case AST_CHAR: outTypeKind = COMET_SMALL; break;
 
         case AST_ARRAY: {
             List(astNodePtr) elements = node->data.AST_ARRAY.elements;
