@@ -1,17 +1,19 @@
 import io
 
-func main() -> int {
-    for int i in 0 .. 5 {
-        for int j in 0 .. 5 {
-            if i == 2
-                continue
+struct Foo {
+    init() {}
 
-            if j == 3
-                break
+    func test(int n) -> int {
+        if n == 10 
+            return 0
 
-            io.println("i: %n, j: %n", i, j)
-        }
+        return self.test(n + 1)
     }
+}
+
+func main() -> int {
+    Foo x = new Foo()
+    x.test(0)
 
     return 0
 }

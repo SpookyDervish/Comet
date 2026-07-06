@@ -260,7 +260,6 @@ CometType* resolveGenericType(char* genericValTypeName, List(GenericTypeMapping)
     return NULL;
 }
 
-ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType);
 CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(GenericTypeMapping) resolvedGenericTypes) {
     /*
     
@@ -962,6 +961,8 @@ ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, Co
             ResultType(CometType, ErrorMessage) structType = resolveType(c, expr.left);
             if (structType.error)
                 return Error(CometFunctionTypeInfo, ErrorMessage, structType.as.error);
+
+            
 
             // get function from module
             if (structType.as.success.typeKind == COMET_MODULE) {
@@ -4103,10 +4104,16 @@ ResultType(CometOperand, ErrorMessage) visitDestructorDefStatement(CometCompiler
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
-ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType) {
+ResultType(CometOperand, ErrorMessage) visitMethodDefStatement(CometCompiler* c, CometASTNode* node, CometType structType, CometMethod* method) {
     c->currentLine = node->lineNum;
     struct AST_FUNC_DEF_STATEMENT funcDef = node->data.AST_FUNC_DEF_STATEMENT;
     char* funcName = funcDef.ident->data.AST_IDENTIFIER.ident;
+
+    if (method) {
+        size_t funcNameLen = strlen(funcName);
+
+        memcpy(method->name, funcName, funcNameLen < 32 ? funcNameLen + 1 : 32);
+    }
 
     // get arg types
     CometType* argTypes = calloc(funcDef.args.count+1, sizeof(CometType));
@@ -4511,7 +4518,7 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 }
 
                 CometASTNode* funcDef = fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef;
-                ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, funcDef, generalStructType);
+                ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, funcDef, generalStructType, NULL);
                 if (result.error)
                     return Error(cometTypePtr, ErrorMessage, result.as.error);
 
@@ -4605,7 +4612,13 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                     }
                 }
 
-                ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, fieldDef, generalStructType);
+                CometMethod* newMethod = malloc(sizeof(CometMethod));
+                newMethod->symbolIdx = c->functionCount;
+                newMethod->owner = structType;
+                newMethod->attrib = fieldDef->data.AST_FUNC_DEF_STATEMENT.attrib;
+                structType->vtable[vtableIdx++] = newMethod;
+
+                ResultType(CometOperand, ErrorMessage) result = visitMethodDefStatement(c, fieldDef, generalStructType, newMethod);
                 if (result.error)
                     return Error(cometTypePtr, ErrorMessage, result.as.error);
 
@@ -4614,19 +4627,17 @@ ResultType(cometTypePtr, ErrorMessage) visitStructDefStatement(CometCompiler* c,
                 Estr newFuncName = CREATE_ESTR(structName);
                 APPEND_ESTR(newFuncName, "_");
                 APPEND_ESTR(newFuncName, function->name);
-
-                CometMethod* newMethod = malloc(sizeof(CometMethod));
+                
                 memcpy(newMethod->name, function->name, strlen(function->name) + 1);
                 memcpy(function->name, newFuncName.str, newFuncName.size + 1);
                 newMethod->argCount = function->argCount;
-                newMethod->blockIdx = function->blockIdx,
-                newMethod->symbolIdx = result.as.success.symbolIdx;
-                newMethod->owner = structType;
-                newMethod->attrib = fieldDef->data.AST_FUNC_DEF_STATEMENT.attrib;
+                newMethod->blockIdx = function->blockIdx;
+                
+                
 
                 DESTROY_ESTR(newFuncName);
 
-                structType->vtable[vtableIdx++] = newMethod;
+                
                 break;
             }
 
