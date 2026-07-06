@@ -10,7 +10,6 @@ const struct argp_option options[] = {
     { "asm", 'a', 0, 0, "output assembly instead of an executable file", 0 },
     { "ast", 'A', 0, 0, "print out AST", 0 },
     { "tokens", 't', 0, 0, "print out tokens", 0 },
-    { "optimisation", 'O', "OPTIMISATION", 0, "the level of optimisation (0 - 3, default is 2)", 0 },
     { 0 }
 };
 
@@ -20,10 +19,6 @@ int parseCommandLineArgs(int key, char* arg, struct argp_state* state) {
     switch (key) {
         case 'o':
             args->outputPath = arg;
-            break;
-        
-        case 'O':
-            args->optimisation = atoi(arg);
             break;
 
         case 'd':
@@ -74,8 +69,7 @@ ResultType(CometArgs, charptr) parseArgs(int argc, char** argv) {
         .filePath = NULL,
         .outputPath = NULL,
         .outputASM = false,
-        .debugSymbols = false,
-        .optimisation = 2
+        .debugSymbols = false
     };
     argp_parse(&argp, argc, argv, 0, 0, &args);
 
@@ -84,12 +78,6 @@ ResultType(CometArgs, charptr) parseArgs(int argc, char** argv) {
     }
 
     // check args
-    if (args.optimisation < 0) {
-        return Error(CometArgs, charptr, "optimisation level can't be less than 0\n");
-    } else if (args.optimisation > 3) {
-        return Error(CometArgs, charptr, "optimisation level can't be higher than 3\n");
-    }
-
     if (!args.filePath) {
         return Error(CometArgs, charptr, "no input file specified\n");
     }
