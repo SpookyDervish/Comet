@@ -3558,6 +3558,50 @@ ResultType(CometOperand, ErrorMessage) visitReturnStatement(CometCompiler* c, Co
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
+
+ResultType(CometOperand, ErrorMessage) visitBreakStatement(CometCompiler* c, CometASTNode* node) {
+    if (c->loopContexts.count < 1) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "NotInLoop",
+            "Cannot use break outside a loop",
+            NULL,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
+    LoopContext context = *get(c->loopContexts, c->loopContexts.count - 1);
+    buildJump(c, context.breakLabel);
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+ResultType(CometOperand, ErrorMessage) visitContinueStatement(CometCompiler* c, CometASTNode* node) {
+    if (c->loopContexts.count < 1) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "NotInLoop",
+            "Cannot use continue outside a loop",
+            NULL,
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
+    }
+
+    LoopContext context = *get(c->loopContexts, c->loopContexts.count - 1);
+    buildJump(c, context.continueLabel);
+
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 ResultType(CometOperand, ErrorMessage) visitFuncCall(CometCompiler* c, CometASTNode* node) {
     c->currentLine = node->lineNum;
     struct AST_FUNC_CALL funcCall = node->data.AST_FUNC_CALL;
@@ -3723,7 +3767,14 @@ ResultType(CometOperand, ErrorMessage) visitWhileStatement(CometCompiler* c, Com
     struct AST_WHILE_STATEMENT whileStmt = node->data.AST_WHILE_STATEMENT;
     
     CometLabel* startLabel = buildLabel(c);
+    CometLabel* continueLabel = buildLabel(c);
     CometLabel* endLabel = buildLabel(c);
+
+    LoopContext loopContext = {
+        .breakLabel = endLabel,
+        .continueLabel = continueLabel
+    };
+    append(c->loopContexts, loopContext);
 
     CometEnvironment* whileEnv = newEnvironment("whileLoop", c->env, false);
     c->env = whileEnv;
@@ -3735,6 +3786,8 @@ ResultType(CometOperand, ErrorMessage) visitWhileStatement(CometCompiler* c, Com
 
     buildJumpIfFalse(c, endLabel);
 
+    resolveLabel(c, continueLabel);
+
     ResultType(CometOperand, ErrorMessage) whileBodyResult = compile(c, whileStmt.program);
     if (whileBodyResult.error)
         return whileBodyResult;
@@ -3744,6 +3797,8 @@ ResultType(CometOperand, ErrorMessage) visitWhileStatement(CometCompiler* c, Com
 
     c->env = destroyEnv(whileEnv);
 
+    pop(c->loopContexts);
+
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, CometASTNode* node) {
@@ -3752,6 +3807,14 @@ ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, Comet
 
     CometLabel* mainLabel = buildLabel(c);
     CometLabel* endLabel = buildLabel(c);
+
+    CometLabel* continueLabel = buildLabel(c);
+
+    LoopContext loopContext = {
+        .breakLabel = endLabel,
+        .continueLabel = continueLabel
+    };
+    append(c->loopContexts, loopContext);
 
     // resolve start and end types
     ResultType(CometType, ErrorMessage) startType = resolveType(c, forStmt.start);
@@ -3798,6 +3861,7 @@ ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, Comet
     if (stepType.error)
         return Error(CometOperand, ErrorMessage, stepType.as.error);
 
+    resolveLabel(c, continueLabel);
     buildLoad(c, idx);
 
     ResultType(CometOperand, ErrorMessage) step = visitValue(c, forStmt.step);
@@ -3821,7 +3885,7 @@ ResultType(CometOperand, ErrorMessage) visitForStatement(CometCompiler* c, Comet
     // exit the for loop's env
     c->env = destroyEnv(forLoopEnv);
 
-    
+    pop(c->loopContexts);
 
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
@@ -5327,6 +5391,7 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
     newCompiler->cachedGenerics = newList(CachedGenericStruct);
     newCompiler->genericDefinitions = newList(GenericStructDef);
     newCompiler->blocks = newList(Block);
+    newCompiler->loopContexts = newList(LoopContext);
 
     // fill in type map
     defineType(newCompiler->typeMap, "small",  (CometType){.typeKind = COMET_SMALL });
@@ -5388,6 +5453,10 @@ ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* n
             return visitFuncDefStatement(c, node);
         case AST_RETURN_STATEMENT:
             return visitReturnStatement(c, node);
+        case AST_BREAK_STATEMENT:
+            return visitBreakStatement(c, node);
+        case AST_CONTINUE_STATEMENT:
+            return visitContinueStatement(c, node);
         case AST_IF_STATEMENT:
             return visitIfStatement(c, node);
         case AST_WHILE_STATEMENT:

@@ -171,6 +171,10 @@ void freeNode(CometASTNode* node) {
             break;
         }   
 
+        case AST_CONTINUE_STATEMENT:
+        case AST_BREAK_STATEMENT:
+            break;
+
         case AST_TYPE: {
             for (size_t i = 0; i < node->data.AST_TYPE.baseType.count; i++) {
                 freeNode(*get(node->data.AST_TYPE.baseType, i));
@@ -288,6 +292,10 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
             return "AST_THROW_STATEMENT";
         case AST_AS_FUNC_DEF:
             return "AST_AS_FUNC_DEF";
+        case AST_CONTINUE_STATEMENT:
+            return "AST_CONTINUE_STATEMENT";
+        case AST_BREAK_STATEMENT:
+            return "AST_BREAK_STATEMENT";
 
         case AST_INFIX_EXPRESSION:
             return "AST_INFIX_EXPRESSION";

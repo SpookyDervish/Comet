@@ -24,6 +24,12 @@ struct Block {
     Block* parent;
 };
 
+typedef struct {
+    CometLabel* breakLabel;
+    CometLabel* continueLabel;
+} LoopContext;
+UseList(LoopContext);
+
 
 UseList(uint64_t);
 UseList(Block);
@@ -45,6 +51,7 @@ typedef struct {
 
     List(Block) blocks;
     Block* currentBlock;
+    List(LoopContext) loopContexts;
 
     CometOperand consts[512];
     CometFunction* functions[128];

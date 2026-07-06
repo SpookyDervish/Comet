@@ -1,3 +1,17 @@
+import io
+
 func main() -> int {
-    return 2 || 1
+    for int i in 0 .. 5 {
+        for int j in 0 .. 5 {
+            if i == 2
+                continue
+
+            if j == 3
+                break
+
+            io.println("i: %n, j: %n", i, j)
+        }
+    }
+
+    return 0
 }
