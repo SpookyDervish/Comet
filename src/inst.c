@@ -359,6 +359,26 @@ CometOperand buildGte(CometCompiler* c, CometType resultType) {
 
     return dest;
 }
+CometOperand buildOr(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_OR, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
+CometOperand buildAnd(CometCompiler* c) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    buildInst(c, INST_AND, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+
+    return dest;
+}
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, CometType* argTypes, bool isVarArgs, bool isMethod, bool isExternal, int8_t libIdx, CometASTNode* defNode) {
     CometFunction* newFunction = malloc(sizeof(CometFunction));
     newFunction->argCount = argCount;

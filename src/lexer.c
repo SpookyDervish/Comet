@@ -539,6 +539,54 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
             case ']': append(tokens, TOKEN_CHAR(CT_CLOSE_SQUARE, "]", lexer)); break;
             case '#': append(tokens, TOKEN_CHAR(CT_HASH, "#", lexer)); break;
             case ':': append(tokens, TOKEN_CHAR(CT_COLON, ":", lexer)); break;
+
+            case '|': {
+                ResultType(char, charptr) next = lexerPeek(lexer);
+                lexerConsume(lexer);
+
+                if (next.error || next.as.success != '|') {
+                    ErrorMessage errMsg = createError(
+                        lexer->filePath,
+                        lexer->source,
+                        "InvalidSyntax",
+                        "Expected '|' after '|'",
+                        NULL,
+                        lexer->lineNum,
+                        lexer->column,
+                        lexer->column
+                    );
+
+                    return Error(tokenList, ErrorMessage, errMsg);
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_OR, "||", lexer));
+
+                break; 
+            }
+
+            case '&': {
+                ResultType(char, charptr) next = lexerPeek(lexer);
+                lexerConsume(lexer);
+
+                if (next.error || next.as.success != '&') {
+                    ErrorMessage errMsg = createError(
+                        lexer->filePath,
+                        lexer->source,
+                        "InvalidSyntax",
+                        "Expected '&' after '&'",
+                        NULL,
+                        lexer->lineNum,
+                        lexer->column,
+                        lexer->column
+                    );
+
+                    return Error(tokenList, ErrorMessage, errMsg);
+                }
+
+                append(tokens, TOKEN_LITERAL(CT_AND, "&&", lexer));
+
+                break; 
+            }
             
             case '.': {
                 ResultType(char, charptr) nextDot = lexerPeek(lexer);

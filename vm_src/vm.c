@@ -298,6 +298,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&GTEF,
         &&LTEI,
         &&LTEF,
+        &&OR,
+        &&AND,
         &&LOAD_ARG,
         &&RET,
         &&CALL,
@@ -573,6 +575,14 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&aDouble, &a, sizeof(double));
 
         pushValue(vm, aDouble >= bDouble);
+        DISPATCH();
+    }
+    OR: {
+        pushValue(vm, popValue(vm) || popValue(vm));
+        DISPATCH();
+    }
+    AND: {
+        pushValue(vm, popValue(vm) && popValue(vm));
         DISPATCH();
     }
     JMP: {

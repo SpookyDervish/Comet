@@ -2281,6 +2281,10 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                 case CT_DIVIDE: // division always results in a double
                     return Success(CometType, ErrorMessage, {.typeKind = COMET_DOUBLE});
 
+                case CT_OR:
+                case CT_AND:
+                    return Success(CometType, ErrorMessage, cometTypeBool);
+
                 case CT_COLON:
                     if (left.as.success.typeKind != COMET_ARRAY) {
                         ErrorMessage errMsg = createError(
@@ -3134,6 +3138,87 @@ ResultType(CometOperand, ErrorMessage) visitAsExpr(CometCompiler* c, CometASTNod
     return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
+ResultType(CometOperand, ErrorMessage) visitLogicalOpExpr(CometCompiler* c, CometASTNode* node) {
+    struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
+
+    
+    CometLabel* endLabel = buildLabel(c);
+
+    if (expr.op.type == CT_AND) {
+        CometLabel* falseLabel = buildLabel(c);
+
+        // return false if the first value is false
+        ResultType(CometOperand, ErrorMessage) leftValue = visitValue(c, expr.left);
+        if (leftValue.error)
+            return leftValue;
+
+        buildJumpIfFalse(c, falseLabel);
+
+        // return false if the second value is false
+        ResultType(CometOperand, ErrorMessage) rightValue = visitValue(c, expr.right);
+        if (rightValue.error)
+            return rightValue;
+
+        buildJumpIfFalse(c, falseLabel);
+
+        // if we made it here it must be true
+        CometOperand trueValue = createOperand(CO_IMMEDIATE);
+        trueValue.imm.typeKind = COMET_SMALL;
+        trueValue.imm.smallVal = 1;
+
+        CometOperand trueConst = storeConst(c, trueValue);
+        buildPushConst(c, trueConst);
+        buildJump(c, endLabel);
+
+        // otherwise we jump here if its false
+        resolveLabel(c, falseLabel);
+        CometOperand falseValue = createOperand(CO_IMMEDIATE);
+        falseValue.imm.typeKind = COMET_SMALL;
+        falseValue.imm.smallVal = 0;
+
+        CometOperand falseConst = storeConst(c, falseValue);
+        buildPushConst(c, falseConst);
+    } else {
+        CometLabel* trueLabel = buildLabel(c);
+
+        // return false if the first value is false
+        ResultType(CometOperand, ErrorMessage) leftValue = visitValue(c, expr.left);
+        if (leftValue.error)
+            return leftValue;
+
+        buildJumpIfTrue(c, trueLabel);
+
+        // return false if the second value is false
+        ResultType(CometOperand, ErrorMessage) rightValue = visitValue(c, expr.right);
+        if (rightValue.error)
+            return rightValue;
+
+        buildJumpIfTrue(c, trueLabel);
+
+        // if we made it here it must be false
+        CometOperand falseValue = createOperand(CO_IMMEDIATE);
+        falseValue.imm.typeKind = COMET_SMALL;
+        falseValue.imm.smallVal = 0;
+
+        CometOperand falseConst = storeConst(c, falseValue);
+        buildPushConst(c, falseConst);
+        buildJump(c, endLabel);
+
+        // otherwise we jump here if its true
+        resolveLabel(c, trueLabel);
+        CometOperand trueValue = createOperand(CO_IMMEDIATE);
+        trueValue.imm.typeKind = COMET_SMALL;
+        trueValue.imm.smallVal = 1;
+
+        CometOperand trueConst = storeConst(c, trueValue);
+        buildPushConst(c, trueConst);
+    }
+
+    // end
+    resolveLabel(c, endLabel);
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
+}
+
 ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, CometASTNode* node) {
     c->currentLine = node->lineNum;
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
@@ -3156,6 +3241,10 @@ ResultType(CometOperand, ErrorMessage) visitInfixExpression(CometCompiler* c, Co
         return Error(CometOperand, ErrorMessage, rightType.as.error);
 
     CometType resultType = unifyType(leftType.as.success, rightType.as.success);
+
+    if (expr.op.type == CT_OR || expr.op.type == CT_AND) { // we need this for short
+        return visitLogicalOpExpr(c, node);
+    }
     
     // left
     ResultType(CometOperand, ErrorMessage) leftValue = visitValue(c, expr.left);

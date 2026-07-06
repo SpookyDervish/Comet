@@ -37,7 +37,9 @@ const CometTokenPrecedencePair PRECEDENCES[] = {
     {CT_EQ, PRECEDENCE_SET},
     {CT_OPEN_PAREN, PRECEDENCE_CALL},
     {CT_COLON, PRECEDENCE_INDEX},
-    {CT_AS, PRECEDENCE_DOT}
+    {CT_AS, PRECEDENCE_DOT},
+    {CT_OR, PRECEDENCE_OR},
+    {CT_AND, PRECEDENCE_AND}
 };
 
 ResultType(astNodePtr, ErrorMessage) parseIntLiteral(CometParser* parser);
@@ -92,6 +94,8 @@ const CometInfixParseFn INFIX_PARSE_FUNCTIONS[] = {
     {CT_DOT, parseInfixExpression},
     {CT_EQ, parseInfixExpression},
     {CT_COLON, parseInfixExpression},
+    {CT_OR, parseInfixExpression},
+    {CT_AND, parseInfixExpression},
     {CT_AS, parseAsExpression},
     {CT_OPEN_PAREN, parseFunctionCall}
 };

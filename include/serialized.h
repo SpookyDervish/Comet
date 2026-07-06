@@ -31,6 +31,8 @@ typedef enum {
     INST_GTEF,
     INST_LTEI,
     INST_LTEF,
+    INST_OR,
+    INST_AND,
     INST_LOAD_ARG,
     INST_RET,
     INST_CALL,
