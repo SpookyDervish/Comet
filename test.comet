@@ -1,6 +1,7 @@
-import socket
+import io
 
 func main() -> int {
-    socket.Foo x = socket.Foo.Blue
-    return x
+    cards:0 .field = 123
+
+    return 0
 }
