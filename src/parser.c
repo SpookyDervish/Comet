@@ -1201,7 +1201,7 @@ ResultType(astNodePtr, ErrorMessage) parseScalarType(CometParser* parser, Parsed
     uint32_t lineNum = parser->currentToken->lineNum;
     uint32_t startCol = parser->currentToken->startCol;
 
-    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.chain, baseType.genericArgs, NULL, 0);
+    CometASTNode* typeNode = AST_NODE(AST_TYPE, lineNum, baseType.chain, baseType.genericArgs, newList(astNodePtr), 0);
     typeNode->startCol = startCol;
     typeNode->endCol = parser->currentToken->endCol;
 
@@ -1991,7 +1991,7 @@ ResultType(astNodePtr, ErrorMessage) parseStructCreateStatement(CometParser* par
     if (structType.error)
         return structType;
 
-    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType.as.success, NULL);
+    CometASTNode* stmt = AST_NODE(AST_NEW_STATEMENT, lineNum, structType.as.success, {});
 
     if (peekTokenIs(parser, CT_OPEN_PAREN)) {
         parserNextToken(parser);
@@ -2196,6 +2196,8 @@ ResultType(astNodePtr, ErrorMessage) parseAsFuncDef(CometParser* parser) {
         return body;
 
     CometASTNode* stmt = AST_NODE(AST_AS_FUNC_DEF, lineNumber, type.as.success, body.as.success);
+    stmt->startCol = startCol;
+    stmt->endCol = parser->currentToken->endCol;
 
     return Success(astNodePtr, ErrorMessage, stmt);
 }

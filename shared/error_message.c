@@ -7,10 +7,8 @@
 
 void printErrorMessage(ErrorMessage errMsg) {
     char* errorLineSource = getLineInString(errMsg.sourceCode, errMsg.lineNumber);
-    bool lineSourceOwned = true;
     if (errorLineSource == NULL) {
         errorLineSource = "??? (something REALLLYYY bad has happened)";
-        lineSourceOwned = false;
     }
 
     static const unsigned int linesToShow = 2; // 2 above, 2 below

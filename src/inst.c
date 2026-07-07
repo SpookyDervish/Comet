@@ -425,8 +425,6 @@ CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
     CometOperand funcValue = createOperand(CO_SYMBOL);
     funcValue.symbolIdx = getSymbolIndex(c, name);
 
-    assert(funcValue.symbolIdx != -1);
-
     CometOperand returnValue = pushVal(c);
 
     for (size_t argIdx = 0; argIdx < args.count; argIdx++) {

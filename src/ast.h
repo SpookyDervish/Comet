@@ -88,7 +88,7 @@ struct CometASTNode {
             List(astNodePtr) baseType;
             List(astNodePtr) genericTypes;
             List(astNodePtr) shape;
-            int dimensions;
+            unsigned int dimensions;
         } AST_TYPE;
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;

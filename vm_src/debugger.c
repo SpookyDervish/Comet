@@ -97,12 +97,19 @@ CometSerializedFunc* getFuncByName(CometDebugger* dbgr, char* name) {
 }
 
 ResultType(charptr, charptr) continueHandler(CometDebugger* dbgr, int argc, char** argv) {
+    (void)argc; // force the arg to be unused
+    (void)argv;
+
     dbgr->vm->instructionsLeftToExec = UINT64_MAX;
     dbgr->running = false;
     return Success(charptr, charptr, NULL);
 }
 
 ResultType(charptr, charptr) quitHandler(CometDebugger* dbgr, int argc, char** argv) {
+    (void)dbgr; // force the arg to be unused
+    (void)argc;
+    (void)argv;
+
     exit(0);
 }
 
@@ -249,10 +256,6 @@ ResultType(charptr, charptr) disassembleHandler(CometDebugger* dbgr, int argc, c
         range = getRangeNearIP(dbgr);
     else 
         range = parseRange(argv[0]);
-    
-    if (range.start < 0) {
-        return Error(charptr, charptr, "can't start disassembly at negative address!");
-    }
 
     printDisassembly(dbgr, range) ;
 
@@ -278,7 +281,7 @@ ResultType(charptr, charptr) stackHandler(CometDebugger* dbgr, int argc, char** 
             return Error(charptr, charptr, "index is past length of stack!");
         }
 
-        printf(ESC_BOLD "Stack[%ld]:" ESC_RESET " 0x%08llx\n", value, dbgr->vm->stack[value]);
+        printf(ESC_BOLD "Stack[%ld]:" ESC_RESET " 0x%08lx\n", value, dbgr->vm->stack[value]);
         return Success(charptr, charptr, NULL);
     }
 
@@ -314,7 +317,7 @@ ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char
 
     Range range = parseRange(argv[0]);
 
-    if (range.start < 0 || range.end >= MAX_VARIABLES) 
+    if (range.end >= MAX_VARIABLES) 
         return Error(charptr, charptr, "variable index out of bounds");
 
     char* varType = argc > 1 ? argv[1] : "hex";
@@ -323,9 +326,9 @@ ResultType(charptr, charptr) variableHandler(CometDebugger* dbgr, int argc, char
         printf(ESC_BOLD "vars[%d]" ESC_RESET " = ", i);
 
         if (strcmp(varType, "hex") == 0) {
-            printf("0x%08llx", dbgr->vm->variables[i]);
+            printf("0x%08lx", dbgr->vm->variables[i]);
         } else if (strcmp(varType, "int") == 0) {
-            printf("%lld", dbgr->vm->variables[i]);
+            printf("%ld", dbgr->vm->variables[i]);
         } else if (strcmp(varType, "float") == 0) {
             double out;
             memcpy(&out, &dbgr->vm->variables[i], sizeof(double));
@@ -403,7 +406,7 @@ ResultType(charptr, charptr) structsHandler(CometDebugger* dbgr, int argc, char*
             range.end = newEnd;
         }
 
-        if (range.start < 0 || range.end >= dbgr->vm->numStructs) 
+        if (range.end >= dbgr->vm->numStructs) 
             return Error(charptr, charptr, "struct index out of bounds");
 
         for (uint32_t i = range.start; i < range.end; i++) {
@@ -448,7 +451,7 @@ ResultType(charptr, charptr) functionsHandler(CometDebugger* dbgr, int argc, cha
             range.end = newEnd;
         }
 
-        if (range.start < 0 || range.end >= dbgr->vm->numFunctions) 
+        if (range.end >= dbgr->vm->numFunctions) 
             return Error(charptr, charptr, "function index out of bounds");
 
         for (uint32_t i = range.start; i < range.end; i++) {
@@ -637,10 +640,11 @@ void printAliases(CometDebugCommand cmd) {
 }
 
 ResultType(charptr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** argv) {
+    (void)argv; // force the arg to be unused
+    (void)dbgr;
+
     // look for command with given name
     if (argc > 0) {
-        char* cmdName = argv[0];
-
         const CometDebugCommand* cmd = getCommandByName(argv[0]);
         if (cmd == NULL) {
             Estr errMsg = CREATE_ESTR("no such command: \"");
@@ -675,7 +679,7 @@ ResultType(charptr, charptr) helpHandler(CometDebugger* dbgr, int argc, char** a
 Range parseRange(const char* str) {
     Range r = {0};
 
-    char* colon = strchr(str, ':');
+    const char* colon = strchr(str, ':');
 
     if (!colon) {
         // single value: "3"
@@ -700,7 +704,7 @@ Range parseRange(const char* str) {
     return r;
 }
 
-char* cometImmediateToCStr(CometVM* vm, CometImmediate immediate) {
+char* cometImmediateToCStr(CometImmediate immediate) {
     switch (immediate.typeKind) {
         case COMET_SMALL: {
             char* buffer = malloc(4);
@@ -749,7 +753,7 @@ char* cometImmediateToCStr(CometVM* vm, CometImmediate immediate) {
 char* cometOperandToCStr(CometVM* vm, CometOperand operand) {
     switch (operand.type) {
         case CO_IMMEDIATE:
-            return cometImmediateToCStr(vm, operand.imm);
+            return cometImmediateToCStr(operand.imm);
 
         case CO_STACK: {
             char* buffer = malloc(32);
@@ -1007,7 +1011,7 @@ char* cometInstructionToCStr(CometVM* vm, CometSerializedInst inst, uint64_t ins
 
         case INST_JMP:
         case INST_JMP_IF_FALSE:
-            if (inst.a >= vm->numInstructions) {
+            if ((uint32_t)inst.a >= vm->numInstructions) {
                 sprintf(extra, "; (???)");
                 break;
             }

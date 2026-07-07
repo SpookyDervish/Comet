@@ -26,7 +26,7 @@ uint32_t serializeOperand(CometOperand operand) {
     }
 }
 
-CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType, uint32_t idx) {
+CometSerializedStruct* serializeStruct(CometStruct* structType, uint32_t idx) {
     CometSerializedStruct* serialized = calloc(1, sizeof(CometSerializedStruct));
     
     *serialized = (CometSerializedStruct){

@@ -118,7 +118,7 @@ typedef struct {
 } CometInst;
 
 CometSerializedInst* serializeInst(CometInst inst);
-CometSerializedStruct* serializeStruct(CometFunction** compilerFuncs, CometStruct* structType, uint32_t idx);
+CometSerializedStruct* serializeStruct(CometStruct* structType, uint32_t idx);
 uint32_t serializeOperand(CometOperand operand);
 
 int64_t cometSerializeValue(CometOperand value);

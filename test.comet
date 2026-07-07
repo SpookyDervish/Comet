@@ -1,7 +1,3 @@
-import io
-
 func main() -> int {
-    cards:0 .field = 123
-
     return 0
 }

@@ -157,7 +157,7 @@ void newUninitList(CometVM* vm) {
     int64_t length = popValue(vm);
 
     CometSerializedArray* array = malloc(sizeof(CometSerializedArray));
-    int64_t* arrayData = calloc(sizeof(int64_t), length);
+    int64_t* arrayData = calloc(length, sizeof(int64_t));
 
     array->data = arrayData;
     array->capacity = length;
@@ -208,8 +208,6 @@ ResultType(voidPtr, charptr) invalidInstruction(CometSerializedInst inst) {
 
 void vmThrow(CometVM* vm, char* errName, char* msg, CometObject* errPtr) {
     if (vm->currentExcept == 0) {
-        char* trace = stackTrace(vm);
-
         if (!vm->debugInfo) {
             ErrorMessage errMsg = createError(
                 "<empty>",
@@ -692,7 +690,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         uint64_t capacity = array->capacity;
 
         if (index < 0) index = capacity + index;
-        if (index < 0 || index >= capacity) {
+        if (index < 0 || (uint64_t)index >= capacity) {
             char* buffer = malloc(128);
             snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
             return Error(voidPtr, charptr, buffer);
@@ -712,7 +710,7 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         uint64_t capacity = array->capacity;
 
         if (index < 0) index = capacity + index;
-        if (index < 0 || index >= capacity) {
+        if (index < 0 || (uint64_t)index >= capacity) {
             char* buffer = malloc(128);
             snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
             return Error(voidPtr, charptr, buffer);
@@ -929,7 +927,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
         for (size_t symbolIdx = 0; symbolIdx < newVM->numFunctions; symbolIdx++) {
             CometSerializedFunc* externalFunc = &newVM->functions[symbolIdx];
 
-            if (!(externalFunc->libIdx == i && externalFunc->isExternal))
+            if (!((uint8_t)externalFunc->libIdx == i && externalFunc->isExternal))
                 continue;
             
 

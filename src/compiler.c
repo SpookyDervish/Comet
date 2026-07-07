@@ -102,7 +102,7 @@ char* typeToString(CometType type) {
                     );
                 }
     
-                if (i >= type.arrayType->dims - 1) {
+                if (i >= (uint8_t)(type.arrayType->dims - 1)) {
     
                     written += snprintf(
                         buffer + written, 
@@ -133,7 +133,7 @@ char* typeToString(CometType type) {
                 for (size_t i = 0; i < type.structType->numGivenGenericTypes; i++) {
                     APPEND_ESTR(buffer, typeToString(type.structType->givenGenericTypes[i]));
 
-                    if (i < type.structType->numGivenGenericTypes - 1) {
+                    if (i < (uint8_t)(type.structType->numGivenGenericTypes - 1)) {
                         APPEND_ESTR(buffer, ", ");
                     }
                 }
@@ -312,10 +312,6 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
 
     CometStruct* newStruct = malloc(sizeof(CometStruct));
     if (!newStruct) return NULL;
-    CometType structType = {
-        .structType = newStruct,
-        .typeKind = COMET_STRUCT
-    };
 
     // prepare vtable
     CometMethod** newVtable = calloc(cometStruct->numMethods, sizeof(CometMethod*));
@@ -381,7 +377,6 @@ CometStruct* getGenericStruct(CometCompiler* c, CometStruct* cometStruct, List(G
 
         // compile the function body into the new function
         CometEnvironment* oldEnv = c->env;
-        CometFunction* oldFunc = c->currentFunction; // buildFunction set currentFunction to new function
 
         CometEnvironment* funcEnv = newEnvironment(mangledName.str, oldEnv, true);
         c->env = funcEnv;
@@ -1627,7 +1622,7 @@ ResultType(voidPtr, ErrorMessage) visitLValue(CometCompiler* c, CometASTNode* no
                     }
 
                     char* fieldName = expr.right->data.AST_IDENTIFIER.ident;
-                    uint32_t fieldIndex = getFieldIndex(leftType.as.success.structType, fieldName);
+                    int32_t fieldIndex = getFieldIndex(leftType.as.success.structType, fieldName);
                     if (fieldIndex == -1) {
                         Estr buffer = CREATE_ESTR("Struct \"");
                         APPEND_ESTR(buffer, typeToString(leftType.as.success));
@@ -2070,7 +2065,7 @@ CometType getTopArrayElemType(CometArrayType* arrayType) {
     };
 
     outArrayType->dims = arrayType->dims - 1;
-    for (size_t i = 0; i < arrayType->dims - 1; i++) {
+    for (size_t i = 0; i < (uint8_t)(arrayType->dims - 1); i++) {
         outArrayType->fixedSize[i] = arrayType->fixedSize[i];
         outArrayType->isFixedSize[i] = arrayType->isFixedSize[i];
     }
@@ -4226,10 +4221,6 @@ ResultType(CometOperand, ErrorMessage) visitAsFuncDef(CometCompiler* c, CometAST
 
     // build the function start
     CometOperand funcValue = buildFunction(c, funcName.str, 1, returnType.as.success, argTypes, false, true, false, -1, node);
-    CometType funcType = {
-        .typeKind = COMET_FUNCTION,
-        .functionType = getValueType(c, funcValue).functionType
-    };
 
     // create the new scope for the function
     CometEnvironment* funcEnv = newEnvironment(funcName.str, c->env, true);
@@ -5293,7 +5284,7 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
 
     for (size_t structIdx = 0; structIdx < c->structs.count; structIdx++) {
         CometStruct* structType = *get(c->structs, structIdx);
-        CometSerializedStruct* serializedStruct = serializeStruct(c->functions, structType, structIdx);
+        CometSerializedStruct* serializedStruct = serializeStruct(structType, structIdx);
 
         fwrite(serializedStruct->name, 1, 48, file);
         fwrite(&serializedStruct->numFields, 1, sizeof(uint32_t), file);

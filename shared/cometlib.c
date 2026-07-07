@@ -8,8 +8,6 @@
 #include <string.h>
 #include <sys/types.h>
 
-static CometStruct* exceptStruct = NULL;
-
 int8_t cometArgSmall(int64_t argVal) {
     return cometDeserializeValue(argVal, cometTypeSmall).imm.smallVal;
 }
@@ -418,6 +416,11 @@ CometOperand cometValue(CometValueTypeKind valueType, ...) {
                 .imm.moduleVal = va_arg(args, CometEnvironment*)
             };
             break;
+        default: {
+            return (CometOperand){
+                .type = CO_NONE
+            };
+        }
     }
 
     va_end(args);
