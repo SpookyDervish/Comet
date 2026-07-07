@@ -468,7 +468,7 @@ CometSerializedStruct* cometVMGetStruct(CometVM* vm, char* structName) {
     return NULL;
 }
 
-API_EXPORT CometObject* cometCreateObject(CometSerializedStruct* structType) {
+CometObject* cometCreateObject(CometSerializedStruct* structType) {
     CometObject* obj = malloc(sizeof(CometObject));
 
     obj->fields = calloc(structType->numFields, sizeof(int64_t));
@@ -476,6 +476,34 @@ API_EXPORT CometObject* cometCreateObject(CometSerializedStruct* structType) {
     obj->structIdx = structType->structIdx;
 
     return obj;
+}
+
+CometType cometDefineEnum(CometEnvironment* env, CometTypeMap* typeMap, char* name, char* items[], size_t numItems) {
+    CometEnumType* enumType = malloc(sizeof(CometEnumType));
+    enumType->enumName = strdup(name);
+    enumType->numItems = numItems;
+    enumType->valueNames = malloc(sizeof(char*) * numItems);
+
+    for (size_t i = 0; i < numItems; i++) {
+        enumType->valueNames[i] = strdup(items[i]);
+    }
+
+    CometType enumTypeWrapper = {
+        .typeKind = COMET_ENUM,
+        .enumType = enumType
+    };
+
+    defineType(typeMap, enumType->enumName, enumTypeWrapper);
+
+    CometOperand enumValue = {
+        .type = CO_IMMEDIATE,
+        .imm.typeKind = COMET_TYPE,
+        .imm.typeVal = enumTypeWrapper
+    };
+
+    defineVar(env, enumType->enumName, RECORD_LOCAL, enumValue, enumTypeWrapper, false);
+
+    return enumTypeWrapper;
 }
 
 ResultType(int64_t, objectPtr) cometError(CometVM* vm, char* errorName, char* errorMessage) {

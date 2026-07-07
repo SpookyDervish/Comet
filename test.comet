@@ -1,19 +1,6 @@
-import io
-
-struct Foo {
-    init() {}
-
-    func test(int n) -> int {
-        if n == 10 
-            return 0
-
-        return self.test(n + 1)
-    }
-}
+import socket
 
 func main() -> int {
-    Foo x = new Foo()
-    x.test(0)
-
-    return 0
+    socket.Foo x = socket.Foo.Blue
+    return x
 }

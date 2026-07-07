@@ -93,6 +93,8 @@ API_EXPORT void cometSetField(CometObject* object, uint32_t index, int64_t value
 
 API_EXPORT CometSerializedStruct* cometVMGetStruct(CometVM* vm, char* structName);
 
+API_EXPORT CometType cometDefineEnum(CometEnvironment* env, CometTypeMap* typeMap, char* name, char* items[], size_t numItems);
+
 API_EXPORT ResultType(int64_t, objectPtr) cometError(CometVM* vm, char* errorName, char* errorMessage);
 
 #endif
