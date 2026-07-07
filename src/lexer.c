@@ -207,6 +207,7 @@ ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
 
     while (lexer->pos < lexer->sourceLen) {
         char current = lexer->currentChar;
+        
 
         if (current == '-') {
             if (isNegative) {
@@ -283,6 +284,12 @@ ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
         }
 
         char peek = lexer->source[lexer->pos+1];
+
+        char extraPeek = lexer->source[lexer->pos+2];
+        if (peek == '.' && (!isdigit(extraPeek) || isspace(extraPeek))) { // we do this to avoid situations like array:0.field
+            break;
+        }
+
         if ((isdigit(peek) && !isspace(peek)) || peek == '.') {
             lexerConsume(lexer);
         } else {
