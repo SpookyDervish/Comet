@@ -12,6 +12,12 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
 - An extensive standard library that handles memory management for you
 - Arrays
 
+## Supported Systems
+- Linux - natively supported. Comet will work perfectly fine on Linux.
+- MacOS - supported. MacOS will you give you extra warnings and you will need to install argp as well as uthash.
+- Windows - untested. Comet may or may not work. For the best compatibility, use Comet inside of WSL.
+- Other systems - untested. If you're on a Unix-like system then Comet will likely work.
+
 ## Completed Features
 - [x] Variables
 - [x] Loops
