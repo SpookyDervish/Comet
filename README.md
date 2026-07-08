@@ -63,5 +63,12 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [x] Catch exceptions
 - [x] Enums
 
-## Compiling
+## Installation
+Comet has no official release yet, and thus you will have to build Comet from source.
+
+### Compile Requirements
+- uthash - needed for a dictionary implementation in C
+- argp (installed on most Linux distros) - used for command line argument parsing
+
+### Compiling
 Just run `make install` in the root of the repo. This will install the `cometc` and `comet` executables as well as the core library needed to run comet. If you want a debug build, run `make debug` which will just put the `cometc` and `comet` executables in the root of the repo instead. Debug builds include the address sanitizer for tracking down segfaults. 
