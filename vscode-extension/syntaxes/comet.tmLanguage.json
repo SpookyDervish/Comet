@@ -29,8 +29,8 @@
 			"patterns": [
                 {
 					"name": "comment.block.comet",
-					"begin": "--\\[\\[",
-					"end": "\\]\\]"
+					"begin": "\\/",
+					"end": "\\*/"
 				},
 				{
 					"name": "comment.line.double-slash.comet",

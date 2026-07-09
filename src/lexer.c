@@ -438,6 +438,49 @@ ResultType(CometToken, ErrorMessage) lexerParseChar(CometLexer* lexer) {
     return Success(CometToken, ErrorMessage, token.as.success);
 }
 
+ResultType(CometToken, ErrorMessage) lexerParseComment(CometLexer* lexer) {
+    uint32_t startCol = lexer->column;
+    uint32_t startLine = lexer->lineNum;
+
+    if (lexer->currentChar == '*') {
+        while (lexer->pos <= lexer->sourceLen) {
+            lexerConsume(lexer);
+
+            if (lexer->currentChar == '*') {
+                ResultType(char, charptr) peek = lexerPeek(lexer);
+                
+                if (!peek.error && peek.as.success == '/') {
+                    lexerConsume(lexer);
+                    break;
+                }
+            }
+
+            if (lexer->pos > lexer->sourceLen) { // didnt close comment
+                ErrorMessage errMsg = createError(
+                    lexer->filePath,
+                    lexer->source,
+                    "SyntaxError",
+                    "Block comment was never closed",
+                    NULL,
+                    startLine,
+                    startCol,
+                    startCol
+                );
+
+                return Error(CometToken, ErrorMessage, errMsg);
+            }
+        }
+    } else {
+        uint32_t startLine = lexer->lineNum;
+        while (startLine == lexer->lineNum && lexer->pos <= lexer->sourceLen) {
+            lexerConsume(lexer);
+        }
+        
+    }
+
+    return Success(CometToken, ErrorMessage, {});
+}
+
 ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
     List(CometToken) tokens = newList(CometToken);
 
@@ -629,6 +672,13 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
                 } else if (!arrow.error && arrow.as.success == '=') {
                     lexerConsume(lexer);
                     append(tokens, TOKEN_LITERAL(CT_MINUS_EQ, "-=", lexer));
+                } else if (!arrow.error && arrow.as.success == '-') {
+                    lexerConsume(lexer);
+                    lexerConsume(lexer);
+                    
+                    ResultType(CometToken, ErrorMessage) commentResult = lexerParseComment(lexer);
+                    if (commentResult.error)
+                        return Error(tokenList, ErrorMessage, commentResult.as.error);
                 } else {
                     append(tokens, TOKEN_CHAR(CT_MINUS, "-", lexer));
                 }
@@ -653,6 +703,14 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
                 if (!eq.error && eq.as.success == '=') {
                     lexerConsume(lexer);
                     append(tokens, TOKEN_LITERAL(CT_DIVIDE_EQ, "/=", lexer));
+                    break;
+                } else if(!eq.error && eq.as.success == '*') {
+                    lexerConsume(lexer);
+
+                    ResultType(CometToken, ErrorMessage) commentResult = lexerParseComment(lexer);
+                    if (commentResult.error)
+                        return Error(tokenList, ErrorMessage, commentResult.as.error);
+
                     break;
                 }
 

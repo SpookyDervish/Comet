@@ -1,3 +1,11 @@
 func main() -> int {
+    -- single line comment
+
+    /*
+    multi
+    line
+    comment
+    */
+
     return 0
 }
