@@ -1,14 +1,9 @@
 import io
 
-func foo(int[3] test) -> void {
-    test : 0 = 123
-    return
-}
+func main() -> double {
 
-func main() -> int {
+    float[5] intList = [0.1, 0.2, 0.3, 0.4, 0.5]
+    intList:0 = 0.5
 
-    int[3] test = new int[3]
-    foo(test)
-
-    return 0
+    return intList : 0
 }

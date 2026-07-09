@@ -2734,7 +2734,8 @@ ResultType(CometOperand, ErrorMessage) visitArrayReassignStatement(CometCompiler
     }
 
     CometType resultType = unifyType(varType.as.success, exprType.as.success);
-    if (resultType.typeKind != varType.as.success.typeKind) {
+    if (!typesAreEqual(exprType.as.success, varType.as.success) &&
+        !canImplicitCastType(varType.as.success, exprType.as.success)) {
         ErrorMessage errMsg = createError(
             c->inputFilePath,
             c->sourceCode,
