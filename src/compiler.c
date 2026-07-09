@@ -3054,27 +3054,36 @@ ResultType(CometOperand, ErrorMessage) getEnumValue(CometCompiler* c, CometType 
 }
 
 ResultType(CometOperand, ErrorMessage) convertInbuiltType(CometCompiler* c, CometType leftType, CometType rightType, CometASTNode* leftNode) {
-    switch (leftType.typeKind) {
-        default: break;
+
+    ResultType(CometOperand, ErrorMessage) leftValue = visitValue(c, leftNode);
+    if (leftValue.error)
+        return leftValue;
+
+    if (typeIsFloat(leftType) && typeIsInt(rightType)) {
+        buildF2I(c);
+    } else if (typeIsInt(leftType) && typeIsFloat(rightType)) {
+        buildI2F(c);
+    } else {
+        Estr buffer = CREATE_ESTR("Cannot convert type ");
+        APPEND_ESTR(buffer, typeToString(leftType));
+        APPEND_ESTR(buffer, " to ");
+        APPEND_ESTR(buffer, typeToString(rightType));
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "CannotConvertType",
+            buffer.str,
+            NULL,
+            leftNode->lineNum,
+            leftNode->startCol,
+            leftNode->endCol
+        );
+
+        return Error(CometOperand, ErrorMessage, errMsg);
     }
 
-    Estr buffer = CREATE_ESTR("Cannot convert type ");
-    APPEND_ESTR(buffer, typeToString(leftType));
-    APPEND_ESTR(buffer, " to ");
-    APPEND_ESTR(buffer, typeToString(rightType));
-
-    ErrorMessage errMsg = createError(
-        c->inputFilePath,
-        c->sourceCode,
-        "CannotConvertType",
-        buffer.str,
-        NULL,
-        leftNode->lineNum,
-        leftNode->startCol,
-        leftNode->endCol
-    );
-
-    return Error(CometOperand, ErrorMessage, errMsg);
+    return Success(CometOperand, ErrorMessage, NO_OPERAND);
 }
 
 ResultType(CometOperand, ErrorMessage) visitAsExpr(CometCompiler* c, CometASTNode* node) {
