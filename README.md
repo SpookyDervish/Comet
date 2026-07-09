@@ -6,7 +6,7 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
 - Runtime exceptions
 - Inline functions
 - A system for casting values from one type to another
-- A constraint system for generics
+- A constraint system for generics (not done just yet!)
 - Inheritance
 - Imports and a package system (no more C-style header files!)
 - An extensive standard library that handles memory management for you
