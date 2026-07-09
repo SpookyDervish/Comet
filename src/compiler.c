@@ -576,11 +576,13 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
     Record* current, *tmp;
 
     // iterate over functions first
+
     HASH_ITER(hh, libEnv->records, current, tmp) {
 
         switch (current->type.typeKind) {
             case COMET_FUNCTION: {
-                CometFunction* funcVal = (CometFunction*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
+                CometExternalMethod* externalMethod = (CometExternalMethod*)current->value.imm.bigVal; // i sure do love casting pointers to ints lmao
+                CometFunction* funcVal = externalMethod->func;
                 funcVal->libIdx = libIdx;
 
                 // doin it manually lo-
@@ -591,6 +593,7 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
                 c->functionCount++;
 
                 current->value = funcOperand;
+
                 break;
             }
 
@@ -610,12 +613,16 @@ ResultType(CometOperand, ErrorMessage) loadExternalLib(CometCompiler* c, const c
 
                 CometMethod** vtable = malloc(sizeof(CometMethod*) * structVal->numMethods);
                 for (size_t i = 0; i < structVal->numMethods; i++) {
-                    CometFunction* func = (CometFunction*)(structVal->vtable[i]);
+                    CometExternalMethod* externalMethod = (CometExternalMethod*)(structVal->vtable[i]);
+                    CometFunction* func = externalMethod->func;
 
                     CometMethod* method = malloc(sizeof(CometMethod));
                     method->argCount = func->argCount;
                     method->returnType = func->returnType;
                     method->blockIdx = func->blockIdx;
+                    method->owner = externalMethod->owner;
+                    method->attrib = externalMethod->attrib;
+                    
                     memcpy(method->name, func->name, 32);
 
                     // find symbol idx

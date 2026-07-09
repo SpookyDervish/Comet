@@ -17,6 +17,14 @@
     #endif
 #endif
 
+typedef struct {
+    CometFunction* func;
+    CometStruct* owner;
+    FieldAttribute attrib;
+} CometExternalMethod;
+
+typedef CometExternalMethod* externalMethodPtr;
+
 #define on_import void onImport(CometEnvironment* env, CometTypeMap* typeMap)
 
 typedef CometFunction* cometFuncPtr;
@@ -28,7 +36,7 @@ typedef struct {
 } StructField;
 
 UseList(CometSerializedFunc);
-UseList(cometFuncPtr);
+UseList(externalMethodPtr);
 UseList(StructField);
 
 CometType cometCreateArrayType(CometType elem, uint8_t dimensions, bool isFixedSize[], uint64_t fixedSize[]);
@@ -53,7 +61,7 @@ API_EXPORT char* cometArgString(int64_t argVal);
 API_EXPORT uintptr_t cometArgPointer(int64_t argVal);
 API_EXPORT int64_t cometSerializeString(char* cString);
 
-API_EXPORT CometFunction* cometDefineFunc(
+API_EXPORT CometExternalMethod* cometDefineFunc(
     CometEnvironment* env,
     char* name,
     CometType returnType,
@@ -61,10 +69,11 @@ API_EXPORT CometFunction* cometDefineFunc(
     bool isVarArgs,
     ...
 );
-API_EXPORT CometFunction* cometDefineMethod(
+API_EXPORT CometExternalMethod* cometDefineMethod(
     CometEnvironment* env,
     char* name,
     CometStruct* cometStruct,
+    FieldAttribute attribute,
     CometType returnType,
     uint32_t numArgs,
     bool isVarArgs,
@@ -73,7 +82,7 @@ API_EXPORT CometFunction* cometDefineMethod(
 
 API_EXPORT StructField cometCreateField(char* name, CometType type, FieldAttribute attribute);
 
-API_EXPORT void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods);
+API_EXPORT void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(externalMethodPtr) methods);
 
 API_EXPORT CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* parent);
 

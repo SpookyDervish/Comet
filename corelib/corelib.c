@@ -16,7 +16,7 @@ void defineExceptionStruct(CometEnvironment* env, CometTypeMap* typeMap) {
     append(fields, cometCreateField("name", cometTypeString, FIELD_READ_ONLY));
     append(fields, cometCreateField("message", cometTypeString, FIELD_READ_ONLY));
 
-    List(cometFuncPtr) methods = newList(cometFuncPtr);
+    List(externalMethodPtr) methods = newList(externalMethodPtr);
 
     cometSetStructFieldsAndMethods(exceptionStruct, fields, methods);
     cometDefineConstructor(env, exceptionStruct, 1, false, cometTypeString);

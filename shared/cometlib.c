@@ -46,7 +46,7 @@ int64_t cometSerializeString(char* cString) {
     return cometSerializeValue(cometArray);
 }
 
-void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(cometFuncPtr) methods) {
+void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) fields, List(externalMethodPtr) methods) {
     size_t fieldCount  = cometStruct->parent == NULL ? fields.count : fields.count + cometStruct->parent->fieldCount;
     size_t methodCount = cometStruct->parent == NULL ? methods.count : methods.count + cometStruct->parent->numMethods;
 
@@ -55,12 +55,12 @@ void cometSetStructFieldsAndMethods(CometStruct* cometStruct, List(StructField) 
     CometStruct** fieldOwners = calloc(fieldCount, sizeof(CometStruct*));
     FieldAttribute* fieldAttribs = calloc(fieldCount, sizeof(FieldAttribute));
 
-    CometFunction** methodsArr = calloc(methodCount, sizeof(CometFunction*));
+    CometExternalMethod** methodsArr = calloc(methodCount, sizeof(CometExternalMethod*));
     size_t methodIdx = 0;
     size_t fieldIdx = 0;
 
     if (cometStruct->parent != NULL) {
-        memcpy(methodsArr, cometStruct->parent->vtable, sizeof(CometMethod*) * cometStruct->parent->numMethods);
+        memcpy(methodsArr, cometStruct->parent->vtable, sizeof(CometExternalMethod*) * cometStruct->parent->numMethods);
 
         memcpy(fieldNames, cometStruct->parent->fieldNames, sizeof(char*) * cometStruct->parent->fieldCount);
         memcpy(fieldTypes, cometStruct->parent->fieldTypes, sizeof(CometType) * cometStruct->parent->fieldCount);
@@ -129,7 +129,7 @@ CometStruct* cometDefineStruct(CometEnvironment* env, char* name, CometStruct* p
     return newStruct;
 }
 
-CometFunction* cometDefineFunc(
+CometExternalMethod* cometDefineFunc(
     CometEnvironment* env,
     char* name,
     CometType returnType,
@@ -146,17 +146,26 @@ CometFunction* cometDefineFunc(
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
     func->funcDef = NULL;
+
+    name = strdup(name);
     
     CometType type = {
         .typeKind = COMET_FUNCTION,
     };
     type.functionType = func;
 
+    CometExternalMethod* externalMethod = malloc(sizeof(CometExternalMethod));
+    *externalMethod = (CometExternalMethod){
+        .func = func,
+        .attrib = FIELD_PUBLIC,
+        .owner = NULL
+    };
+
     CometOperand funcVal = {
         .type = CO_IMMEDIATE,
         .imm = {
             .typeKind = COMET_FUNCTION,
-            .bigVal = (int64_t)func
+            .bigVal = (int64_t)externalMethod
         }
     };
 
@@ -174,14 +183,15 @@ CometFunction* cometDefineFunc(
 
     if (env)
         defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
-    
-    return func;
+
+    return externalMethod;
 }
 
-CometFunction* cometDefineMethod(
+CometExternalMethod* cometDefineMethod(
     CometEnvironment* env,
     char* name,
     CometStruct* cometStruct,
+    FieldAttribute attribute,
     CometType returnType,
     uint32_t numArgs,
     bool isVarArgs,
@@ -196,17 +206,26 @@ CometFunction* cometDefineMethod(
     func->isExternal = true;
     func->isVarArgs = isVarArgs;
     func->funcDef = NULL;
+
+    name = strdup(name);
     
     CometType type = {
         .typeKind = COMET_FUNCTION,
     };
     type.functionType = func;
 
+    CometExternalMethod* externalMethod = malloc(sizeof(CometExternalMethod));
+    *externalMethod = (CometExternalMethod){
+        .func = func,
+        .attrib = attribute,
+        .owner = cometStruct
+    };
+
     CometOperand funcVal = {
         .type = CO_IMMEDIATE,
         .imm = {
             .typeKind = COMET_FUNCTION,
-            .bigVal = (int64_t)func
+            .bigVal = (int64_t)externalMethod
         }
     };
 
@@ -226,7 +245,9 @@ CometFunction* cometDefineMethod(
     if (env)
         defineVar(env, name, RECORD_LOCAL, funcVal, type, false);
 
-    return func;
+    
+
+    return externalMethod;
 }
 
 StructField cometCreateField(char* name, CometType type, FieldAttribute attribute) {
@@ -267,11 +288,18 @@ void cometDefineConstructor(
         .functionType = func
     };
 
+    CometExternalMethod* externalMethod = malloc(sizeof(CometExternalMethod));
+    *externalMethod = (CometExternalMethod){
+        .func = func,
+        .attrib = FIELD_PUBLIC,
+        .owner = cometStruct
+    };
+
     CometOperand funcVal = {
         .type = CO_IMMEDIATE,
         .imm = {
             .typeKind = COMET_FUNCTION,
-            .bigVal = (int64_t)func
+            .bigVal = (int64_t)externalMethod
         }
     };
 

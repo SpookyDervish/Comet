@@ -1,11 +1,8 @@
-func main() -> int {
-    -- single line comment
+import socket
 
-    /*
-    multi
-    line
-    comment
-    */
+func main() -> int {
+    socket.Socket s = new socket.Socket(socket.Family.INET, socket.Type.STREAM, 0)
+    s.connect("https://google.com", 22)
 
     return 0
 }
