@@ -11,6 +11,7 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
 - Imports and a package system (no more C-style header files!)
 - An extensive standard library that handles memory management for you
 - Arrays
+- A package manager for external libraries (See [Nebula](https://chookspace.com/Comet/Nebula))
 
 ## Supported Systems
 - Linux - natively supported. Comet will work perfectly fine on Linux.
@@ -62,6 +63,10 @@ Comet is a fast, compiled programming language built on top of C and runs on a c
   - [x] Throw exceptions
   - [x] Catch exceptions
 - [x] Enums
+
+## Syntax and Creating External Libs
+- Syntax and tutorial: [Comet Website](https://chsp.au/Comet/Comet/docs.html)
+- Creating an External Library: [Comet Wiki](https://chookspace.com/Comet/Comet/wiki)
 
 ## Installation
 Comet has no official release yet, and thus you will have to build Comet from source.
