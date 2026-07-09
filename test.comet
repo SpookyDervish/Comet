@@ -1,6 +1,11 @@
+import io
+
 func main() -> int {
 
-    array:0.field = 0
+    int a = 123
+    for int i in -a .. 0 {
+        io.println("%n", i)
+    }
 
     return 0
 }

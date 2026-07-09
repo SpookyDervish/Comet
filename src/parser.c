@@ -66,6 +66,7 @@ const CometPrefixParseFn PREFIX_PARSE_FUNCTIONS[] = {
 
     {CT_NOT, parsePrefixExpression},
     {CT_HASH, parsePrefixExpression},
+    {CT_MINUS, parsePrefixExpression}
 };
 
 ResultType(astNodePtr, ErrorMessage) parseFunctionCall(CometParser* parser, CometASTNode* left);

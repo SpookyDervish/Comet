@@ -2244,6 +2244,9 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
                     return Success(CometType, ErrorMessage, {.typeKind = COMET_BOOL});
                 case CT_HASH:
                     return Success(CometType, ErrorMessage, {.typeKind = COMET_INT});
+                case CT_MINUS: {
+                    return right;
+                }
                 
                 default: {
                     Estr buffer = CREATE_ESTR("Invalid prefix operator: \"");
@@ -3375,6 +3378,18 @@ ResultType(CometOperand, ErrorMessage) visitPrefixExpression(CometCompiler* c, C
 
             buildListLength(c);
             break;
+
+        case CT_MINUS: {
+            CometOperand negativeOne = createOperand(CO_IMMEDIATE);
+            negativeOne.imm.typeKind = COMET_SMALL;
+            negativeOne.imm.smallVal = -1;
+
+            CometOperand negativeOneConst = storeConst(c, negativeOne);
+
+            buildPushConst(c, negativeOneConst);
+            buildMul(c, rightType.as.success);
+            break;
+        }
         
         default: {
             Estr buffer = CREATE_ESTR("Invalid prefix operator: \"");

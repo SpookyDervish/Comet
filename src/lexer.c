@@ -201,7 +201,6 @@ ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
     uint32_t bufferPos = 0;
     char* buffer = malloc(bufferSize);
 
-    bool isNegative = false;
     bool isFloat = false;
 
 
@@ -209,26 +208,7 @@ ResultType(CometToken, ErrorMessage) lexerParseNumber(CometLexer* lexer) {
         char current = lexer->currentChar;
         
 
-        if (current == '-') {
-            if (isNegative) {
-                free(buffer);
-
-                ErrorMessage errMsg = createError(
-                    lexer->filePath,
-                    lexer->source,
-                    "InvalidSyntax",
-                    "Malformed number! (has multiple negative signs)",
-                    NULL,
-                    lexer->lineNum,
-                    startColumn,
-                    lexer->column
-                );
-
-                return Error(CometToken, ErrorMessage, errMsg);
-            }
-
-            isNegative = true;
-        } else if (current == '.') {
+        if (current == '.') {
 
             if (isFloat) {
                 free(buffer);
@@ -649,16 +629,9 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
                 } else if (!arrow.error && arrow.as.success == '=') {
                     lexerConsume(lexer);
                     append(tokens, TOKEN_LITERAL(CT_MINUS_EQ, "-=", lexer));
-                } else if (isdigit(arrow.as.success)) {
-
-                    ResultType(CometToken, ErrorMessage) numberTok = lexerParseNumber(lexer);
-                    if (numberTok.error)
-                        return Error(tokenList, ErrorMessage, numberTok.as.error);
-
-                    append(tokens, numberTok.as.success);
-                 } else {
+                } else {
                     append(tokens, TOKEN_CHAR(CT_MINUS, "-", lexer));
-                 }
+                }
 
                 break; 
             }
