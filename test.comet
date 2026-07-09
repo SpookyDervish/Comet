@@ -1,11 +1,14 @@
 import io
 
+func foo(int[3] test) -> void {
+    test : 0 = 123
+    return
+}
+
 func main() -> int {
 
-    int a = 123
-    for int i in -a .. 0 {
-        io.println("%n", i)
-    }
+    int[3] test = new int[3]
+    foo(test)
 
     return 0
 }

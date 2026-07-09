@@ -818,7 +818,7 @@ ResultType(vmPtr, charptr) newCometVM(char* filePath) {
     // header magic isnt correct
     char magic[5] = {'C','O','M','E','T'};
     if (memcmp(loadedFile->magic, magic, 5) != 0) {
-        return Error(vmPtr, charptr, "given file is not a comet file!");
+        return Error(vmPtr, charptr, "given file is not a Comet bytecode file!");
     }
 
     CometVM* newVM = malloc(sizeof(CometVM));

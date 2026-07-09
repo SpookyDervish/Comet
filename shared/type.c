@@ -31,46 +31,43 @@ CometType cometTypeString = {
     .arrayType = &stringArray
 };
 
-bool typesAreEqual(CometType a, CometType b) {
-    if (a.typeKind != b.typeKind) {
+bool typesAreEqual(CometType child, CometType parent) {
+    if (child.typeKind != parent.typeKind) {
         return false;
     }
 
-    if (a.typeKind == COMET_GENERIC) {
-        return strcmp(a.genericParamName, b.genericParamName) == 0;
+    if (child.typeKind == COMET_GENERIC) {
+        return strcmp(child.genericParamName, parent.genericParamName) == 0;
     }
 
-    if (a.typeKind == COMET_STRUCT) {
-        // is "a" a child of "b"
-        if (a.structType != b.structType && a.structType->parent != NULL) {
+    if (child.typeKind == COMET_STRUCT) {
+        // is "child" child child of "parent"
+        if (child.structType != parent.structType && child.structType->parent != NULL) {
             CometType parentType = {
                 .typeKind = COMET_STRUCT,
-                .structType = a.structType->parent
+                .structType = child.structType->parent
             };
 
-            return typesAreEqual(parentType, b);
+            return typesAreEqual(parentType, parent);
         }
 
-        return a.structType == b.structType;
+        return child.structType == parent.structType;
     }
 
-    if (a.typeKind == COMET_ARRAY) {
+    if (child.typeKind == COMET_ARRAY) {
         
-        if (a.arrayType->dims != b.arrayType->dims)
+        if (child.arrayType->dims != parent.arrayType->dims)
             return false;
 
-        for (size_t i = 0; i < a.arrayType->dims; i++) {
+        for (size_t i = 0; i < child.arrayType->dims; i++) {
 
-            if (!(typesAreEqual(*a.arrayType->elem, *b.arrayType->elem))) 
+            if (!(typesAreEqual(*child.arrayType->elem, *parent.arrayType->elem))) 
                 return false;
 
-            if (a.arrayType->isFixedSize[i] != b.arrayType->isFixedSize[i]) 
-                return false;
+            if (!parent.arrayType->isFixedSize[i])
+                continue;
 
-            if (!a.arrayType->isFixedSize[i])
-                return true;
-
-            if (a.arrayType->fixedSize[i] != b.arrayType->fixedSize[i]) 
+            if (child.arrayType->fixedSize[i] != parent.arrayType->fixedSize[i]) 
                 return false;
             
         }
