@@ -23,7 +23,6 @@ typedef struct {
 typedef CometParser* parserPtr;
 
 typedef List(astNodePtr) argList;
-typedef List(astNodePtr) nodeList;
 
 Result(astNodePtr, ErrorMessage);
 Result(nodeList, ErrorMessage);
@@ -82,5 +81,3 @@ extern const CometInfixParseFn INFIX_PARSE_FUNCTIONS[];
 ResultType(parserPtr, ErrorMessage) newParser(tokenList tokens, char* fileName, char* sourceCode);
 // parse tokens via lexer and return the AST
 ResultType(astNodePtr, ErrorMessage) buildAST(CometParser* parser);
-
-void printNode(CometASTNode* node);

@@ -135,7 +135,7 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
         }
 
         case AST_EXPRESSION_STATEMENT: {
-            ast = foldIntExpr(ast->data.AST_EXPRESSION_STATEMENT.expression);
+            ast->data.AST_EXPRESSION_STATEMENT.expression = constantFold(c, ast->data.AST_EXPRESSION_STATEMENT.expression);
             break;
         }
 
@@ -145,9 +145,8 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
         }
 
         case AST_FUNC_DEF_STATEMENT: {
-            struct AST_FUNC_DEF_STATEMENT funcDef = ast->data.AST_FUNC_DEF_STATEMENT;
-            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = constantFold(c, funcDef.inlineExpr);
-            ast->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, funcDef.program);
+            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = constantFold(c, ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr);
+            ast->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, ast->data.AST_FUNC_DEF_STATEMENT.program);
             break;
         }
 
@@ -221,11 +220,166 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
     return ast;
 }
 
-void runOptimisations(CometCompiler* c, CometASTNode* ast) {
-    printNode(ast);
-    printf("\n");
-    ast = constantFold(c, ast);
-    printNode(ast);
-    printf("\n");
+CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv* currentEnv) {
+    if (!ast) return ast;
 
+    switch (ast->nodeType) {
+        case AST_PROGRAM: {
+            for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
+                ast->data.AST_PROGRAM.statements[i] = constantPropogate(c, ast->data.AST_PROGRAM.statements[i], currentEnv);
+            }
+            break;
+        }
+
+        case AST_FUNC_DEF_STATEMENT: {
+
+            currentEnv = newConstantEnv(currentEnv, "function");
+            ast->data.AST_AS_FUNC_DEF.body = constantPropogate(c, ast->data.AST_FUNC_DEF_STATEMENT.program, currentEnv);
+            currentEnv = destroyConstantEnv(currentEnv);
+
+            break;
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            ast->data.AST_INFIX_EXPRESSION.left = constantPropogate(c, ast->data.AST_INFIX_EXPRESSION.left, currentEnv);
+            ast->data.AST_INFIX_EXPRESSION.right = constantPropogate(c, ast->data.AST_INFIX_EXPRESSION.right, currentEnv);
+            break;
+        }
+
+        case AST_RETURN_STATEMENT: {
+            ast->data.AST_RETURN_STATEMENT.expression = constantPropogate(c, ast->data.AST_RETURN_STATEMENT.expression, currentEnv);
+            break;
+        }
+
+        case AST_ASSIGN_STATEMENT: {
+            char* varName = ast->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+            CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
+
+            
+            if (nodeIsALiteral(expr)) {
+                defineConstant(currentEnv, varName, expr);
+            } else { // x isnt constant
+                removeConstant(currentEnv, varName);
+            }
+            break;
+        }
+
+        case AST_REASSIGN_STATEMENT: {
+            char* varName = ast->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
+            CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
+
+            
+            if (nodeIsALiteral(expr)) {
+                defineConstant(currentEnv, varName, expr);
+            } else { // x isnt constant
+                removeConstant(currentEnv, varName);
+            }
+            break;
+        }
+
+        case AST_IF_STATEMENT: {
+            ast->data.AST_IF_STATEMENT.expression = constantPropogate(c, ast->data.AST_IF_STATEMENT.expression, currentEnv);
+
+            ConstantEnv* thenEnv = newConstantEnv(currentEnv, "then");
+            ast->data.AST_IF_STATEMENT.program = constantPropogate(c, ast->data.AST_IF_STATEMENT.program, thenEnv);
+
+            ConstantEnv* elseEnv = newConstantEnv(currentEnv, "else");
+            ast->data.AST_IF_STATEMENT.elseProgram = constantPropogate(c, ast->data.AST_IF_STATEMENT.elseProgram, elseEnv);
+            
+
+            
+            
+
+            ConstantRecord* current, *tmp;
+            HASH_ITER(hh, currentEnv->records, current, tmp) {
+                char* varName = current->name;
+
+                ConstantRecord* thenRecord = findConstantLocal(thenEnv, varName);
+                if (!thenRecord) {
+                    removeConstant(currentEnv, varName);
+                    continue;
+                }
+
+                // if there is no else branch then any changes mutate the variable, making it no longer a constant
+                if (!ast->data.AST_IF_STATEMENT.elseProgram) {
+                    removeConstant(currentEnv, varName);
+                    continue;
+                }
+
+                ConstantRecord* elseRecord = findConstantLocal(elseEnv, varName);
+                if (elseRecord) {
+                    if (nodesAreEqual(thenRecord->value, elseRecord->value)) {
+                        // both branches got the same value
+                        defineConstant(currentEnv, varName, thenRecord->value);
+                    } else {
+                        // both branches reached two different values, we can't use the variable as a constant
+                        removeConstant(currentEnv, varName);
+                    }
+                } else {
+                    // then branch mutated the variable and the else branch didn't
+                    removeConstant(currentEnv, varName);
+                }
+
+            }
+
+            if (ast->data.AST_IF_STATEMENT.elseProgram) {
+                ConstantRecord* current, *tmp;
+                HASH_ITER(hh, currentEnv->records, current, tmp) {
+                    char* varName = current->name;
+
+                    // if the else branch modifies a variable that the then branch doesn't then the value is mutated and no longer a constant
+                    if (!findConstantLocal(thenEnv, varName)) {
+                        removeConstant(currentEnv, varName);
+                    }   
+                }
+            }
+
+            destroyConstantEnv(thenEnv);
+            destroyConstantEnv(elseEnv);
+            break;
+        }
+
+        case AST_IDENTIFIER: {
+            char* varName = ast->data.AST_IDENTIFIER.ident;
+            ConstantRecord* constantValue = findConstant(currentEnv, varName);
+
+            if (constantValue && constantValue->value) {
+                return constantValue->value;
+            }
+
+            break;
+        }
+
+        default: break;
+    }
+
+    return ast;
+}
+
+void runOptimisations(CometCompiler* c, CometASTNode* ast) {
+    char* previous = nodeToCStr(ast);
+
+    ConstantEnv* constantEnv = newConstantEnv(NULL, "root");
+
+    size_t pass = 0;
+    while (true) {
+        
+        ast = constantFold(c, ast);
+        ast = constantPropogate(c, ast, constantEnv);
+
+        char* current = nodeToCStr(ast);
+
+        if (strcmp(previous, current) == 0)
+            break;
+
+        pass++;
+        if (pass >= MAX_OPTIMISE_PASSES)
+            break;
+
+        previous = current;
+    }
+
+    
+
+    
 }

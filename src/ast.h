@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include "lexer.h"
+#include "strb.h"
 #include "../include/struct.h"
 #include "token.h"
 
@@ -88,7 +89,7 @@ struct CometASTNode {
             List(astNodePtr) baseType;
             List(astNodePtr) genericTypes;
             List(astNodePtr) shape;
-            unsigned int dimensions;
+            uint32_t dimensions;
         } AST_TYPE;
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
@@ -190,6 +191,8 @@ struct CometASTNode {
     uint32_t endCol;
 };
 
+typedef List(astNodePtr) nodeList;
+
 // put a node on the heap
 CometASTNode* allocateNode(CometASTNode parent);
 void freeNode(CometASTNode* node);
@@ -198,5 +201,8 @@ void freeNode(CometASTNode* node);
 char* ASTNodeTypeToCStr(CometASTNodeType nodeType);
 bool nodeIsALiteral(CometASTNode* node);
 uint64_t getNodeIntValue(CometASTNode* node);
+char* nodeToCStr(CometASTNode* node);
+CometASTNode* deepCopyNode(CometASTNode* node);
+bool nodesAreEqual(CometASTNode* a, CometASTNode* b);
 
 #define AST_NODE(type, lineNumber, ...) allocateNode((CometASTNode){.nodeType = type, {.type=(struct type){__VA_ARGS__}}, .lineNum = lineNumber, .startCol = 0, .endCol = 0})

@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -48,5 +49,7 @@ typedef struct Estr {
     int8_t shouldBeFreed;
     int8_t destroyed;
 } Estr; 
+
+
 
 #endif // ESTR_H
