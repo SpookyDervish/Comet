@@ -5353,7 +5353,7 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
         fwrite(&sourceLen, sizeof(size_t), 1, file);
         fwrite(c->sourceCode, 1, sourceLen, file);
 
-        //fwrite(c->debugInstInfo.pointer, sizeof(uint64_t), c->programIdx, file);
+        fwrite(c->debugInstInfo.pointer, sizeof(uint64_t), instCount, file);
     }
 
     fclose(file);
