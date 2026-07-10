@@ -1,9 +1,6 @@
 func main() -> int {
-    breakpoint
-    int x = (2 + 3) * (4 + 5)
-
-    if (2 + 2 == 6)
-        x = 0
+    mut int x = (2 + 3) * (4 + 5)
+    int y = -1
 
     return x
 }

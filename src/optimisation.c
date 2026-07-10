@@ -4,7 +4,7 @@ CometASTNode* foldBoolExpr(CometCompiler* c, CometASTNode* node) {
     struct AST_INFIX_EXPRESSION expr = node->data.AST_INFIX_EXPRESSION;
 
     ResultType(CometType, ErrorMessage) leftType = resolveType(c, expr.left);
-    ResultType(CometType, ErrorMessage) rightType = resolveType(c, expr.left);
+    ResultType(CometType, ErrorMessage) rightType = resolveType(c, expr.right);
 
     if (leftType.error || rightType.error)
         return node;
@@ -15,6 +15,7 @@ CometASTNode* foldBoolExpr(CometCompiler* c, CometASTNode* node) {
     if (typeIsInt(leftType.as.success) && typeIsInt(rightType.as.success)) {
         switch (expr.op.type) {
             case CT_EQ_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number == expr.right->data.AST_INT.number);
+            case CT_NOT_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number != expr.right->data.AST_INT.number);
             case CT_LT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number < expr.right->data.AST_INT.number);
             case CT_GT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number > expr.right->data.AST_INT.number);
             case CT_LTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number <= expr.right->data.AST_INT.number);
@@ -23,6 +24,7 @@ CometASTNode* foldBoolExpr(CometCompiler* c, CometASTNode* node) {
         }
     } else {
         switch (expr.op.type) {
+            // we avoid == for decimals cause of precision errors
             case CT_LT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number < expr.right->data.AST_DOUBLE.number);
             case CT_GT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number > expr.right->data.AST_DOUBLE.number);
             case CT_LTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number <= expr.right->data.AST_DOUBLE.number);
@@ -44,6 +46,7 @@ CometASTNode* foldIntExpr(CometASTNode* node) {
         case CT_MOD: return AST_NODE(AST_INT, node->lineNum, expr.left->data.AST_INT.number % expr.right->data.AST_INT.number);
         
         case CT_EQ_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number == expr.right->data.AST_INT.number);
+        case CT_NOT_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number != expr.right->data.AST_INT.number);
         case CT_LT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number < expr.right->data.AST_INT.number);
         case CT_GT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number > expr.right->data.AST_INT.number);
         case CT_LTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number <= expr.right->data.AST_INT.number);
@@ -64,10 +67,56 @@ CometASTNode* foldFloatExpr(CometASTNode* node) {
         case CT_POW: return AST_NODE(AST_DOUBLE, node->lineNum, pow(expr.left->data.AST_DOUBLE.number, expr.right->data.AST_DOUBLE.number));
 
         case CT_EQ_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number == expr.right->data.AST_DOUBLE.number);
+        case CT_NOT_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number != expr.right->data.AST_DOUBLE.number);
         case CT_LT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number < expr.right->data.AST_DOUBLE.number);
         case CT_GT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number > expr.right->data.AST_DOUBLE.number);
         case CT_LTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number <= expr.right->data.AST_DOUBLE.number);
         case CT_GTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_DOUBLE.number >= expr.right->data.AST_DOUBLE.number);
+
+        default: return node;
+    }
+}
+
+CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
+    struct AST_PREFIX_EXPRESSION expr = node->data.AST_PREFIX_EXPRESSION;
+
+    ResultType(CometType, ErrorMessage) rightType = resolveType(c, expr.right);
+    if (rightType.error)
+        return node;
+
+    
+    switch (expr.op.type) {
+        case CT_NOT: {
+            switch (rightType.as.success.typeKind) {
+                case COMET_BOOL:
+                case COMET_SMALL:
+                case COMET_INT:
+                case COMET_BIG:
+                    return AST_NODE(AST_BOOL, node->lineNum, !expr.right->data.AST_INT.number);
+
+                case COMET_FLOAT:
+                case COMET_DOUBLE:
+                    return AST_NODE(AST_BOOL, node->lineNum, !expr.right->data.AST_DOUBLE.number);
+
+                default: return node;
+            }
+        }
+
+        case CT_MINUS: {
+            switch (rightType.as.success.typeKind) {
+                case COMET_BOOL:
+                case COMET_SMALL:
+                case COMET_INT:
+                case COMET_BIG:
+                    return AST_NODE(AST_INT, node->lineNum, -expr.right->data.AST_INT.number);
+
+                case COMET_FLOAT:
+                case COMET_DOUBLE:
+                    return AST_NODE(AST_DOUBLE, node->lineNum, -expr.right->data.AST_DOUBLE.number);
+
+                default: return node;
+            }
+        }
 
         default: return node;
     }
@@ -117,6 +166,16 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
         case AST_REASSIGN_STATEMENT: {
             ast->data.AST_REASSIGN_STATEMENT.expression = constantFold(c, ast->data.AST_REASSIGN_STATEMENT.expression);
             break;
+        }
+
+        case AST_PREFIX_EXPRESSION: {
+            ast->data.AST_PREFIX_EXPRESSION.right = constantFold(c, ast->data.AST_PREFIX_EXPRESSION.right);
+            
+            if (!nodeIsALiteral(ast->data.AST_PREFIX_EXPRESSION.right)) {
+                break;
+            }
+
+            return foldPrefixExpr(c, ast);
         }
 
         case AST_INFIX_EXPRESSION: {
