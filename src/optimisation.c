@@ -74,6 +74,9 @@ CometASTNode* foldFloatExpr(CometASTNode* node) {
 }
 
 CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
+    if (!ast)
+        return ast;
+
     switch (ast->nodeType) {
         case AST_PROGRAM: {
             for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
@@ -88,18 +91,14 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
         }
 
         case AST_RETURN_STATEMENT: {
-            if (ast->data.AST_RETURN_STATEMENT.expression)
-                ast->data.AST_RETURN_STATEMENT.expression = constantFold(c, ast->data.AST_RETURN_STATEMENT.expression);
+            ast->data.AST_RETURN_STATEMENT.expression = constantFold(c, ast->data.AST_RETURN_STATEMENT.expression);
             break;
         }
 
         case AST_FUNC_DEF_STATEMENT: {
             struct AST_FUNC_DEF_STATEMENT funcDef = ast->data.AST_FUNC_DEF_STATEMENT;
-
-            if (funcDef.inlineExpr)
-                ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = constantFold(c, funcDef.inlineExpr);
-            else
-                ast->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, funcDef.program);
+            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = constantFold(c, funcDef.inlineExpr);
+            ast->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, funcDef.program);
             break;
         }
 
@@ -111,8 +110,7 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
         }
 
         case AST_ASSIGN_STATEMENT: {
-            if (ast->data.AST_ASSIGN_STATEMENT.expression)
-                ast->data.AST_ASSIGN_STATEMENT.expression = constantFold(c, ast->data.AST_ASSIGN_STATEMENT.expression);
+            ast->data.AST_ASSIGN_STATEMENT.expression = constantFold(c, ast->data.AST_ASSIGN_STATEMENT.expression);
             break;
         }
 
@@ -127,7 +125,6 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
 
             if (!nodeIsALiteral(ast->data.AST_INFIX_EXPRESSION.left) ||
                 !nodeIsALiteral(ast->data.AST_INFIX_EXPRESSION.right)) {
-                    printf("AAAAA\n");
                 break;
             }
 

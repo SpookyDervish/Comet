@@ -74,7 +74,6 @@ int main(int argc, char** argv) {
     }
 
     runOptimisations(compiler.as.success, ast.as.success);
-    return 0;
 
     ResultType(CompiledValue, ErrorMessage) compileResult = compile(compiler.as.success, ast.as.success);
     if (compileResult.error) {
