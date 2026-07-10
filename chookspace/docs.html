@@ -52,6 +52,19 @@
                     <li><a href="#while-loops">While-Loops</a></li>
                     <li><a href="#for-loops">For-Loops</a></li>
                 </ul>
+                <li><a href="#structs"> Structs</a></li>
+                <ul>
+                    <li><a href="#field-attribs">Field Attributes</a></li>
+                    <li><a href="#inheritance">Inheritance</a></li>
+                    <li><a href="#generics">Generics</a></li>
+                    <li><a href="#drop">Drop Statement</a></li>
+                </ul>
+                <li><a href="#arrays">Arrays</a></li>
+                <ul>
+                    <li><a href="#hash-op">'#' Operator</a></li>
+                    <li><a href="#star-syntax">'*' Syntax</a></li>
+                </ul>
+                <li><a href="#enums">Enums</a></li>
 
         </ul>
     </div>
@@ -84,6 +97,12 @@
                                 <p class="note-text">Comet is still very, <b>VERY</b> early in development! Here be
                                     dragons!</p>
                         </div>
+                        <div class="note note-warn">
+                            <h3 class="note-title"><i class="fa fa-exclamation" aria-hidden="true"></i> Warning</h1>
+                                <p class="note-text">The Comet docs are written with the expectation that you have used
+                                    another programming language before. Comet is not designed for beginner programmers.
+                                </p>
+                        </div>
                     </div>
 
                     <div id="install">
@@ -95,12 +114,11 @@
                             <h3>Building From Source</h3>
                             <div class="note note-info">
                                 <h3 class="note-title"><i class="fa fa-info" aria-hidden="true"></i> Note</h1>
-                                    <p class="note-text">Comet is not <b>entirely</b> supported on Windows yet. (due to
-                                        argp)</p>
+                                    <p class="note-text">Comet is not <b>entirely</b> supported on Windows yet, please
+                                        use Comet inside WSL for the best experience.</p>
                             </div>
                             <p>To build comet, you first have to get the repo. Make sure you have <a
-                                    href="https://git-scm.com/install/">Git</a> and <a
-                                    href="https://releases.llvm.org/">LLVM</a> installed before anything else. Once you
+                                    href="https://git-scm.com/install/">Git</a> installed before anything else. Once you
                                 have git installed, type these commands in a terminal to clone the repository, build
                                 Comet, and install it:</p>
                             <pre class="command">git clone https://chookspace.com/comet/comet &&
@@ -130,10 +148,11 @@ sudo make install</pre>
                         <pre class="code"><code class="language-go">import io
 
 func main() -> int {
-    io.print("Hello, World!")
+    io.println("Hello, World!")
 }</code></pre>
                         <br />
-                        <p>Save this to a file called "helloWorld.comet". We can compile this program to an executable file with the following command:</p>
+                        <p>Save this to a file called "helloWorld.comet". We can compile this program to an executable
+                            file with the following command:</p>
                         <pre class="command">cometc helloWorld.comet -o helloWorld.cvm</pre>
                         <p>And then we can run our program on the Comet VM:</p>
                         <pre class="command">comet helloWorld.cvm</pre>
@@ -158,7 +177,7 @@ func main() -> int {
                     <br />
                     <h2 id="built-in-types">Built-in Types</h2>
                     <p>Comet has a few built in types:</p>
-    <link rel="shortcut icon" href="assets/favicon.ico" type="image/x-icon">
+                    <link rel="shortcut icon" href="assets/favicon.ico" type="image/x-icon">
                     <ul>
                         <li>small - An 8 bit integer. | e.g: 123</li>
                         <li>int - A 32 bit integer. This is what you would use for most calculations. | e.g: 123456</li>
@@ -218,7 +237,7 @@ func main() -> int {
                             the condition is <b>false</b>.</p>
                         <p>Example syntax:</p>
                         <pre class="code"><code class="language-go">while true {
-    io.print("To infinity and beyond!\n")
+    io.println("To infinity and beyond!")
 }</code></pre>
                         <br />
                         <p>The above code will print "To infinity and beyond!" forever.</p>
@@ -243,14 +262,236 @@ func main() -> int {
                             down.</p>
                         <p>Example syntax:</p>
                         <pre class="code"><code class="language-go">for int i in 10 .. 0 step -1 {
-    io.print("%d\n", i)
+    io.println("%d", i)
 }</code></pre>
                         <br />
                         <p>The above code outputs the numbers 10 to 1.</p>
                     </div>
                 </div>
 
+                <div id="structs">
+                    <h1>Structs</h1>
+                    <p>Structs are like classes in most other programming languages. Structs are required to have a
+                        constructor, but they can also have fields, methods, and a destructor.</p>
+                    <p>To define a struct, you just use the following syntax:</p>
+                    <pre class="code"><code class="language-go">struct StructName { /* every word in your struct should always start with a capital letter! */
+    int myField = 123 /* you define fields like variables, and you can give them an optional default value */
+    readonly int value /* the keyword "readonly" means code outside this struct can't change the value of this field,
+                          but they can still read it. */
 
+    init(int value) {
+        /*
+            this is where the code for your constructor goes. your constructor can take arguments like a normal function.
+            you are automatically given the "self" variable, and can change the value of fields with the '.' operator 
+        */
+        self.value = value
+    }
+
+    destroy {
+        /*
+            you can optionally have a destructor to clean up used memory.
+
+            the destructor is called when you use the drop keyword on your struct, more on that later!
+        */
+        ...
+    }
+}
+
+func main() -> int {
+    StructName test = new StructName(16) /* we create a new instance of StructName and pass args to its constructor */
+    return test.value /* We get the field called "value" */
+}</code></pre>
+                    <br />
+                    <div id="field-attribs">
+                        <h2>Field Attributes</h2>
+                        <ul>
+                            <li>private - Any code outside of this struct can't read or write to this field</li>
+                            <li>protected - Any code outside of this struct or its children can't read or write to this
+                                field</li>
+                            <li>readonly - Any code outside of this struct can't write to this field, but they can read
+                                it</li>
+                            <li>public (default) - Any code can read or write to this field</li>
+                        </ul>
+                    </div>
+                    <br>
+                    <div id="inheritance">
+                        <h2>Inheritance</h2>
+                        <p>Structs can inherit from eachother, and thus get all the fields and methods of their parent.
+                            Here is an example of inheritance:</p>
+                        <pre class="code"><code class="language-go">import io
+                            
+struct Animal {
+    protected int age = 0 /* The "protected" keyword makes it so code outside of this class or
+                             its children can't access the age field */
+
+    init() {
+
+    }
+
+    func speak() {
+        io.println("...")
+    }
+}
+
+struct Dog : Animal { /* Inherit from the Animal struct */
+    string owner
+
+    init(string owner) {
+        super(self) /* Call the parent struct's constructor */
+
+        /* Then set our own fields */
+        self.owner = owner
+    }
+
+    override func speak() { /* We change what the parent struct's "speak" method does! */
+        io.println("Woof! Hello, %s!", self.owner)
+    }
+}
+
+func main() -> int {
+    Animal animal = new Animal()
+    animal.speak() /* "..." */
+    
+    Dog dog = new Dog("Bob")
+    dog.speak() /* "Woof! Hello, Bob!" */
+}</code></pre>
+                    </div>
+                    <br />
+                    <div id="generics">
+                        <h2>Generics</h2>
+                        <p>What if we wanted to make a struct that needs a field that can be any type? For example, a
+                            list struct. We can do that with generics! See the example below:</p>
+                        <pre class="code"><code class="language-go">import io
+                            
+struct MyStruct &lt;T1, T2&gt; {
+        T1 someValue /* T1 and T2 are types that can be anything */
+        T2 someOtherValue
+
+        init(T1 a, T2 b) {
+            self.someValue = a
+            self.someOtherValue = b
+        }
+    }
+
+    func main() -> int {
+        MyStruct&lt;int, float&gt; test = new MyStruct&lt;int, float&gt;(123, 0.456) /* We've created a new instance of MyStruct with our custom types! */
+        return test.someValue /* if we defined our generic struct with any type other than an int, this return statement would error */
+    }</code></pre>
+                    </div>
+                    <br>
+                    <div id="drop">
+                        <h2>Drop Statement</h2>
+                        <p>When you're done with your struct, you can free its memory with the drop statement. This also
+                            calls the destructor of the struct.</p>
+                        <pre class="code"><code class="language-go">import io
+                            
+struct Foo {
+    int x
+
+    init(int x) {
+        self.x = x
+    }
+
+    destroy {
+        io.println("Destructor called!")
+    }
+}
+
+func main() -> int {
+    Foo foo = new Foo(123)
+    io.println("%n", foo.x)
+
+    drop foo /* call destructor and free memory */
+
+    return 0
+}</code></pre>
+                        <br>
+                        <p>Just remember to not call drop twice on the same thing!</p>
+                    </div>
+                </div>
+
+                <div id="arrays">
+                    <h1>Arrays</h1>
+                    <p>Arrays allow you to define a list of something, like a list of integers or a list of strings.
+                        Arrays are indexed starting at 0. Array syntax in Comet is a bit different to other programming
+                        languages:</p>
+                    <pre class="code"><code class="language-go">func main() -> int {
+    int[3] myArray = new int[3] /* create an array (list) of 3 integers */
+    myArray:0 = 2 /* set the first integer to 2 */
+    myArray:1 = 8 /* set the second integer to 8 */
+    myArray:2 = 3 /* and so on... */
+
+    int something = myArray:1 /* get the second value in the array */
+    drop myArray /* you can drop arrays and free their memory like how you can free structs */
+
+    return something /* returns 8 */
+}</code></pre>
+                    <br>
+                    <p>You can also define array literals:</p>
+                    <pre class="code"><code class="language-go">func main() -> int {
+    int[3] myArray = [1, 2, 3]
+
+    return myArray:0
+}</code></pre>
+                    <br>
+                    <h2 id="hash-op">'#' Operator</h2>
+                    <p>you can get the length of an array with
+                        the '#' operator. Because strings are also arrays, you can use the '#' operator on them too! For example:</p>
+                    <pre class="code"><code class="language-go">import io
+                        
+func main() -> int {
+    int[3] myArray = [1, 2, 3]
+    io.println("Array length: %n", #myArray) /* "Array length: 3" */
+
+    string myString = "hi there!"
+    io.println("String length: %n", #myArray) /* "String length: 9" */
+
+    return 0
+}</code></pre>
+                    <br>
+                    <h2 id="star-syntax">'*' Syntax</h2>
+                    <p>If you don't know the size of an array at compile time, you can use the '*' syntax. If you have a
+                        function that takes an array of a fixed size, that function enforces that the array being passed
+                        to it must also be the same fixed size. You can use the '*' syntax to allow a function to take
+                        an array of any size. The following is an example that uses both star syntax and the '#' operator:</p>
+                    <pre class="code"><code class="language-go">func sum(int[*] arr) -> int { /* take an array of * size (any size) */
+    int sum = 0
+
+    for int i in 0 .. #arr { /* loop over every number in the array */
+        sum += arr:i /* add the current number to the sum */
+    }
+
+    return sum
+}
+
+func main() -> int {
+    int[3] myNumbers = [4, 5, 6]
+    return sum(myNumbers) /* because the function takes an array of any size, this is valid */
+}</code></pre>
+                <br>
+                </div>
+
+                <div id="enums">
+                    <h1>Enums</h1>
+                    <p>Enums allow you to define a category of something, like a colour. Enums can be treated like
+                        integers because enum items are indexed starting at 0 and increasing at each value. Example
+                        usage of enums:</p>
+                    <pre class="code"><code class="language-go">import io
+
+enum Colour {
+    Red, /* 0 */
+    Green, /* 1 */
+    Blue /* 2 */
+    /* and so on if you add more items... */
+}
+
+func main() -> int {
+    Colour myColour = Colour.Green
+    io.println("%n", myColour) /* "1" */
+    return myColour
+}</code></pre>
+                    <br />
+                </div>
 
 
             </div>
