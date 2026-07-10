@@ -100,5 +100,7 @@ extern CometType cometTypeString;
 extern CometType cometTypePointer;
 
 bool typesAreEqual(CometType a, CometType b);
+int rankType(CometType type);
+CometType unifyType(CometType a, CometType b);
 
 #endif

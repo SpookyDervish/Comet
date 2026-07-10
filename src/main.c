@@ -1,5 +1,5 @@
 #include "compiler.h"
-#include "inst.h"
+#include "optimisation.h"
 #include "lexer.h"
 #include "parser.h"
 #include "args.h"
@@ -72,6 +72,9 @@ int main(int argc, char** argv) {
         printErrorMessage(compiler.as.error);
         return 1;
     }
+
+    runOptimisations(compiler.as.success, ast.as.success);
+    return 0;
 
     ResultType(CompiledValue, ErrorMessage) compileResult = compile(compiler.as.success, ast.as.success);
     if (compileResult.error) {

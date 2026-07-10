@@ -699,23 +699,6 @@ ResultType(CompiledValue, ErrorMessage) visitProgram(CometCompiler* c, CometASTN
     return result;
 }
 
-int rankType(CometType type) {
-    switch (type.typeKind) {
-        case COMET_BOOL: return 1;
-        case COMET_SMALL: return 2;
-        case COMET_INT: return 3;
-        case COMET_BIG: return 4;
-        case COMET_FLOAT: return 5;
-        case COMET_DOUBLE: return 6;
-        case COMET_STRUCT: return 7;
-        default: return 0;
-    }
-}
-
-CometType unifyType(CometType a, CometType b) {
-    return (rankType(a) > rankType(b)) ? a : b;
-}
-
 bool canImplicitCastType(CometType target, CometType type) {
     if (typeIsInt(target) && typeIsInt(type))
         return true;
@@ -920,7 +903,6 @@ ResultType(CompiledValue, ErrorMessage) visitValue(CometCompiler* c, CometASTNod
 }
 
 ResultType(CompiledValue, ErrorMessage) getModuleValue(CometCompiler* c, CometASTNode* infixExpr);
-ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* node);
 ResultType(CometFunctionTypeInfo, ErrorMessage) getFunction(CometCompiler* c, CometASTNode* node, bool buildValues) {
     switch (node->nodeType) {
         case AST_IDENTIFIER: {

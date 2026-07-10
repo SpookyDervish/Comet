@@ -39,7 +39,7 @@ Result(CometFunctionTypeInfo, ErrorMessage);
 Result(cometCompilerPtr, ErrorMessage);
 Result(cometTypePtr, ErrorMessage);
 
-
+ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* node);
 ResultType(CompiledValue, ErrorMessage) compile(CometCompiler* c, CometASTNode* node);
 ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols);
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols);

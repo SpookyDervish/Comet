@@ -199,4 +199,4 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType);
 bool nodeIsALiteral(CometASTNode* node);
 uint64_t getNodeIntValue(CometASTNode* node);
 
-#define AST_NODE(type, lineNumber, ...) allocateNode((CometASTNode){.nodeType = type, {.type=(struct type){__VA_ARGS__}}, .lineNum = lineNumber})
+#define AST_NODE(type, lineNumber, ...) allocateNode((CometASTNode){.nodeType = type, {.type=(struct type){__VA_ARGS__}}, .lineNum = lineNumber, .startCol = 0, .endCol = 0})

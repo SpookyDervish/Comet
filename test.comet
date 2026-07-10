@@ -1,7 +1,4 @@
-func foo() -> int {
-    return 0
-}
-
-func main() -> void {
-    foo()
+func main() -> int {
+    int x = (2 + 3) * (4 + 5)
+    return x
 }
