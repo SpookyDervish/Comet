@@ -660,6 +660,11 @@ void printNode(CometASTNode* node) {
             printf(")");
 
             break;
+        case AST_THROW_STATEMENT: {
+            printf("throw ");
+            printNode(node->data.AST_THROW_STATEMENT.newStmt);
+            break;
+        }
         case AST_IMPORT_STATEMENT:
             printf("import ");
 

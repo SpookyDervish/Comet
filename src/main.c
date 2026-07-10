@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    ResultType(CometOperand, ErrorMessage) compileResult = compile(compiler.as.success, ast.as.success);
+    ResultType(CompiledValue, ErrorMessage) compileResult = compile(compiler.as.success, ast.as.success);
     if (compileResult.error) {
         freeNode(ast.as.success);
         printErrorMessage(compileResult.as.error);

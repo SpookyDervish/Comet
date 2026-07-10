@@ -19,10 +19,19 @@
 
 typedef void* voidPtr;
 
+typedef struct {
+    CometOperand value;
+    bool fallsThrough;
+} CompiledValue;
+
+#define COMPILED_VALUE(val, ft) ((CompiledValue){ .value = (val), .fallsThrough = (ft) })
+#define FALLS_THROUGH(val) (CompiledValue){ .value = val, .fallsThrough = true }
+#define NO_VALUE ((CompiledValue){ .value = NO_OPERAND, .fallsThrough = true })
 
 typedef List(astNodePtr) astNodeList;
 typedef CometType* cometTypePtr;
 
+Result(CompiledValue, ErrorMessage);
 Result(voidPtr, ErrorMessage);
 Result(CometType, ErrorMessage);
 Result(astNodeList, ErrorMessage);
@@ -31,7 +40,7 @@ Result(cometCompilerPtr, ErrorMessage);
 Result(cometTypePtr, ErrorMessage);
 
 
-ResultType(CometOperand, ErrorMessage) compile(CometCompiler* c, CometASTNode* node);
+ResultType(CompiledValue, ErrorMessage) compile(CometCompiler* c, CometASTNode* node);
 ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, char* sourceCode, bool debugSymbols);
 ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* filePath, bool debugSymbols);
 CometOperand createOperand(CometOperandKind type);

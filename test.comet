@@ -1,16 +1,7 @@
-import socket
-import io
-
-func main() -> int {
-    socket.Socket s = new socket.Socket(socket.Family.INET, socket.Type.STREAM, 0)
-
-    s.connect("example.com", 80)
-    s.send("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
-
-    string response = s.readAll()
-    io.println("Response: %s", response)
-
-    s.close()
-
+func foo() -> int {
     return 0
+}
+
+func main() -> void {
+    foo()
 }

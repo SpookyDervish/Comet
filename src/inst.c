@@ -421,19 +421,19 @@ CometOperand buildLoadArg(CometCompiler* c, uint32_t idx) {
 
     return argValue;
 }
-CometOperand buildCall(CometCompiler* c, char* name, List(CometOperand) args) {
+CometOperand buildCall(CometCompiler* c, char* name, size_t argCount) {
     CometOperand funcValue = createOperand(CO_SYMBOL);
     funcValue.symbolIdx = getSymbolIndex(c, name);
 
     CometOperand returnValue = pushVal(c);
 
-    for (size_t argIdx = 0; argIdx < args.count; argIdx++) {
+    for (size_t argIdx = 0; argIdx < argCount; argIdx++) {
         pushVal(c);
     }
 
     CometOperand numArgs = createOperand(CO_IMMEDIATE);
     numArgs.imm.typeKind = COMET_SMALL;
-    numArgs.imm.smallVal = args.count;
+    numArgs.imm.smallVal = argCount;
 
     buildInst(c, INST_CALL, funcValue, numArgs, NO_OPERAND);
     return returnValue;
@@ -541,20 +541,20 @@ void buildSetField(CometCompiler* c, uint32_t idx) {
 
     buildInst(c, INST_SET_FIELD, indexOperand, NO_OPERAND, NO_OPERAND);
 }
-CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, List(CometOperand) args) {
+CometOperand buildCallMethod(CometCompiler* c, uint32_t vtableIdx, size_t argCount) {
     CometOperand funcValue = createOperand(CO_IMMEDIATE);
     funcValue.imm.typeKind = COMET_SMALL;
     funcValue.imm.smallVal = vtableIdx;
 
     CometOperand returnValue = pushVal(c);
 
-    for (size_t argIdx = 0; argIdx < args.count; argIdx++) {
+    for (size_t argIdx = 0; argIdx < argCount; argIdx++) {
         pushVal(c);
     }
 
     CometOperand numArgs = createOperand(CO_IMMEDIATE);
     numArgs.imm.typeKind = COMET_SMALL;
-    numArgs.imm.smallVal = args.count;
+    numArgs.imm.smallVal = argCount;
 
     buildInst(c, INST_CALL_METHOD, funcValue, numArgs, NO_OPERAND);
     return returnValue;
