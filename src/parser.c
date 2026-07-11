@@ -1175,13 +1175,13 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
 
     parserNextToken(parser);
 
+    ResultType(astNodePtr, ErrorMessage) start = parseExpression(parser, PRECEDENCE_LOWEST);
+    if (start.error) {
+        return start;
+    }
+
     bool isArrayLoop = !peekTokenIs(parser, CT_DOT_DOT);
     if (isArrayLoop) { // we're looping over an array
-        ResultType(astNodePtr, ErrorMessage) array = parseExpression(parser, PRECEDENCE_LOWEST);
-        if (array.error) {
-            return array;
-        }
-
         ResultType(astNodePtr, ErrorMessage) block = parseOptionalBlockStatement(parser);
         if (block.error) {
             return block;
@@ -1196,7 +1196,7 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
             NULL,
             NULL,
             block.as.success,
-            array.as.success
+            start.as.success
         );
         stmt->startCol = startCol;
         stmt->endCol = block.as.success->endCol;
@@ -1204,10 +1204,7 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
         return Success(astNodePtr, ErrorMessage, stmt);
     }
 
-    ResultType(astNodePtr, ErrorMessage) start = parseExpression(parser, PRECEDENCE_LOWEST);
-    if (start.error) {
-        return start;
-    }
+    
 
     ResultType(int, ErrorMessage) dotDot = expectPeek(parser, CT_DOT_DOT);
     if (dotDot.error) {
