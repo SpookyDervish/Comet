@@ -157,7 +157,14 @@ void newUninitList(CometVM* vm) {
     int64_t length = popValue(vm);
 
     CometSerializedArray* array = malloc(sizeof(CometSerializedArray));
+    if (!array) {
+        vmThrow(vm, "MemoryAllocFail", "Failed to allocate memory for array object", NULL);
+    }
+
     int64_t* arrayData = calloc(length, sizeof(int64_t));
+    if (!arrayData) {
+        vmThrow(vm, "MemoryAllocFail", "Failed to allocate memory for array data", NULL);
+    }
 
     array->data = arrayData;
     array->capacity = length;
@@ -171,10 +178,7 @@ void buildList(CometVM* vm) {
     int64_t size = popValue(vm);
 
     if (size < 0) {
-        char* trace = stackTrace(vm);
-
-        fprintf(stderr, "Attempted to create a list of negative size!\n%s", trace);
-        assert(size < 0);
+        vmThrow(vm, "InvalidParameter", "Attempted to create a list of negative size", NULL);
     }
 
     // create list object

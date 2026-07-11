@@ -1,4 +1,4 @@
 func main() -> int {
     int[*] list = new int[0]
-    return list:0
+    return list + 1
 }

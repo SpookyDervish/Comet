@@ -3337,6 +3337,27 @@ ResultType(CompiledValue, ErrorMessage) visitInfixExpression(CometCompiler* c, C
         }
     }
 
+    
+    if ((expr.op.type == CT_PLUS ||
+         expr.op.type == CT_MINUS ||
+         expr.op.type == CT_TIMES ||
+         expr.op.type == CT_DIVIDE) &&
+        
+        (typeIsPointer(leftType.as.success) || typeIsPointer(rightType.as.success))) {
+        CometASTNode* warningNode = typeIsPointer(leftType.as.success) ? expr.left : expr.right;
+
+        printErrorMessage(createWarning(
+            c->inputFilePath,
+            c->sourceCode,
+            "PointerArithmetic",
+            "Pointer arithmetic is unsafe",
+            NULL,
+            warningNode->lineNum,
+            warningNode->startCol,
+            warningNode->endCol
+        ));
+    }
+
     return Success(CompiledValue, ErrorMessage, FALLS_THROUGH(out));
 }
 

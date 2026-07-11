@@ -31,6 +31,18 @@ CometType cometTypeString = {
     .arrayType = &stringArray
 };
 
+bool typeIsPointer(CometType type) {
+    switch (type.typeKind) {
+        case COMET_ARRAY:
+        case COMET_STRUCT:
+        case COMET_FUNCTION:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 bool typesAreEqual(CometType child, CometType parent) {
     if (child.typeKind != parent.typeKind) {
         return false;
