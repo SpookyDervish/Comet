@@ -1,10 +1,8 @@
 func main() -> int {
-    mut int x = (2 + 3) * (4 + 5)
-    int y = x + 5
+    int[*] x = new int[3]
+    int[*] y = new int[3]
 
-    if (x + 5 == y) {
-        x = 45
-    }
+    x:#y = 13
 
-    return x + 5
+    return 0
 }
