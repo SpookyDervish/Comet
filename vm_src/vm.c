@@ -692,8 +692,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         if (index < 0) index = capacity + index;
         if (index < 0 || (uint64_t)index >= capacity) {
             char* buffer = malloc(128);
-            snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu.\n", index, capacity);
-            return Error(voidPtr, charptr, buffer);
+            snprintf(buffer, 128, "Index %ld out of bounds for array of size %lu", index, capacity);
+            vmThrow(vm, "IndexOutOfBounds", buffer, NULL);
         }
 
         pushValue(
