@@ -43,6 +43,7 @@
                 <ul>
                     <li><a href="#built-in-types">Built-In Types</a></li>
                 </ul>
+                <li><a href="#comments">Comments</a></li>
                 <li><a href="#functions">Functions</a></li>
                 <ul>
                     <li><a href="#inline-funcs">Inline Functions</a></li>
@@ -63,6 +64,7 @@
                 <ul>
                     <li><a href="#hash-op">'#' Operator</a></li>
                     <li><a href="#star-syntax">'*' Syntax</a></li>
+                    <li><a href="#array-loop">Looping Over Arrays</a></li>
                 </ul>
                 <li><a href="#enums">Enums</a></li>
 
@@ -159,7 +161,6 @@ func main() -> int {
                     </div>
                 </div>
 
-
                 <div id="variables">
                     <h1>Variables</h1>
                     <p>This is the syntax for defining a variable in Comet:</p>
@@ -196,6 +197,22 @@ func main() -> int {
                     <pre class="code"><code class="language-go">int myNumber</code></pre>
                     <br />
 
+                </div>
+
+                <div id="comments">
+                    <h1>Comments</h1>
+                    <p>There are two types of comments in Comet, single line comments and block comments. Below is the
+                        syntax for both:</p>
+                    <pre class="code"><code class="language-go">-- this is the syntax for a single line comment
+
+/*
+    this is the
+    syntax for a
+    block comment.
+*/</code></pre>
+                    <br>
+                    <p>I will use the block comments throughout the docs because I don't have a syntax highligher for
+                        Comet. The language with the closest syntax to Comet (Go) uses this syntax for comments.</p>
                 </div>
 
                 <div id="functions">
@@ -436,7 +453,8 @@ func main() -> int {
                     <br>
                     <h2 id="hash-op">'#' Operator</h2>
                     <p>you can get the length of an array with
-                        the '#' operator. Because strings are also arrays, you can use the '#' operator on them too! For example:</p>
+                        the '#' operator. Because strings are also arrays, you can use the '#' operator on them too! For
+                        example:</p>
                     <pre class="code"><code class="language-go">import io
                         
 func main() -> int {
@@ -453,7 +471,8 @@ func main() -> int {
                     <p>If you don't know the size of an array at compile time, you can use the '*' syntax. If you have a
                         function that takes an array of a fixed size, that function enforces that the array being passed
                         to it must also be the same fixed size. You can use the '*' syntax to allow a function to take
-                        an array of any size. The following is an example that uses both star syntax and the '#' operator:</p>
+                        an array of any size. The following is an example that uses both star syntax and the '#'
+                        operator:</p>
                     <pre class="code"><code class="language-go">func sum(int[*] arr) -> int { /* take an array of * size (any size) */
     int sum = 0
 
@@ -468,7 +487,21 @@ func main() -> int {
     int[3] myNumbers = [4, 5, 6]
     return sum(myNumbers) /* because the function takes an array of any size, this is valid */
 }</code></pre>
-                <br>
+                    <br>
+                    <h2 id="array-loop">Looping over Arrays</h2>
+                    <p>You can loop over an array with the following syntax:</p>
+                    <pre class="code"><code class="language-go">import io
+
+func main() -> int {
+    int[3] arr = [1, 2, 3]
+
+    for int value in arr {
+        io.println("arr[%n] = %n", i, value) /* you are also given the current index with the "i" variable */
+    }
+
+    return 0
+}</code></pre>
+                    <br />
                 </div>
 
                 <div id="enums">
