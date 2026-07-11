@@ -519,11 +519,18 @@ void appendNodeToBuff(CometASTNode* node, StringBuffer* buff) {
             sbAppend(buff, " ");
             appendNodeToBuff(node->data.AST_FOR_STATEMENT.ident, buff);
             sbAppend(buff, " in ");
-            appendNodeToBuff(node->data.AST_FOR_STATEMENT.start, buff);
-            sbAppend(buff, "..");
-            appendNodeToBuff(node->data.AST_FOR_STATEMENT.end, buff);
-            sbAppend(buff, " step ");
-            appendNodeToBuff(node->data.AST_FOR_STATEMENT.step, buff);
+
+            if (node->data.AST_FOR_STATEMENT.array) {
+                appendNodeToBuff(node->data.AST_FOR_STATEMENT.array, buff);
+            } else {
+                appendNodeToBuff(node->data.AST_FOR_STATEMENT.start, buff);
+                sbAppend(buff, "..");
+                appendNodeToBuff(node->data.AST_FOR_STATEMENT.end, buff);
+                sbAppend(buff, " step ");
+                appendNodeToBuff(node->data.AST_FOR_STATEMENT.step, buff);
+            }
+
+            
             sbAppend(buff, " {\n");
             appendNodeToBuff(node->data.AST_FOR_STATEMENT.program, buff);
             sbAppend(buff, "       }");

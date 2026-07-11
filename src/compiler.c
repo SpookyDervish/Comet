@@ -3857,6 +3857,105 @@ ResultType(CompiledValue, ErrorMessage) visitForStatement(CometCompiler* c, Come
     };
     append(c->loopContexts, loopContext);
 
+    char* ident = forStmt.ident->data.AST_IDENTIFIER.ident;
+
+    // create env for for loop
+    CometEnvironment* forLoopEnv = newEnvironment("forLoop", c->env, false);
+    c->env = forLoopEnv;
+
+    ResultType(CometType, ErrorMessage) iterType = getType(c, forStmt.type);
+    if (iterType.error)
+        return Error(CompiledValue, ErrorMessage, iterType.as.error);
+
+    if (forStmt.array) { // we're looping over an array
+
+        // get array type
+        ResultType(CometType, ErrorMessage) arrayType = resolveType(c, forStmt.array);
+        if (arrayType.as.success.typeKind != COMET_ARRAY) {
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeMismatch",
+                "Attempted to loop over something that isn't an array",
+                NULL,
+                forStmt.array->lineNum,
+                forStmt.array->startCol,
+                forStmt.array->endCol
+            );
+
+            return Error(CompiledValue, ErrorMessage, errMsg);
+        } 
+
+        CometType elemType = *arrayType.as.success.arrayType->elem;
+
+        // build zero
+        CometOperand zeroVal = createOperand(CO_IMMEDIATE);
+        zeroVal.imm.typeKind = COMET_INT;
+        zeroVal.imm.intVal = 0;
+
+        CometOperand zeroConst = storeConst(c, zeroVal);
+        buildPushConst(c, zeroConst);
+
+        uint32_t idx = defineVar(c->env, "i", RECORD_LOCAL, zeroVal, iterType.as.success, false);
+        uint32_t currentValue = defineVar(c->env, ident, RECORD_LOCAL, zeroVal, elemType, false);
+
+        buildStore(c, idx);
+
+        resolveLabel(c, mainLabel);
+
+        // get iterator
+        buildLoad(c, idx);
+
+        // get list size
+        ResultType(CompiledValue, ErrorMessage) arrayVal = visitValue(c, forStmt.array);
+        if (arrayVal.error)
+            return arrayVal;
+        buildListLength(c);
+
+        buildEq(c, iterType.as.success);
+        buildJumpIfTrue(c, endLabel);
+
+        // get value
+        arrayVal = visitValue(c, forStmt.array);
+        if (arrayVal.error)
+            return arrayVal;
+        buildLoad(c, idx);
+        buildListAt(c);
+        buildStore(c, currentValue);
+
+        // compile the body of the for loop
+        ResultType(CompiledValue, ErrorMessage) bodyResult = compile(c, forStmt.program);
+        if (bodyResult.error)
+            return bodyResult;
+
+        resolveLabel(c, continueLabel);
+        buildLoad(c, idx);
+
+        // build one
+        CometOperand oneVal = createOperand(CO_IMMEDIATE);
+        oneVal.imm.typeKind = COMET_SMALL;
+        oneVal.imm.smallVal = 1;
+        CometOperand oneConst = storeConst(c, oneVal);
+        buildPushConst(c, oneConst);
+        
+        // add the one to the iterator var
+        buildAdd(c, iterType.as.success);
+
+        // save the iterator value
+        buildStore(c, idx);
+
+        // jump back to the start of the for loop
+        buildJump(c, mainLabel);
+
+        resolveLabel(c, endLabel);
+
+        // exit the for loop's env
+        c->env = destroyEnv(forLoopEnv);
+
+        pop(c->loopContexts);
+        return Success(CompiledValue, ErrorMessage, NO_VALUE);
+    }
+
     // resolve start and end types
     ResultType(CometType, ErrorMessage) startType = resolveType(c, forStmt.start);
     if (startType.error)
@@ -3866,11 +3965,7 @@ ResultType(CompiledValue, ErrorMessage) visitForStatement(CometCompiler* c, Come
         return Error(CompiledValue, ErrorMessage, endType.as.error);
     CometType resultType = unifyType(startType.as.success, endType.as.success);
 
-    char* ident = forStmt.ident->data.AST_IDENTIFIER.ident;
 
-    // create env for for loop
-    CometEnvironment* forLoopEnv = newEnvironment("forLoop", c->env, false);
-    c->env = forLoopEnv;
 
     // define iterator variable
     ResultType(CompiledValue, ErrorMessage) start = visitValue(c, forStmt.start);
@@ -3909,7 +4004,7 @@ ResultType(CompiledValue, ErrorMessage) visitForStatement(CometCompiler* c, Come
     if (step.error)
         return Error(CompiledValue, ErrorMessage, step.as.error);
 
-    CometType addType = unifyType(startType.as.success, stepType.as.success);
+    CometType addType = unifyType(iterType.as.success, stepType.as.success);
 
     // add the step to the iterator var
     buildAdd(c, addType);

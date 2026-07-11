@@ -1143,6 +1143,7 @@ ResultType(astNodePtr, ErrorMessage) parseWhileStatement(CometParser* parser) {
 ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
     // basic format
     // for int i in 0 .. 10 {}
+    // for int x in y {}
 
     uint32_t lineNum = parser->currentToken->lineNum;
     uint32_t startCol = parser->currentToken->startCol;
@@ -1173,6 +1174,35 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
     }
 
     parserNextToken(parser);
+
+    bool isArrayLoop = !currentTokenIs(parser, CT_DOT_DOT);
+    if (isArrayLoop) { // we're looping over an array
+        ResultType(astNodePtr, ErrorMessage) array = parseExpression(parser, PRECEDENCE_LOWEST);
+        if (array.error) {
+            return array;
+        }
+
+        ResultType(astNodePtr, ErrorMessage) block = parseOptionalBlockStatement(parser);
+        if (block.error) {
+            return block;
+        }
+
+        CometASTNode* stmt = AST_NODE(
+            AST_FOR_STATEMENT,
+            lineNum,
+            type.as.success,
+            ident,
+            NULL,
+            NULL,
+            NULL,
+            block.as.success,
+            array.as.success
+        );
+        stmt->startCol = startCol;
+        stmt->endCol = block.as.success->endCol;
+
+        return Success(astNodePtr, ErrorMessage, stmt);
+    }
 
     ResultType(astNodePtr, ErrorMessage) start = parseExpression(parser, PRECEDENCE_LOWEST);
     if (start.error) {
@@ -1217,7 +1247,8 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
         start.as.success,
         end.as.success,
         stepNode.as.success,
-        block.as.success
+        block.as.success,
+        NULL
     );
     stmt->startCol = startCol;
     stmt->endCol = block.as.success->endCol;

@@ -108,6 +108,7 @@ struct CometASTNode {
             CometASTNode* end;
             CometASTNode* step;
             CometASTNode* program;
+            CometASTNode* array;
         } AST_FOR_STATEMENT;
         struct AST_IF_STATEMENT {
             CometASTNode* expression;

@@ -1,18 +1,11 @@
-struct Foo {
-    int x = 5 + 5
-
-    func foo() -> int {
-        int f = 2 * 10
-        return 2 + 2 + f + self.x
-    }
-
-    init() {
-
-    }
-}
+import io
 
 func main() -> int {
-    Foo f = new Foo()
+    int[3] array = [1, 2, 3]
 
-    return f.foo()
+    for int x in array {
+        io.println("%n", x)
+    }
+
+    return 0
 }
