@@ -77,6 +77,112 @@ CometASTNode* foldFloatExpr(CometASTNode* node) {
     }
 }
 
+CometASTNode* optimizerWalkAST(
+    CometCompiler* c,
+    ConstantEnv* currentEnv,
+    CometASTNode* ast,
+    CometASTNode* (callback)(CometCompiler* c, ConstantEnv* env, CometASTNode* node)) {
+    
+    if (!ast) return NULL;
+
+    switch (ast->nodeType) {
+        case AST_PROGRAM: {
+            for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
+                ast->data.AST_PROGRAM.statements[i] = optimizerWalkAST(c, currentEnv, ast->data.AST_PROGRAM.statements[i], callback);
+            }
+            break;
+        }
+
+        case AST_INFIX_EXPRESSION: {
+            ast->data.AST_INFIX_EXPRESSION.left = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.left, callback);
+            ast->data.AST_INFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.right, callback);
+            break;
+        }
+
+        case AST_FUNC_DEF_STATEMENT: {
+            ast->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_FUNC_DEF_STATEMENT.program, callback);
+            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = optimizerWalkAST(c, currentEnv, ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr, callback);
+            break;
+        }
+
+        case AST_EXPRESSION_STATEMENT: {
+            ast->data.AST_EXPRESSION_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_EXPRESSION_STATEMENT.expression, callback);
+            break;
+        }
+
+        case AST_RETURN_STATEMENT: {
+            ast->data.AST_RETURN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_RETURN_STATEMENT.expression, callback);
+            break;
+        }
+
+        case AST_IF_STATEMENT: {
+            ast->data.AST_IF_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.expression, callback);
+            ast->data.AST_IF_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.program, callback);
+            ast->data.AST_IF_STATEMENT.elseProgram = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.elseProgram, callback);
+            break;
+        }
+
+        case AST_ASSIGN_STATEMENT: {
+            ast->data.AST_ASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_ASSIGN_STATEMENT.expression, callback);
+            break;
+        }
+
+        case AST_REASSIGN_STATEMENT: {
+            ast->data.AST_REASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_REASSIGN_STATEMENT.expression, callback);
+            break;
+        }
+
+        case AST_PREFIX_EXPRESSION: {
+            ast->data.AST_PREFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_PREFIX_EXPRESSION.right, callback);
+            break;
+        }
+
+        case AST_STRUCT_DEF_STATEMENT: {
+            nodeList fieldDefs = ast->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
+            for (size_t i = 0; i < fieldDefs.count; i++) {
+                CometASTNode* fieldDef = *get(fieldDefs, i);
+
+                switch (fieldDef->nodeType) {
+                    case AST_ASSIGN_STATEMENT: {
+                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_ASSIGN_STATEMENT.expression, callback);
+                        break;
+                    }
+
+                    case AST_FUNC_DEF_STATEMENT: {
+                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_FUNC_DEF_STATEMENT.program, callback);
+                        break;
+                    }
+
+                    case AST_OVERRIDE_STATEMENT: {
+                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program, callback);
+                        break;
+                    }
+
+                    case AST_AS_FUNC_DEF: {
+                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_AS_FUNC_DEF.body = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_AS_FUNC_DEF.body, callback);
+                        break;
+                    }
+
+                    default: break;
+                }
+            }
+
+            if (ast->data.AST_STRUCT_DEF_STATEMENT.constructor) {
+                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = optimizerWalkAST(c, currentEnv, ast->data.AST_STRUCT_DEF_STATEMENT.constructor, callback);
+            }
+            if (ast->data.AST_STRUCT_DEF_STATEMENT.destructor) {
+                ast->data.AST_STRUCT_DEF_STATEMENT.destructor = optimizerWalkAST(c, currentEnv, ast->data.AST_STRUCT_DEF_STATEMENT.destructor, callback);
+            }
+
+            break;
+        }
+
+        default: break;
+    }
+
+    return callback(c, currentEnv, ast);
+}
+
 CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
     struct AST_PREFIX_EXPRESSION expr = node->data.AST_PREFIX_EXPRESSION;
 
@@ -122,54 +228,13 @@ CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
     }
 }
 
-CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
-    if (!ast)
-        return ast;
+CometASTNode* constantFold(CometCompiler* c, ConstantEnv* env, CometASTNode* ast) {
+    (void)env; // do this to tell gcc we're using the arg;
+
+    if (!ast) return NULL;
 
     switch (ast->nodeType) {
-        case AST_PROGRAM: {
-            for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
-                ast->data.AST_PROGRAM.statements[i] = constantFold(c, ast->data.AST_PROGRAM.statements[i]);
-            }
-            break;
-        }
-
-        case AST_EXPRESSION_STATEMENT: {
-            ast->data.AST_EXPRESSION_STATEMENT.expression = constantFold(c, ast->data.AST_EXPRESSION_STATEMENT.expression);
-            break;
-        }
-
-        case AST_RETURN_STATEMENT: {
-            ast->data.AST_RETURN_STATEMENT.expression = constantFold(c, ast->data.AST_RETURN_STATEMENT.expression);
-            break;
-        }
-
-        case AST_FUNC_DEF_STATEMENT: {
-            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = constantFold(c, ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr);
-            ast->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, ast->data.AST_FUNC_DEF_STATEMENT.program);
-            break;
-        }
-
-        case AST_IF_STATEMENT: {
-            ast->data.AST_IF_STATEMENT.expression = constantFold(c, ast->data.AST_IF_STATEMENT.expression);
-            ast->data.AST_IF_STATEMENT.program = constantFold(c, ast->data.AST_IF_STATEMENT.program);
-            ast->data.AST_IF_STATEMENT.elseProgram = constantFold(c, ast->data.AST_IF_STATEMENT.elseProgram);
-            break;
-        }
-
-        case AST_ASSIGN_STATEMENT: {
-            ast->data.AST_ASSIGN_STATEMENT.expression = constantFold(c, ast->data.AST_ASSIGN_STATEMENT.expression);
-            break;
-        }
-
-        case AST_REASSIGN_STATEMENT: {
-            ast->data.AST_REASSIGN_STATEMENT.expression = constantFold(c, ast->data.AST_REASSIGN_STATEMENT.expression);
-            break;
-        }
-
         case AST_PREFIX_EXPRESSION: {
-            ast->data.AST_PREFIX_EXPRESSION.right = constantFold(c, ast->data.AST_PREFIX_EXPRESSION.right);
-            
             if (!nodeIsALiteral(ast->data.AST_PREFIX_EXPRESSION.right)) {
                 break;
             }
@@ -177,42 +242,7 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
             return foldPrefixExpr(c, ast);
         }
 
-        case AST_STRUCT_DEF_STATEMENT: {
-            nodeList fieldDefs = ast->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
-            for (size_t i = 0; i < fieldDefs.count; i++) {
-                CometASTNode* fieldDef = *get(fieldDefs, i);
-
-                switch (fieldDef->nodeType) {
-                    case AST_ASSIGN_STATEMENT: {
-                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = constantFold(c, fieldDef->data.AST_ASSIGN_STATEMENT.expression);
-                        break;
-                    }
-
-                    case AST_FUNC_DEF_STATEMENT: {
-                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, fieldDef->data.AST_FUNC_DEF_STATEMENT.program);
-                        break;
-                    }
-
-                    case AST_OVERRIDE_STATEMENT: {
-                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program);
-                        break;
-                    }
-
-                    default: break;
-                }
-            }
-
-            if (ast->data.AST_STRUCT_DEF_STATEMENT.constructor) {
-                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = constantFold(c, ast->data.AST_STRUCT_DEF_STATEMENT.constructor);
-            }
-
-            break;
-        }
-
         case AST_INFIX_EXPRESSION: {
-            ast->data.AST_INFIX_EXPRESSION.left = constantFold(c, ast->data.AST_INFIX_EXPRESSION.left);
-            ast->data.AST_INFIX_EXPRESSION.right = constantFold(c, ast->data.AST_INFIX_EXPRESSION.right);
-
             if (!nodeIsALiteral(ast->data.AST_INFIX_EXPRESSION.left) ||
                 !nodeIsALiteral(ast->data.AST_INFIX_EXPRESSION.right)) {
                 break;
@@ -252,42 +282,10 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
     return ast;
 }
 
-CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv* currentEnv) {
-    if (!ast) return ast;
-
+CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, CometASTNode* ast) {
     switch (ast->nodeType) {
-        case AST_PROGRAM: {
-            for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
-                ast->data.AST_PROGRAM.statements[i] = constantPropogate(c, ast->data.AST_PROGRAM.statements[i], currentEnv);
-            }
-            break;
-        }
-
-        case AST_FUNC_DEF_STATEMENT: {
-
-            currentEnv = newConstantEnv(currentEnv, "function");
-            ast->data.AST_AS_FUNC_DEF.body = constantPropogate(c, ast->data.AST_FUNC_DEF_STATEMENT.program, currentEnv);
-            currentEnv = destroyConstantEnv(currentEnv);
-
-            break;
-        }
-
-        case AST_INFIX_EXPRESSION: {
-            ast->data.AST_INFIX_EXPRESSION.left = constantPropogate(c, ast->data.AST_INFIX_EXPRESSION.left, currentEnv);
-            ast->data.AST_INFIX_EXPRESSION.right = constantPropogate(c, ast->data.AST_INFIX_EXPRESSION.right, currentEnv);
-            break;
-        }
-
-        case AST_RETURN_STATEMENT: {
-            ast->data.AST_RETURN_STATEMENT.expression = constantPropogate(c, ast->data.AST_RETURN_STATEMENT.expression, currentEnv);
-            break;
-        }
-
         case AST_ASSIGN_STATEMENT: {
             char* varName = ast->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-
-            ast->data.AST_ASSIGN_STATEMENT.expression = constantPropogate(c, ast->data.AST_ASSIGN_STATEMENT.expression, currentEnv);
-
             CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
             
             if (expr && nodeIsALiteral(expr)) {
@@ -302,7 +300,6 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             char* varName = ast->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
             CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
 
-            
             if (nodeIsALiteral(expr)) {
                 defineConstant(currentEnv, varName, expr);
             } else { // x isnt constant
@@ -316,15 +313,6 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             HASH_ITER(hh, currentEnv->records, current, tmp) {
                 removeConstant(currentEnv, current->name);
             }
-            ast->data.AST_FOR_STATEMENT.start = constantPropogate(c, ast->data.AST_FOR_STATEMENT.start, currentEnv);
-            ast->data.AST_FOR_STATEMENT.end = constantPropogate(c, ast->data.AST_FOR_STATEMENT.end, currentEnv);
-            ast->data.AST_FOR_STATEMENT.step = constantPropogate(c, ast->data.AST_FOR_STATEMENT.step, currentEnv);
-            ast->data.AST_FOR_STATEMENT.program = constantPropogate(c, ast->data.AST_FOR_STATEMENT.program, currentEnv);
-
-
-            
-            
-            
             break;
         }
 
@@ -333,21 +321,16 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             HASH_ITER(hh, currentEnv->records, current, tmp) {
                 removeConstant(currentEnv, current->name);
             }
-            ast->data.AST_WHILE_STATEMENT.expression = constantPropogate(c, ast->data.AST_WHILE_STATEMENT.expression, currentEnv);
-            ast->data.AST_WHILE_STATEMENT.program = constantPropogate(c, ast->data.AST_WHILE_STATEMENT.program, currentEnv);
-
             
             break;
         }
 
         case AST_IF_STATEMENT: {
-            ast->data.AST_IF_STATEMENT.expression = constantPropogate(c, ast->data.AST_IF_STATEMENT.expression, currentEnv);
-
             ConstantEnv* thenEnv = newConstantEnv(currentEnv, "then");
-            ast->data.AST_IF_STATEMENT.program = constantPropogate(c, ast->data.AST_IF_STATEMENT.program, thenEnv);
+            ast->data.AST_IF_STATEMENT.program = constantPropogate(c, thenEnv, ast->data.AST_IF_STATEMENT.program);
 
             ConstantEnv* elseEnv = newConstantEnv(currentEnv, "else");
-            ast->data.AST_IF_STATEMENT.elseProgram = constantPropogate(c, ast->data.AST_IF_STATEMENT.elseProgram, elseEnv);
+            ast->data.AST_IF_STATEMENT.elseProgram = constantPropogate(c, elseEnv, ast->data.AST_IF_STATEMENT.elseProgram);
 
             // create a union of all three environments
             ConstantRecord* current, *tmp;
@@ -406,42 +389,6 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             break;
         }
 
-        case AST_STRUCT_DEF_STATEMENT: {
-            nodeList fieldDefs = ast->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
-            for (size_t i = 0; i < fieldDefs.count; i++) {
-                CometASTNode* fieldDef = *get(fieldDefs, i);
-
-                switch (fieldDef->nodeType) {
-                    case AST_ASSIGN_STATEMENT: {
-                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = constantPropogate(c, fieldDef->data.AST_ASSIGN_STATEMENT.expression, currentEnv);
-                        break;
-                    }
-
-                    case AST_FUNC_DEF_STATEMENT: {
-                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = constantPropogate(c, fieldDef->data.AST_FUNC_DEF_STATEMENT.program, currentEnv);
-                        break;
-                    }
-
-                    case AST_OVERRIDE_STATEMENT: {
-                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = constantPropogate(
-                            c,
-                            fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program,
-                            currentEnv
-                        );
-                        break;
-                    }
-
-                    default: break;
-                }
-            }
-
-            if (ast->data.AST_STRUCT_DEF_STATEMENT.constructor) {
-                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = constantPropogate(c, ast->data.AST_STRUCT_DEF_STATEMENT.constructor, currentEnv);
-            }
-
-            break;
-        }
-
         case AST_IDENTIFIER: {
             char* varName = ast->data.AST_IDENTIFIER.ident;
             ConstantRecord* constantValue = findConstant(currentEnv, varName);
@@ -449,7 +396,6 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             if (constantValue && constantValue->value) {
                 return constantValue->value;
             }
-
             break;
         }
 
@@ -459,31 +405,17 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
     return ast;
 }
 
-CometASTNode* controlFlowSimplify(CometCompiler* c, CometASTNode* ast) {
-    if (!ast) return ast;
+CometASTNode* controlFlowSimplify(CometCompiler* c, ConstantEnv* env, CometASTNode* ast) {
+    (void)c; // do this to tell gcc we're using the arg;
+    (void)env;
 
     switch (ast->nodeType) {
-        case AST_PROGRAM: {
-            for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
-                ast->data.AST_PROGRAM.statements[i] = controlFlowSimplify(c, ast->data.AST_PROGRAM.statements[i]);
-            }
-            break;
-        }
-
-        case AST_FUNC_DEF_STATEMENT: {
-            ast->data.AST_AS_FUNC_DEF.body = controlFlowSimplify(c, ast->data.AST_FUNC_DEF_STATEMENT.program);
-            break;
-        }
-
         case AST_IF_STATEMENT: {
             CometASTNode* expr = ast->data.AST_IF_STATEMENT.expression;
 
             if (expr->nodeType == AST_BOOL && expr->data.AST_BOOL.value == false) {
                 return NULL;
             } 
-
-            ast->data.AST_IF_STATEMENT.program = controlFlowSimplify(c, ast->data.AST_IF_STATEMENT.program);
-
             break;
         }
 
@@ -493,17 +425,8 @@ CometASTNode* controlFlowSimplify(CometCompiler* c, CometASTNode* ast) {
             if (expr->nodeType == AST_BOOL && expr->data.AST_BOOL.value == false) {
                 return NULL;
             } 
-
-            ast->data.AST_WHILE_STATEMENT.program = controlFlowSimplify(c, ast->data.AST_WHILE_STATEMENT.program);
-
             break;
         }
-
-        case AST_FOR_STATEMENT: {
-            ast->data.AST_FOR_STATEMENT.program = controlFlowSimplify(c, ast->data.AST_FOR_STATEMENT.program);
-            break;
-        }
-
         default: break;
     }
 
@@ -517,9 +440,10 @@ void runOptimisations(CometCompiler* c, CometASTNode* ast, bool showPasses) {
 
     size_t pass = 0;
     while (true) {
-        ast = constantFold(c, ast);
-        ast = constantPropogate(c, ast, constantEnv);
-        ast = controlFlowSimplify(c, ast);
+
+        ast = optimizerWalkAST(c, constantEnv, ast, constantFold);
+        ast = optimizerWalkAST(c, constantEnv, ast, constantPropogate);
+        ast = optimizerWalkAST(c, constantEnv, ast, controlFlowSimplify);
 
         char* current = nodeToCStr(ast);
 

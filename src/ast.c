@@ -931,12 +931,12 @@ CometASTNode* deepCopyNode(CometASTNode* node) {
             );
             break;
 
-        case AST_AS_FUNC_DEV:
+        case AST_AS_FUNC_DEF:
             out = AST_NODE(
-                AST_AS_FUNC_DEV,
+                AST_AS_FUNC_DEF,
                 node->lineNum,
-                deepCopyNode(node->data.AST_AS_FUNC_DEV.program),
-                deepCopyNode(node->data.AST_AS_FUNC_DEV.castType)
+                deepCopyNode(node->data.AST_AS_FUNC_DEF.type),
+                deepCopyNode(node->data.AST_AS_FUNC_DEF.body)
             );
             break;
 
@@ -1011,15 +1011,6 @@ CometASTNode* deepCopyNode(CometASTNode* node) {
             );
             break;
         }
-
-        case AST_AS_FUNC_DEF:
-            out = AST_NODE(
-                AST_AS_FUNC_DEF,
-                node->lineNum,
-                deepCopyNode(node->data.AST_AS_FUNC_DEF.type),
-                deepCopyNode(node->data.AST_AS_FUNC_DEF.body)
-            );
-            break;
 
         case AST_AS_EXPR:
             out = AST_NODE(
