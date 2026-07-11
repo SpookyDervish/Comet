@@ -1,5 +1,6 @@
-func main() -> void {
-    if true {
-        dup = true
+func main() -> int {
+    int[*] list = new int[0]
+    if (#list < 5) {
+        return 1
     }
 }

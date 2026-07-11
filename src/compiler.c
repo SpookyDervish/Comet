@@ -3778,7 +3778,7 @@ ResultType(CompiledValue, ErrorMessage) visitIfStatement(CometCompiler* c, Comet
         return ifBodyResult;
 
     bool mainBodyFallsThrough = ifBodyResult.as.success.fallsThrough;
-    bool elseBodyFallsThrough = false;
+    bool elseBodyFallsThrough = true;
 
     
 
