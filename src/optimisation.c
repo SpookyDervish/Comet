@@ -177,6 +177,38 @@ CometASTNode* constantFold(CometCompiler* c, CometASTNode* ast) {
             return foldPrefixExpr(c, ast);
         }
 
+        case AST_STRUCT_DEF_STATEMENT: {
+            nodeList fieldDefs = ast->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
+            for (size_t i = 0; i < fieldDefs.count; i++) {
+                CometASTNode* fieldDef = *get(fieldDefs, i);
+
+                switch (fieldDef->nodeType) {
+                    case AST_ASSIGN_STATEMENT: {
+                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = constantFold(c, fieldDef->data.AST_ASSIGN_STATEMENT.expression);
+                        break;
+                    }
+
+                    case AST_FUNC_DEF_STATEMENT: {
+                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, fieldDef->data.AST_FUNC_DEF_STATEMENT.program);
+                        break;
+                    }
+
+                    case AST_OVERRIDE_STATEMENT: {
+                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = constantFold(c, fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program);
+                        break;
+                    }
+
+                    default: break;
+                }
+            }
+
+            if (ast->data.AST_STRUCT_DEF_STATEMENT.constructor) {
+                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = constantFold(c, ast->data.AST_STRUCT_DEF_STATEMENT.constructor);
+            }
+
+            break;
+        }
+
         case AST_INFIX_EXPRESSION: {
             ast->data.AST_INFIX_EXPRESSION.left = constantFold(c, ast->data.AST_INFIX_EXPRESSION.left);
             ast->data.AST_INFIX_EXPRESSION.right = constantFold(c, ast->data.AST_INFIX_EXPRESSION.right);
@@ -366,6 +398,42 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             break;
         }
 
+        case AST_STRUCT_DEF_STATEMENT: {
+            nodeList fieldDefs = ast->data.AST_STRUCT_DEF_STATEMENT.fieldDefs;
+            for (size_t i = 0; i < fieldDefs.count; i++) {
+                CometASTNode* fieldDef = *get(fieldDefs, i);
+
+                switch (fieldDef->nodeType) {
+                    case AST_ASSIGN_STATEMENT: {
+                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = constantPropogate(c, fieldDef->data.AST_ASSIGN_STATEMENT.expression, currentEnv);
+                        break;
+                    }
+
+                    case AST_FUNC_DEF_STATEMENT: {
+                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = constantPropogate(c, fieldDef->data.AST_FUNC_DEF_STATEMENT.program, currentEnv);
+                        break;
+                    }
+
+                    case AST_OVERRIDE_STATEMENT: {
+                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = constantPropogate(
+                            c,
+                            fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program,
+                            currentEnv
+                        );
+                        break;
+                    }
+
+                    default: break;
+                }
+            }
+
+            if (ast->data.AST_STRUCT_DEF_STATEMENT.constructor) {
+                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = constantPropogate(c, ast->data.AST_STRUCT_DEF_STATEMENT.constructor, currentEnv);
+            }
+
+            break;
+        }
+
         case AST_IDENTIFIER: {
             char* varName = ast->data.AST_IDENTIFIER.ident;
             ConstantRecord* constantValue = findConstant(currentEnv, varName);
@@ -420,13 +488,11 @@ void runOptimisations(CometCompiler* c, CometASTNode* ast) {
 
     size_t pass = 0;
     while (true) {
-        printf("pass %zu\n", pass + 1);
         ast = constantFold(c, ast);
         ast = constantPropogate(c, ast, constantEnv);
         ast = controlFlowSimplify(c, ast);
 
         char* current = nodeToCStr(ast);
-        printf("%s\n", current);
 
         if (strcmp(previous, current) == 0)
             break;

@@ -1,8 +1,18 @@
+struct Foo {
+    int x = 5 + 5
+
+    func foo() -> int {
+        int f = 2 * 10
+        return 2 + 2 + f + self.x
+    }
+
+    init() {
+
+    }
+}
+
 func main() -> int {
-    int[*] x = new int[3]
-    int[*] y = new int[3]
+    Foo f = new Foo()
 
-    x:#y = 13
-
-    return 0
+    return f.foo()
 }
