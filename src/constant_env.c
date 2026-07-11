@@ -13,13 +13,13 @@ void defineConstant(ConstantEnv* env, char* name, CometASTNode* value) {
     ConstantRecord* record = findConstantLocal(env, name);
 
     if (record) {
-        record->value = value;
+        record->value = deepCopyNode(value);
         return;
     }
 
     record = malloc(sizeof(ConstantRecord));
     record->name = strdup(name);
-    record->value = value;
+    record->value = deepCopyNode(value);
 
     HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
 }

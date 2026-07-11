@@ -285,10 +285,6 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
 
             ConstantEnv* elseEnv = newConstantEnv(currentEnv, "else");
             ast->data.AST_IF_STATEMENT.elseProgram = constantPropogate(c, ast->data.AST_IF_STATEMENT.elseProgram, elseEnv);
-            
-
-            
-            
 
             ConstantRecord* current, *tmp;
             HASH_ITER(hh, currentEnv->records, current, tmp) {
