@@ -473,6 +473,16 @@ CometASTNode* controlFlowSimplify(CometCompiler* c, CometASTNode* ast) {
             if (expr->nodeType == AST_BOOL && expr->data.AST_BOOL.value == false) {
                 return NULL;
             } 
+            break;
+        }
+
+        case AST_WHILE_STATEMENT: {
+            CometASTNode* expr = ast->data.AST_WHILE_STATEMENT.expression;
+
+            if (expr->nodeType == AST_BOOL && expr->data.AST_BOOL.value == false) {
+                return NULL;
+            } 
+            break;
         }
 
         default: break;
