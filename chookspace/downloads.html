@@ -133,6 +133,9 @@
             if (releases.length > 0) {
                 latestBtn.innerText = `Download Latest (${releases[0].tag_name})`;
                 latestBtn.href = releases[0].html_url;
+            } else {
+                latestBtn.innerHTML = `<img src="assets/chookspace.png" alt="Chookspace logo">Source Code`;
+                latestBtn.href = "https://chookspace.com/Comet/Comet#installation"
             }
         }
 

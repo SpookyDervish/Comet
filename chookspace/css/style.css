@@ -161,6 +161,11 @@ h2 {
     }
 }
 
+.btn img, .btn-primary img {
+    width: 1em;
+    margin-right: 1em;
+}
+
 #showcases {
     display: flex;
     flex-direction: column;
@@ -217,11 +222,6 @@ h2 {
 
     h2 {
         margin-bottom: 1.2em;
-    }
-
-    .btn img {
-        width: 1em;
-        margin-right: 1em;
     }
 }
 
