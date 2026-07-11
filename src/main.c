@@ -10,7 +10,7 @@
 #include "../lib/ansi.h"
 
 
-#define VERSION_NUMBER "0.0.7"
+#define VERSION_NUMBER "0.1.0"
 
 
 int main(int argc, char** argv) {
