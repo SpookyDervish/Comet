@@ -369,10 +369,16 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
                 char* varName = current->name;
                 
                 ConstantRecord* before = findConstant(currentEnv, varName);
+
+                if (!before)
+                    continue;
+                
+
                 ConstantRecord* thenRecord = findConstantLocal(thenEnv, varName);
                 ConstantRecord* elseRecord = findConstantLocal(elseEnv, varName);
 
                 if (!ast->data.AST_IF_STATEMENT.elseProgram) {
+                    
                     if (thenRecord && !nodesAreEqual(thenRecord->value, before->value)) {
                         removeConstant(currentEnv, varName);
                     }
