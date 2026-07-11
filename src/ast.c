@@ -8,6 +8,8 @@ CometASTNode* allocateNode(CometASTNode node) {
 }
 
 bool nodeIsALiteral(CometASTNode* node) {
+    if (!node) return false;
+
     switch (node->nodeType) {
         case AST_INT:
         case AST_BOOL:

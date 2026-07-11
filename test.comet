@@ -1,4 +1,4 @@
 func main() -> int {
-    int x = (2 + 3) * (4 + 5)
-    return x
+    int[5] x
+    return 0
 }
