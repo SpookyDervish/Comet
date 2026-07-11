@@ -1175,7 +1175,7 @@ ResultType(astNodePtr, ErrorMessage) parseForStatement(CometParser* parser) {
 
     parserNextToken(parser);
 
-    bool isArrayLoop = !currentTokenIs(parser, CT_DOT_DOT);
+    bool isArrayLoop = !peekTokenIs(parser, CT_DOT_DOT);
     if (isArrayLoop) { // we're looping over an array
         ResultType(astNodePtr, ErrorMessage) array = parseExpression(parser, PRECEDENCE_LOWEST);
         if (array.error) {

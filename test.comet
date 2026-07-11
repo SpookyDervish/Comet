@@ -1,11 +1,11 @@
 import io
 
-func main() -> int {
-    int[3] array = [1, 2, 3]
-
-    for int x in array {
-        io.println("%n", x)
+func main() -> void {
+    for int v in [1,2,3,4,5] {
+        io.println("value %n at index %n", v, i)
     }
 
-    return 0
+    for int i in 0 .. 10 {
+        io.println("%n", i)
+    }
 }
