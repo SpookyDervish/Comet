@@ -318,6 +318,8 @@ char* ASTNodeTypeToCStr(CometASTNodeType nodeType) {
 }
 
 void appendNodeToBuff(CometASTNode* node, StringBuffer* buff) {
+    if (!node) return;
+
     switch (node->nodeType) {
         case AST_PROGRAM:
             sbAppend(buff, "Program:\n");

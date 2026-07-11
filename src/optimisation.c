@@ -253,8 +253,10 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
 
         case AST_ASSIGN_STATEMENT: {
             char* varName = ast->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
-            CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
 
+            ast->data.AST_ASSIGN_STATEMENT.expression = constantPropogate(c, ast->data.AST_ASSIGN_STATEMENT.expression, currentEnv);
+
+            CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
             
             if (expr && nodeIsALiteral(expr)) {
                 defineConstant(currentEnv, varName, expr);
@@ -313,50 +315,52 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
             ConstantEnv* elseEnv = newConstantEnv(currentEnv, "else");
             ast->data.AST_IF_STATEMENT.elseProgram = constantPropogate(c, ast->data.AST_IF_STATEMENT.elseProgram, elseEnv);
 
+            // create a union of all three environments
             ConstantRecord* current, *tmp;
+
+            ConstantEnv* allEnvs = newConstantEnv(currentEnv, "all");
             HASH_ITER(hh, currentEnv->records, current, tmp) {
+                defineConstant(allEnvs, current->name, current->value);
+            }
+            HASH_ITER(hh, thenEnv->records, current, tmp) {
+                defineConstant(allEnvs, current->name, current->value);
+            }
+            HASH_ITER(hh, elseEnv->records, current, tmp) {
+                defineConstant(allEnvs, current->name, current->value);
+            }
+
+
+
+            HASH_ITER(hh, allEnvs->records, current, tmp) {
                 char* varName = current->name;
-
+                
+                ConstantRecord* before = findConstant(currentEnv, varName);
                 ConstantRecord* thenRecord = findConstantLocal(thenEnv, varName);
-                if (!thenRecord) {
-                    removeConstant(currentEnv, varName);
-                    continue;
-                }
-
-                // if there is no else branch then any changes mutate the variable, making it no longer a constant
-                if (!ast->data.AST_IF_STATEMENT.elseProgram) {
-                    removeConstant(currentEnv, varName);
-                    continue;
-                }
-
                 ConstantRecord* elseRecord = findConstantLocal(elseEnv, varName);
-                if (elseRecord) {
-                    if (nodesAreEqual(thenRecord->value, elseRecord->value)) {
-                        // both branches got the same value
-                        defineConstant(currentEnv, varName, thenRecord->value);
-                    } else {
-                        // both branches reached two different values, we can't use the variable as a constant
+
+                if (!ast->data.AST_IF_STATEMENT.elseProgram) {
+                    if (thenRecord && !nodesAreEqual(thenRecord->value, before->value)) {
                         removeConstant(currentEnv, varName);
                     }
+
+                    continue;
+                }
+
+                // has else
+                CometASTNode* thenVal = thenRecord != NULL ? thenRecord->value : before->value;
+                CometASTNode* elseVal = elseRecord != NULL ? elseRecord->value : before->value;
+
+                if (thenVal == NULL || elseVal == NULL) {
+                    removeConstant(currentEnv, varName);
+                } else if (nodesAreEqual(thenVal, elseVal)) {
+                    defineConstant(currentEnv, current->name, thenVal);
                 } else {
-                    // then branch mutated the variable and the else branch didn't
                     removeConstant(currentEnv, varName);
                 }
 
             }
 
-            if (ast->data.AST_IF_STATEMENT.elseProgram) {
-                ConstantRecord* current, *tmp;
-                HASH_ITER(hh, currentEnv->records, current, tmp) {
-                    char* varName = current->name;
-
-                    // if the else branch modifies a variable that the then branch doesn't then the value is mutated and no longer a constant
-                    if (!findConstantLocal(thenEnv, varName)) {
-                        removeConstant(currentEnv, varName);
-                    }   
-                }
-            }
-
+            destroyConstantEnv(allEnvs);
             destroyConstantEnv(thenEnv);
             destroyConstantEnv(elseEnv);
             break;
@@ -416,12 +420,13 @@ void runOptimisations(CometCompiler* c, CometASTNode* ast) {
 
     size_t pass = 0;
     while (true) {
-        
+        printf("pass %zu\n", pass + 1);
         ast = constantFold(c, ast);
         ast = constantPropogate(c, ast, constantEnv);
         ast = controlFlowSimplify(c, ast);
 
         char* current = nodeToCStr(ast);
+        printf("%s\n", current);
 
         if (strcmp(previous, current) == 0)
             break;

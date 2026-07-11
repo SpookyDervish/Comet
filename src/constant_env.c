@@ -50,15 +50,9 @@ void removeConstant(ConstantEnv* env, char* name) {
     HASH_FIND_STR(env->records, name, record);
 
     if (record) {
-        record->value = NULL;
+        HASH_DEL(env->records, record);
         return;
     }
-
-    record = malloc(sizeof(ConstantRecord));
-    record->name = strdup(name);
-    record->value = NULL;
-
-    HASH_ADD_KEYPTR(hh, env->records, record->name, strlen(record->name), record);
 }
 
 ConstantEnv* destroyConstantEnv(ConstantEnv* env) {

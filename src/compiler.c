@@ -5486,6 +5486,8 @@ ResultType(cometCompilerPtr, ErrorMessage) createCompiler(char* inputFilePath, c
 }
 
 ResultType(CompiledValue, ErrorMessage) compile(CometCompiler* c, CometASTNode* node) {
+    if (!node) return Success(CompiledValue, ErrorMessage, NO_VALUE);
+
     switch (node->nodeType) {
         case AST_PROGRAM:
             return visitProgram(c, node);
