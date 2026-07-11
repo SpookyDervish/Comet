@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    runOptimisations(compiler.as.success, ast.as.success);
+    runOptimisations(compiler.as.success, ast.as.success, args.as.success.showOptimisationPasses);
 
     ResultType(CompiledValue, ErrorMessage) compileResult = compile(compiler.as.success, ast.as.success);
     if (compileResult.error) {

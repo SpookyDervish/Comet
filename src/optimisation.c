@@ -491,7 +491,7 @@ CometASTNode* controlFlowSimplify(CometCompiler* c, CometASTNode* ast) {
     return ast;
 }
 
-void runOptimisations(CometCompiler* c, CometASTNode* ast) {
+void runOptimisations(CometCompiler* c, CometASTNode* ast, bool showPasses) {
     char* previous = nodeToCStr(ast);
 
     ConstantEnv* constantEnv = newConstantEnv(NULL, "root");
@@ -504,6 +504,10 @@ void runOptimisations(CometCompiler* c, CometASTNode* ast) {
 
         char* current = nodeToCStr(ast);
 
+        if (showPasses) {
+            printf(ESC_BOLD "==> Optimisation Pass %zu" ESC_RESET "\n%s\n", pass + 1, current);
+        }
+
         if (strcmp(previous, current) == 0)
             break;
 
@@ -513,8 +517,5 @@ void runOptimisations(CometCompiler* c, CometASTNode* ast) {
 
         previous = current;
     }
-
-    printf("%s\n", previous);
-
     
 }

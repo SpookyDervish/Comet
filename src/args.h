@@ -12,6 +12,7 @@ typedef struct {
     bool outputASM;
     bool debugSymbols;
     bool printAST;
+    bool showOptimisationPasses;
     bool printTokens;
     bool showVersion;
 } CometArgs;
