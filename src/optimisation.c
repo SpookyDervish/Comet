@@ -312,29 +312,31 @@ CometASTNode* constantPropogate(CometCompiler* c, CometASTNode* ast, ConstantEnv
         }
 
         case AST_FOR_STATEMENT: {
+            ConstantRecord* current, *tmp;
+            HASH_ITER(hh, currentEnv->records, current, tmp) {
+                removeConstant(currentEnv, current->name);
+            }
             ast->data.AST_FOR_STATEMENT.start = constantPropogate(c, ast->data.AST_FOR_STATEMENT.start, currentEnv);
             ast->data.AST_FOR_STATEMENT.end = constantPropogate(c, ast->data.AST_FOR_STATEMENT.end, currentEnv);
             ast->data.AST_FOR_STATEMENT.step = constantPropogate(c, ast->data.AST_FOR_STATEMENT.step, currentEnv);
             ast->data.AST_FOR_STATEMENT.program = constantPropogate(c, ast->data.AST_FOR_STATEMENT.program, currentEnv);
 
 
-            ConstantRecord* current, *tmp;
-            HASH_ITER(hh, currentEnv->records, current, tmp) {
-                removeConstant(currentEnv, current->name);
-            }
+            
             
             
             break;
         }
 
         case AST_WHILE_STATEMENT: {
-            ast->data.AST_WHILE_STATEMENT.expression = constantPropogate(c, ast->data.AST_WHILE_STATEMENT.expression, currentEnv);
-            ast->data.AST_WHILE_STATEMENT.program = constantPropogate(c, ast->data.AST_WHILE_STATEMENT.program, currentEnv);
-
             ConstantRecord* current, *tmp;
             HASH_ITER(hh, currentEnv->records, current, tmp) {
                 removeConstant(currentEnv, current->name);
             }
+            ast->data.AST_WHILE_STATEMENT.expression = constantPropogate(c, ast->data.AST_WHILE_STATEMENT.expression, currentEnv);
+            ast->data.AST_WHILE_STATEMENT.program = constantPropogate(c, ast->data.AST_WHILE_STATEMENT.program, currentEnv);
+
+            
             break;
         }
 
