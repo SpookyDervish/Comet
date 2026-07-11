@@ -283,6 +283,8 @@ CometASTNode* constantFold(CometCompiler* c, ConstantEnv* env, CometASTNode* ast
 }
 
 CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, CometASTNode* ast) {
+    if (!ast) return NULL;
+
     switch (ast->nodeType) {
         case AST_ASSIGN_STATEMENT: {
             char* varName = ast->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
@@ -308,14 +310,8 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
             break;
         }
 
-        case AST_FOR_STATEMENT: {
-            ConstantRecord* current, *tmp;
-            HASH_ITER(hh, currentEnv->records, current, tmp) {
-                removeConstant(currentEnv, current->name);
-            }
-            break;
-        }
-
+        case AST_IF_STATEMENT:
+        case AST_FOR_STATEMENT:
         case AST_WHILE_STATEMENT: {
             ConstantRecord* current, *tmp;
             HASH_ITER(hh, currentEnv->records, current, tmp) {
@@ -325,7 +321,7 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
             break;
         }
 
-        case AST_IF_STATEMENT: {
+        /*case AST_IF_STATEMENT: {
             ConstantEnv* thenEnv = newConstantEnv(currentEnv, "then");
             ast->data.AST_IF_STATEMENT.program = constantPropogate(c, thenEnv, ast->data.AST_IF_STATEMENT.program);
 
@@ -387,7 +383,7 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
             destroyConstantEnv(thenEnv);
             destroyConstantEnv(elseEnv);
             break;
-        }
+        }*/
 
         case AST_IDENTIFIER: {
             char* varName = ast->data.AST_IDENTIFIER.ident;
