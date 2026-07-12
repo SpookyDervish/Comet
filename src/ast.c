@@ -1,5 +1,4 @@
 #include "ast.h"
-#include <stddef.h>
 
 CometASTNode* allocateNode(CometASTNode node) {
     CometASTNode* ptr = malloc(sizeof(CometASTNode));
@@ -1033,5 +1032,51 @@ CometASTNode* deepCopyNode(CometASTNode* node) {
 bool nodesAreEqual(CometASTNode* a, CometASTNode* b) {
     char* aStr = nodeToCStr(a);
     char* bStr = nodeToCStr(b);
-    return strcmp(aStr, bStr) == 0;
+    bool equal = strcmp(aStr, bStr) == 0;
+
+    free(aStr);
+    free(bStr);
+
+    return equal;
+}
+
+void replaceNode(CometASTNode* parentBlock, CometASTNode* child, CometASTNode* newProgram) {
+    assert(parentBlock->nodeType == AST_PROGRAM);
+
+    struct AST_PROGRAM* prog = &parentBlock->data.AST_PROGRAM;
+    struct AST_PROGRAM newProg = newProgram->data.AST_PROGRAM;
+
+    ssize_t index = -1;
+    for (size_t i = 0; i < prog->numStatements; i++) {
+        if (nodesAreEqual(prog->statements[i], child)) {
+            index = i;
+            break;
+        }
+    }
+
+    if (index == -1) {
+        return;
+    }
+
+    size_t oldNumStatements = prog->numStatements;
+    prog->numStatements += newProg.numStatements - 1; // -1 because child is replaced
+
+    if (prog->statementsArraySize < prog->numStatements) {
+        prog->statementsArraySize = prog->numStatements;
+
+        CometASTNode** tmpPtr = realloc(prog->statements, sizeof(CometASTNode*) * prog->statementsArraySize);
+        if (!tmpPtr) {
+            printf("failed to allocate memory for new statements array (replaceNode)");
+            exit(1);
+        }
+        prog->statements = tmpPtr;
+    }
+
+    size_t elementsToShift = oldNumStatements - (index + 1);
+
+    if (elementsToShift > 0)
+        memmove(&prog->statements[index + newProg.numStatements], &prog->statements[index + 1], sizeof(CometASTNode*) * elementsToShift);
+
+    memcpy(&prog->statements[index], newProg.statements, sizeof(CometASTNode*) * newProg.numStatements);
+
 }

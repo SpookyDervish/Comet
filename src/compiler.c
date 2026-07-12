@@ -2276,6 +2276,11 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
 
                 case CT_OR:
                 case CT_AND:
+                case CT_EQ_EQ:
+                case CT_LT:
+                case CT_LTE:
+                case CT_GT:
+                case CT_GTE:
                     return Success(CometType, ErrorMessage, cometTypeBool);
 
                 case CT_COLON:

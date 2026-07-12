@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "lexer.h"
 #include "strb.h"
 #include "../include/struct.h"
@@ -200,5 +201,6 @@ uint64_t getNodeIntValue(CometASTNode* node);
 char* nodeToCStr(CometASTNode* node);
 CometASTNode* deepCopyNode(CometASTNode* node);
 bool nodesAreEqual(CometASTNode* a, CometASTNode* b);
+void replaceNode(CometASTNode* parentBlock, CometASTNode* child, CometASTNode* newProgram);
 
 #define AST_NODE(type, lineNumber, ...) allocateNode((CometASTNode){.nodeType = type, {.type=(struct type){__VA_ARGS__}}, .lineNum = lineNumber, .startCol = 0, .endCol = 0})

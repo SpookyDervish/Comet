@@ -48,14 +48,7 @@ CometASTNode* foldIntExpr(CometASTNode* node) {
             return AST_NODE(AST_DOUBLE, node->lineNum, (double)expr.left->data.AST_INT.number / (double)expr.right->data.AST_INT.number);
         case CT_POW: return AST_NODE(AST_INT, node->lineNum, pow(expr.left->data.AST_INT.number, expr.right->data.AST_INT.number));
         case CT_MOD: return AST_NODE(AST_INT, node->lineNum, expr.left->data.AST_INT.number % expr.right->data.AST_INT.number);
-        
-        case CT_EQ_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number == expr.right->data.AST_INT.number);
-        case CT_NOT_EQ: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number != expr.right->data.AST_INT.number);
-        case CT_LT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number < expr.right->data.AST_INT.number);
-        case CT_GT: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number > expr.right->data.AST_INT.number);
-        case CT_LTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number <= expr.right->data.AST_INT.number);
-        case CT_GTE: return AST_NODE(AST_BOOL, node->lineNum, expr.left->data.AST_INT.number >= expr.right->data.AST_INT.number);
-        
+
         default: break;
     }
 
@@ -83,67 +76,68 @@ CometASTNode* foldFloatExpr(CometASTNode* node) {
     }
 }
 
-CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, CometASTNode* ast);
+CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, CometASTNode* ast, CometASTNode* parentBlock);
 CometASTNode* optimizerWalkAST(
     CometCompiler* c,
     ConstantEnv* currentEnv,
     CometASTNode* ast,
-    CometASTNode* (callback)(CometCompiler* c, ConstantEnv* env, CometASTNode* node)) {
+    CometASTNode* parentBlock,
+    CometASTNode* (callback)(CometCompiler* c, ConstantEnv* env, CometASTNode* node, CometASTNode* parentBlock)) {
     
     if (!ast) return NULL;
 
     switch (ast->nodeType) {
         case AST_PROGRAM: {
             for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
-                ast->data.AST_PROGRAM.statements[i] = optimizerWalkAST(c, currentEnv, ast->data.AST_PROGRAM.statements[i], callback);
+                ast->data.AST_PROGRAM.statements[i] = optimizerWalkAST(c, currentEnv, ast->data.AST_PROGRAM.statements[i], ast, callback);
             }
             break;
         }
 
         case AST_INFIX_EXPRESSION: {
-            ast->data.AST_INFIX_EXPRESSION.left = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.left, callback);
-            ast->data.AST_INFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.right, callback);
+            ast->data.AST_INFIX_EXPRESSION.left = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.left, parentBlock, callback);
+            ast->data.AST_INFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.right, parentBlock, callback);
             break;
         }
 
         case AST_FUNC_DEF_STATEMENT: {
-            ast->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_FUNC_DEF_STATEMENT.program, callback);
-            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = optimizerWalkAST(c, currentEnv, ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr, callback);
+            ast->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_FUNC_DEF_STATEMENT.program, parentBlock, callback);
+            ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr = optimizerWalkAST(c, currentEnv, ast->data.AST_FUNC_DEF_STATEMENT.inlineExpr, parentBlock, callback);
             break;
         }
 
         case AST_EXPRESSION_STATEMENT: {
-            ast->data.AST_EXPRESSION_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_EXPRESSION_STATEMENT.expression, callback);
+            ast->data.AST_EXPRESSION_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_EXPRESSION_STATEMENT.expression, parentBlock, callback);
             break;
         }
 
         case AST_RETURN_STATEMENT: {
-            ast->data.AST_RETURN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_RETURN_STATEMENT.expression, callback);
+            ast->data.AST_RETURN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_RETURN_STATEMENT.expression, parentBlock, callback);
             break;
         }
 
         case AST_IF_STATEMENT: {
-            ast->data.AST_IF_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.expression, callback);
+            ast->data.AST_IF_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.expression, parentBlock, callback);
 
             if (callback != constantPropogate) {
-                ast->data.AST_IF_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.program, callback);
-                ast->data.AST_IF_STATEMENT.elseProgram = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.elseProgram, callback);
+                ast->data.AST_IF_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.program, parentBlock, callback);
+                ast->data.AST_IF_STATEMENT.elseProgram = optimizerWalkAST(c, currentEnv, ast->data.AST_IF_STATEMENT.elseProgram, parentBlock, callback);
             }
             break;
         }
 
         case AST_ASSIGN_STATEMENT: {
-            ast->data.AST_ASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_ASSIGN_STATEMENT.expression, callback);
+            ast->data.AST_ASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_ASSIGN_STATEMENT.expression, parentBlock, callback);
             break;
         }
 
         case AST_REASSIGN_STATEMENT: {
-            ast->data.AST_REASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_REASSIGN_STATEMENT.expression, callback);
+            ast->data.AST_REASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_REASSIGN_STATEMENT.expression, parentBlock, callback);
             break;
         }
 
         case AST_PREFIX_EXPRESSION: {
-            ast->data.AST_PREFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_PREFIX_EXPRESSION.right, callback);
+            ast->data.AST_PREFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_PREFIX_EXPRESSION.right, parentBlock, callback);
             break;
         }
 
@@ -154,22 +148,34 @@ CometASTNode* optimizerWalkAST(
 
                 switch (fieldDef->nodeType) {
                     case AST_ASSIGN_STATEMENT: {
-                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_ASSIGN_STATEMENT.expression, callback);
+                        fieldDef->data.AST_ASSIGN_STATEMENT.expression = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_ASSIGN_STATEMENT.expression, parentBlock, callback);
                         break;
                     }
 
                     case AST_FUNC_DEF_STATEMENT: {
-                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_FUNC_DEF_STATEMENT.program, callback);
+                        fieldDef->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_FUNC_DEF_STATEMENT.program, parentBlock, callback);
                         break;
                     }
 
                     case AST_OVERRIDE_STATEMENT: {
-                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program, callback);
+                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program = optimizerWalkAST(
+                            c,
+                            currentEnv,
+                            fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_FUNC_DEF_STATEMENT.program,
+                            parentBlock,
+                            callback
+                        );
                         break;
                     }
 
                     case AST_AS_FUNC_DEF: {
-                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_AS_FUNC_DEF.body = optimizerWalkAST(c, currentEnv, fieldDef->data.AST_AS_FUNC_DEF.body, callback);
+                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_AS_FUNC_DEF.body = optimizerWalkAST(
+                            c,
+                            currentEnv,
+                            fieldDef->data.AST_AS_FUNC_DEF.body,
+                            parentBlock,
+                            callback
+                        );
                         break;
                     }
 
@@ -178,10 +184,20 @@ CometASTNode* optimizerWalkAST(
             }
 
             if (ast->data.AST_STRUCT_DEF_STATEMENT.constructor) {
-                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = optimizerWalkAST(c, currentEnv, ast->data.AST_STRUCT_DEF_STATEMENT.constructor, callback);
+                ast->data.AST_STRUCT_DEF_STATEMENT.constructor = optimizerWalkAST(c,
+                    currentEnv,
+                    ast->data.AST_STRUCT_DEF_STATEMENT.constructor,
+                    parentBlock,
+                    callback
+                );
             }
             if (ast->data.AST_STRUCT_DEF_STATEMENT.destructor) {
-                ast->data.AST_STRUCT_DEF_STATEMENT.destructor = optimizerWalkAST(c, currentEnv, ast->data.AST_STRUCT_DEF_STATEMENT.destructor, callback);
+                ast->data.AST_STRUCT_DEF_STATEMENT.destructor = optimizerWalkAST(c,
+                    currentEnv,
+                    ast->data.AST_STRUCT_DEF_STATEMENT.destructor,
+                    parentBlock,
+                    callback
+                );
             }
 
             break;
@@ -190,7 +206,7 @@ CometASTNode* optimizerWalkAST(
         default: break;
     }
 
-    return callback(c, currentEnv, ast);
+    return callback(c, currentEnv, ast, parentBlock);
 }
 
 CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
@@ -238,7 +254,7 @@ CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
     }
 }
 
-CometASTNode* constantFold(CometCompiler* c, ConstantEnv* env, CometASTNode* ast) {
+CometASTNode* constantFold(CometCompiler* c, ConstantEnv* env, CometASTNode* ast, CometASTNode* parentBlock) {
     (void)env; // do this to tell gcc we're using the arg;
 
     if (!ast) return NULL;
@@ -292,7 +308,7 @@ CometASTNode* constantFold(CometCompiler* c, ConstantEnv* env, CometASTNode* ast
     return ast;
 }
 
-CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, CometASTNode* ast) {
+CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, CometASTNode* ast, CometASTNode* parentBlock) {
     if (!ast) return NULL;
 
     switch (ast->nodeType) {
@@ -332,10 +348,10 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
 
         case AST_IF_STATEMENT: {
             ConstantEnv* thenEnv = newConstantEnv(currentEnv, "then");
-            ast->data.AST_IF_STATEMENT.program = optimizerWalkAST(c, thenEnv, ast->data.AST_IF_STATEMENT.program, constantPropogate); //constantPropogate(c, thenEnv, ast->data.AST_IF_STATEMENT.program);
+            ast->data.AST_IF_STATEMENT.program = optimizerWalkAST(c, thenEnv, ast->data.AST_IF_STATEMENT.program, parentBlock, constantPropogate);
 
             ConstantEnv* elseEnv = newConstantEnv(currentEnv, "else");
-            ast->data.AST_IF_STATEMENT.elseProgram = optimizerWalkAST(c, elseEnv, ast->data.AST_IF_STATEMENT.elseProgram, constantPropogate);
+            ast->data.AST_IF_STATEMENT.elseProgram = optimizerWalkAST(c, elseEnv, ast->data.AST_IF_STATEMENT.elseProgram, parentBlock, constantPropogate);
 
             // create a union of all three environments
             ConstantRecord* current, *tmp;
@@ -410,11 +426,22 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
     return ast;
 }
 
-CometASTNode* controlFlowSimplify(CometCompiler* c, ConstantEnv* env, CometASTNode* ast) {
+CometASTNode* controlFlowSimplify(CometCompiler* c, ConstantEnv* env, CometASTNode* ast, CometASTNode* parentBlock) {
     (void)c; // do this to tell gcc we're using the arg;
     (void)env;
 
     switch (ast->nodeType) {
+        case AST_IF_STATEMENT: {
+            CometASTNode* expr = ast->data.AST_IF_STATEMENT.expression;
+            if (expr->nodeType != AST_BOOL) break;
+
+            if (expr->data.AST_BOOL.value == true) {
+                replaceNode(parentBlock, ast, ast->data.AST_IF_STATEMENT.program);
+                return ast->data.AST_IF_STATEMENT.program->data.AST_PROGRAM.statements[0];
+            }
+            break;
+        }
+
         default: break;
     }
 
@@ -428,10 +455,9 @@ void runOptimisations(CometCompiler* c, CometASTNode* ast, bool showPasses) {
 
     size_t pass = 0;
     while (true) {
-
-        ast = optimizerWalkAST(c, constantEnv, ast, constantFold);
-        ast = optimizerWalkAST(c, constantEnv, ast, constantPropogate);
-        ast = optimizerWalkAST(c, constantEnv, ast, controlFlowSimplify);
+        ast = optimizerWalkAST(c, constantEnv, ast, NULL, constantFold);
+        ast = optimizerWalkAST(c, constantEnv, ast, NULL, constantPropogate);
+        ast = optimizerWalkAST(c, constantEnv, ast, NULL, controlFlowSimplify);
 
         char* current = nodeToCStr(ast);
 
