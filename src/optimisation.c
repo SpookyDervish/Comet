@@ -94,6 +94,19 @@ CometASTNode* optimizerWalkAST(
             break;
         }
 
+        case AST_WHILE_STATEMENT: {
+            ast->data.AST_WHILE_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_WHILE_STATEMENT.expression, parentBlock, callback);
+            ast->data.AST_WHILE_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_WHILE_STATEMENT.program, parentBlock, callback);
+            break;
+        }
+
+        case AST_FOR_STATEMENT: {
+            ast->data.AST_FOR_STATEMENT.start = optimizerWalkAST(c, currentEnv, ast->data.AST_FOR_STATEMENT.start, parentBlock, callback);
+            ast->data.AST_FOR_STATEMENT.end = optimizerWalkAST(c, currentEnv, ast->data.AST_FOR_STATEMENT.end, parentBlock, callback);
+            ast->data.AST_FOR_STATEMENT.program = optimizerWalkAST(c, currentEnv, ast->data.AST_FOR_STATEMENT.program, parentBlock, callback);
+            break;
+        }
+
         case AST_INFIX_EXPRESSION: {
             ast->data.AST_INFIX_EXPRESSION.left = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.left, parentBlock, callback);
             ast->data.AST_INFIX_EXPRESSION.right = optimizerWalkAST(c, currentEnv, ast->data.AST_INFIX_EXPRESSION.right, parentBlock, callback);
@@ -435,11 +448,28 @@ CometASTNode* controlFlowSimplify(CometCompiler* c, ConstantEnv* env, CometASTNo
             CometASTNode* expr = ast->data.AST_IF_STATEMENT.expression;
             if (expr->nodeType != AST_BOOL) break;
 
-            if (expr->data.AST_BOOL.value == true) {
+            if (expr->data.AST_BOOL.value == true) { // if statement is true, replace if statement with its main logic
+
                 replaceNode(parentBlock, ast, ast->data.AST_IF_STATEMENT.program);
                 return ast->data.AST_IF_STATEMENT.program->data.AST_PROGRAM.statements[0];
+            } else if (ast->data.AST_IF_STATEMENT.elseProgram) { // if statement is false, if it has an else branch replace it with that
+
+                replaceNode(parentBlock, ast, ast->data.AST_IF_STATEMENT.elseProgram);
+                return ast->data.AST_IF_STATEMENT.elseProgram->data.AST_PROGRAM.statements[0];
+            } else { // if statement is false and it has no else branch, just delete the whole thing
+                return NULL;
             }
             break;
+        }
+
+        case AST_WHILE_STATEMENT: {
+            CometASTNode* expr = ast->data.AST_IF_STATEMENT.expression;
+            if (expr->nodeType != AST_BOOL) break;
+
+            // delete the while loop if its condition will never be true
+            if (expr->data.AST_BOOL.value == false) {
+                return NULL;
+            }
         }
 
         default: break;

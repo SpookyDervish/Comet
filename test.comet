@@ -7,6 +7,10 @@ func main() -> int {
         io.println("hi")
         x = 5
     }
-    
+
+    while (x == 5) {
+        io.println("forever!!")
+    }
+
     return x
 }
