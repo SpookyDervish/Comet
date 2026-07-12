@@ -269,6 +269,7 @@ CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
 
 CometASTNode* constantFold(CometCompiler* c, ConstantEnv* env, CometASTNode* ast, CometASTNode* parentBlock) {
     (void)env; // do this to tell gcc we're using the arg;
+    (void)parentBlock;
 
     if (!ast) return NULL;
 
