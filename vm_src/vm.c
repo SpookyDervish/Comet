@@ -17,10 +17,6 @@
 typedef void* voidPtr;
 Result(voidPtr, charptr);
 
-// For Clang and GCC on macOS
-#define FORCE_INLINE __attribute__((always_inline)) static inline
-
-
 int32_t getStructIndex(CometVM* vm, char* structName) {
     for (uint32_t i = 0; i < vm->numStructs; i++) {
         if (strcmp(vm->structs[i].name, structName) == 0) {
@@ -35,7 +31,7 @@ void createBreakpoint(CometVM* vm) {
     vm->breakpoints[vm->currentFrame->ip - 1] = 1;
 }
 
-FORCE_INLINE void pushValue(CometVM* vm, int64_t value) {
+inline void pushValue(CometVM* vm, int64_t value) {
     vm->stack[vm->sp++] = value;
 }
 
@@ -49,7 +45,7 @@ FORCE_INLINE int64_t getTop(CometVM* vm) {
     return vm->stack[vm->sp-1];
 }
 
-FORCE_INLINE int64_t popValue(CometVM* vm) {
+inline int64_t popValue(CometVM* vm) {
     int64_t value = getTop(vm);
     vm->sp--;
     return value;
@@ -326,7 +322,8 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&LIST_LENGTH,
         &&UNINIT_LIST,
         &&DROP_LIST,
-        &&DROP_STRUCT
+        &&DROP_STRUCT,
+        &&PUSH_FUNC
     };
 
     #define DISPATCH()  if (!vm->running) { \
@@ -771,6 +768,10 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         free(object->fields);
         free(object);
 
+        DISPATCH();
+    }
+    PUSH_FUNC: {
+        pushValue(vm, (int64_t)(&vm->functions[inst.a]));
         DISPATCH();
     }
     BREAKPOINT: {

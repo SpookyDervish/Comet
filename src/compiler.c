@@ -864,6 +864,11 @@ ResultType(CompiledValue, ErrorMessage) visitValue(CometCompiler* c, CometASTNod
 
             uint32_t idx = varRecord->recordIdx;
 
+            if (varRecord->type.typeKind == COMET_FUNCTION) {
+                CometOperand new = buildPushFunc(c, varRecord->value);
+                return Success(CompiledValue, ErrorMessage, FALLS_THROUGH(new));
+            }
+
             CometOperand new;
             switch (varRecord->recordType) {
                 case RECORD_LOCAL: 

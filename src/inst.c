@@ -598,6 +598,12 @@ void buildDropList(CometCompiler* c) {
     buildInst(c, INST_DROP_LIST, NO_OPERAND, NO_OPERAND, NO_OPERAND);
 }
 
+CometOperand buildPushFunc(CometCompiler* c, CometOperand funcVal) {
+    CometOperand dest = pushVal(c);
+    buildInst(c, INST_PUSH_FUNC, funcVal, NO_OPERAND, NO_OPERAND);
+    return dest;
+}
+
 CometType buildCast(CometCompiler* c, CometType before, CometType after) {
     if (typeIsInt(before) && typeIsFloat(after)) {
         buildI2F(c);

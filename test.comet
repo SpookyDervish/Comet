@@ -1,16 +1,9 @@
 import io
 
+func test() -> int {
+    return 123
+}
+
 func main() -> int {
-    mut int x = (3 + 4) * (5 + 6)
-    
-    if (x + 1 == 78) {
-        io.println("hi")
-        x = 5
-    }
-
-    while (x == 5) {
-        io.println("forever!!")
-    }
-
-    return x
+    return test + 1 - 1
 }

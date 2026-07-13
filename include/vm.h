@@ -83,6 +83,9 @@ Result(vmPtr, charptr);
 ResultType(vmPtr, charptr) newCometVM(char* filePath);
 ResultType(int, charptr) startVM(CometVM* vm);
 
+// For Clang and GCC on macOS
+#define FORCE_INLINE __attribute__((always_inline)) static inline
+
 // Functions exposed so external libs can use them. //
 /*
 Call a function. The callee must return the VM's state to how it was before
@@ -96,5 +99,8 @@ Return from the function the VM is currently in.
 void returnFromFunc(CometVM* vm);
 
 void vmThrow(CometVM* vm, char* errName, char* msg, CometObject* errPtr);
+
+void pushValue(CometVM* vm, int64_t value);
+int64_t popValue(CometVM* vm);
 
 #endif

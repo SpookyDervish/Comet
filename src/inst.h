@@ -83,6 +83,7 @@ CometOperand buildGetExcept(CometCompiler* c);
 CometOperand buildUninitList(CometCompiler* c);
 void buildDropStruct(CometCompiler* c);
 void buildDropList(CometCompiler* c);
+CometOperand buildPushFunc(CometCompiler* c, CometOperand funcVal);
 CometType buildCast(CometCompiler* c, CometType before, CometType after);
 
 CometOperand buildFunction(CometCompiler* c, char* name, uint32_t argCount, CometType returnType, CometType* argTypes, bool isVarArgs, bool isMethod, bool isExternal, int8_t libIdx, CometASTNode* defNode);

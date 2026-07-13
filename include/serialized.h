@@ -58,6 +58,7 @@ typedef enum {
     INST_UNINIT_LIST,
     INST_DROP_LIST,
     INST_DROP_STRUCT,
+    INST_PUSH_FUNC,
     INST_MAX
 } CometInstType;
 
