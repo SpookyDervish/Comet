@@ -136,12 +136,28 @@ sudo make install</pre>
                         <p><b>cometc</b> is the Comet compiler. It can take a few command line arguments: (the first
                             argument is the Comet file you want to compile)</p>
                         <ul>
-                            <li><b>-o</b> or <b>--output</b>: the file to output to</li>
+                            <li><b>-o</b> or <b>--output</b>: the file to output to (compiled files end in .cvm)</li>
                             <li><b>-v</b> or <b>--version</b>: print version number and exit</li>
+                            <li><b>-d</b> or <b>--debug</b>: include debug symbols in your program</li>
+                            <li><b>-a</b> or <b>--ast</b>: print out AST from parser</li>
+                            <li><b>-O</b>: show code at each optimisation pass</li>
+                            <li><b>-t</b> or <b>--tokens</b>: print out tokens from lexer</li>
                         </ul>
                         <br />
                         <p>Example usage:</p>
-                        <pre class="command">cometc myFile.comet -O3 -l -o myFile.ll</pre>
+                        <pre class="command">cometc myFile.comet -o myFile.cvm</pre>
+                    </div>
+
+                    <div id="comet">
+                        <h1>comet</h1>
+                        <p><b>comet</b> is the Comet VM. The first positional argument is the bytecode file you want to execute.</p>
+                        <ul>
+                            <li><b>-v</b> or <b>--version</b>: print version number and exit</li>
+                            <li><b>-t</b> or <b>--time</b>: print execution time on exit</li>
+                        </ul>
+                        <br />
+                        <p>Example usage:</p>
+                        <pre class="command">comet myFile.cvm</pre>
                     </div>
 
                     <div id="hello-world">
