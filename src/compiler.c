@@ -5022,7 +5022,7 @@ ResultType(CompiledValue, ErrorMessage) visitNewStatement(CometCompiler* c, Come
         return Error(CompiledValue, ErrorMessage, errMsg);
     }
 
-    buildCall(c, constructorName.str, newStmt.args.count);
+    buildCall(c, constructorName.str, newStmt.args.count + 1);
     DESTROY_ESTR(constructorName);
 
     // return
