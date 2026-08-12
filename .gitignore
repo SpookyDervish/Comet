@@ -60,3 +60,5 @@ cometc
 comet
 test_objs
 Makefile
+test.cvm
+test.comet
