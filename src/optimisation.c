@@ -182,7 +182,7 @@ CometASTNode* optimizerWalkAST(
                     }
 
                     case AST_AS_FUNC_DEF: {
-                        fieldDef->data.AST_OVERRIDE_STATEMENT.funcDef->data.AST_AS_FUNC_DEF.body = optimizerWalkAST(
+                        fieldDef->data.AST_AS_FUNC_DEF.body = optimizerWalkAST(
                             c,
                             currentEnv,
                             fieldDef->data.AST_AS_FUNC_DEF.body,

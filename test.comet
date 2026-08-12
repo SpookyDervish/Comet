@@ -1,9 +1,20 @@
-import io
+struct Foo {
+    int a
+    int b
 
-func test() -> int {
-    return 123
+    init(int a, int b) {
+        self.a = a
+        self.b = b
+    }
+
+    as int {
+        return self.a - self.b
+    }
 }
 
+
 func main() -> int {
-    return test + 1 - 1
+    Foo myStruct = new Foo(9, 2)
+
+    return myStruct as int
 }

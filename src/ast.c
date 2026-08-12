@@ -494,6 +494,16 @@ void appendNodeToBuff(CometASTNode* node, StringBuffer* buff) {
             }
 
             break;
+
+        case AST_AS_FUNC_DEF: {
+            sbAppend(buff, "as ");
+            appendNodeToBuff(node->data.AST_AS_FUNC_DEF.type, buff);
+            sbAppend(buff, " {\n");
+            appendNodeToBuff(node->data.AST_AS_FUNC_DEF.body, buff);
+            sbAppend(buff, "       }");
+            break;
+        }
+
         case AST_RETURN_STATEMENT:
             sbAppend(buff, "return ");
             if (node->data.AST_RETURN_STATEMENT.expression)
