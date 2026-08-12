@@ -19,11 +19,15 @@ struct Parent : Foo {
         super(self, a, b)
         self.c = c
     }
+
+    as int {
+        --return self.a + self.b + self.c
+    }
 }
 
 
 func main() -> int {
-    Parent myStruct = new Foo(3, 1)
+    Parent myStruct = new Parent(3, 1, 5)
 
     return myStruct as int
 }

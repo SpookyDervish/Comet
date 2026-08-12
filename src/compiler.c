@@ -3138,7 +3138,7 @@ ResultType(CompiledValue, ErrorMessage) visitAsExpr(CometCompiler* c, CometASTNo
             if (funcIdx == -1) {
                 Estr buffer = CREATE_ESTR("No \"as\" method was found to convert struct \"");
                 APPEND_ESTR(buffer, leftType.as.success.structType->name);
-                APPEND_ESTR(buffer, "\" to type");
+                APPEND_ESTR(buffer, "\" to type ");
                 APPEND_ESTR(buffer, rightTypeString);
 
                 ErrorMessage errMsg = createError(
@@ -4447,6 +4447,21 @@ ResultType(CompiledValue, ErrorMessage) visitAsFuncDef(CometCompiler* c, CometAS
     ResultType(CompiledValue, ErrorMessage) bodyResult = compile(c, funcDef.body);
     if (bodyResult.error)
         return bodyResult;
+
+    if (bodyResult.as.success.fallsThrough) {
+        ErrorMessage errMsg = createError(
+        c->inputFilePath,
+        c->sourceCode,
+        "MissingReturnVale",
+        "You forgot to include a return value when returning from the as function",
+        NULL,
+        node->lineNum,
+        node->startCol,
+        node->endCol
+    );
+
+    return Error(CompiledValue, ErrorMessage, errMsg);
+    }
 
     // return back to the parent scope
     c->env = destroyEnv(c->env);
