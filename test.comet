@@ -12,9 +12,18 @@ struct Foo {
     }
 }
 
+struct Parent : Foo {
+    int c
+
+    init(int a, int b, int c) {
+        super(self, a, b)
+        self.c = c
+    }
+}
+
 
 func main() -> int {
-    Foo myStruct = new Foo(9, 2)
+    Parent myStruct = new Foo(3, 1)
 
     return myStruct as int
 }

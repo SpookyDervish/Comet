@@ -2554,7 +2554,7 @@ ResultType(CompiledValue, ErrorMessage) visitAssignStatement(CometCompiler* c, C
         }
     }
 
-    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success.value, exprType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
+    uint32_t idx = defineVar(c->env, ident, RECORD_LOCAL, exprResult.as.success.value, varType.as.success, node->data.AST_ASSIGN_STATEMENT.isMutable);
     buildStore(c, idx);
 
     return Success(CompiledValue, ErrorMessage, NO_VALUE);
@@ -2804,8 +2804,9 @@ ResultType(CompiledValue, ErrorMessage) visitArrayReassignStatement(CometCompile
 }
 ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c, CometASTNode* node) {
     c->currentLine = node->lineNum;
+    CometASTNode* expr = node->data.AST_ASSIGN_STATEMENT.expression;
 
-    ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, node->data.AST_ASSIGN_STATEMENT.expression);
+    ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, expr);
     if (exprResult.error)
         return exprResult;
 
@@ -2891,8 +2892,33 @@ ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c,
     if (exprType.error)
         return Error(CompiledValue, ErrorMessage, exprType.as.error);
 
-    CometType resultType = unifyType(varType.as.success, exprType.as.success);
-    if (resultType.typeKind != varType.as.success.typeKind) {
+    CometType resultType = varType.as.success;
+    if (!typesAreEqual(exprType.as.success, varType.as.success) && !canImplicitCastType(varType.as.success, exprType.as.success)) {
+
+        CometType castOut = buildCast(c, exprType.as.success, varType.as.success);
+
+        if (typesAreEqual(exprType.as.success, castOut)) { // cast didnt do anything
+            Estr help = CREATE_ESTR("Variable is type ");
+            APPEND_ESTR(help, typeToString(varType.as.success));
+            APPEND_ESTR(help, " but expression is type ");
+            APPEND_ESTR(help, typeToString(exprType.as.success));
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "TypeMismatch",
+                "Variable type and expression type don't match in assignment.",
+                help.str,
+                node->lineNum,
+                expr->startCol,
+                expr->endCol
+            );
+
+            return Error(CompiledValue, ErrorMessage, errMsg);
+        }
+    }
+
+    if (!typesAreEqual(varType.as.success, resultType)) {
         Estr buffer = CREATE_ESTR("Attempted to reassign type of variable \"");
         APPEND_ESTR(buffer, ident);
         APPEND_ESTR(buffer, "\" at runtime!");
