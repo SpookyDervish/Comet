@@ -5526,8 +5526,19 @@ ResultType(CompiledValue, ErrorMessage) importCoreLib(CometCompiler* c) {
     snprintf(fullPath, 256, "%s/%s.cometlib", libsPath, "core");
 
     ResultType(CompiledValue, ErrorMessage) result = loadExternalLib(c, fullPath, "core");
-    if (result.error)
-        return result;
+    if (result.error) {
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "NoCoreLib",
+            "The core lib was not found, it is required for Comet to function. Please run \"make install\" in the Comet repository to install the core library.",
+            NULL,
+            1,
+            1,
+            1
+        );
+        return Error(CompiledValue, ErrorMessage, errMsg);
+    }
 
     return Success(CompiledValue, ErrorMessage, NO_VALUE);
 }
