@@ -5531,8 +5531,8 @@ ResultType(CompiledValue, ErrorMessage) importCoreLib(CometCompiler* c) {
             c->inputFilePath,
             c->sourceCode,
             "NoCoreLib",
-            "The core lib was not found, it is required for Comet to function. Please run \"make install\" in the Comet repository to install the core library.",
-            NULL,
+            "The core lib was not found, it is required for Comet to function",
+            "Run \"make install\" in the Comet repository to install the core library",
             1,
             1,
             1
