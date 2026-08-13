@@ -847,6 +847,8 @@ CometOperand createOperand(CometOperandKind type) {
 }
 
 CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index) {
+
+    
     // table of sadness and despair :trollface:
     const CometValueTypeKind argTypesTable[][3] = {
         {COMET_SMALL, COMET_VOID, COMET_VOID}, // INST_PUSH_CONST
@@ -872,6 +874,8 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_GTEF
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_LTEI
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_LTEF
+        {COMET_BOOL,  COMET_BOOL, COMET_VOID}, // INST_OR
+        {COMET_BOOL,  COMET_BOOL, COMET_VOID}, // INST_AND
         {COMET_SMALL,  COMET_VOID, COMET_VOID}, // INST_LOAD_ARG
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_RET
         {COMET_FUNCTION, COMET_INT, COMET_VOID}, // INST_CALL
