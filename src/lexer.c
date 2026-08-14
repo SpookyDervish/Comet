@@ -738,7 +738,7 @@ ResultType(tokenList, ErrorMessage) lex(CometLexer* lexer) {
                     break;
                 }
 
-                append(tokens, TOKEN_CHAR(CT_POW_EQ, "^", lexer));
+                append(tokens, TOKEN_CHAR(CT_POW, "^", lexer));
                 break;
             }
 

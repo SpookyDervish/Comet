@@ -119,6 +119,15 @@ CometASTNode* optimizerWalkAST(
             break;
         }
 
+        case AST_FUNC_CALL: {
+            for (size_t i = 0; i < ast->data.AST_FUNC_CALL.args.count; i++) {
+                CometASTNode* arg = *get(ast->data.AST_FUNC_CALL.args, i);
+                ast->data.AST_FUNC_CALL.args.pointer[i] = optimizerWalkAST(c, currentEnv, arg, parentBlock, callback);
+            }
+            
+            break;
+        }
+
         case AST_EXPRESSION_STATEMENT: {
             ast->data.AST_EXPRESSION_STATEMENT.expression = optimizerWalkAST(c, currentEnv, ast->data.AST_EXPRESSION_STATEMENT.expression, parentBlock, callback);
             break;
@@ -341,8 +350,9 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
         case AST_REASSIGN_STATEMENT: {
             char* varName = ast->data.AST_REASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
             CometASTNode* expr = ast->data.AST_REASSIGN_STATEMENT.expression;
+            CometToken op = ast->data.AST_REASSIGN_STATEMENT.op;
 
-            if (nodeIsALiteral(expr)) {
+            if (nodeIsALiteral(expr) && op.type == CT_EQ) {
                 defineConstant(currentEnv, varName, expr);
             } else { // x isnt constant
                 removeConstant(currentEnv, varName);

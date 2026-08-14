@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -284,6 +285,10 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         &&MULF,
         &&DIVI,
         &&DIVF,
+        &&MODI,
+        &&MODF,
+        &&POWI,
+        &&POWF,
         &&EQI,
         &&EQF,
         &&NEQI,
@@ -456,6 +461,52 @@ ResultType(voidPtr, charptr) vmMainLoop(CometVM* vm) {
         memcpy(&aDouble, &a, sizeof(double));
 
         double result = aDouble / bDouble;
+        int64_t outputtedResult;
+        memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+        pushValue(vm, outputtedResult);
+        DISPATCH();
+    }
+    MODI: {
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
+
+        pushValue(vm, a % b);
+        DISPATCH();
+    }
+    MODF: {
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
+
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        double result = fmod(aDouble, bDouble);
+        int64_t outputtedResult;
+        memcpy(&outputtedResult, &result, sizeof(int64_t));
+
+        pushValue(vm, outputtedResult);
+        DISPATCH();
+    }
+    POWI: {
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
+
+        pushValue(vm, (int64_t)pow(a, b));
+        DISPATCH();
+    }
+    POWF: {
+        int64_t b = popValue(vm);
+        int64_t a = popValue(vm);
+
+        double aDouble;
+        memcpy(&aDouble, &a, sizeof(double));
+        double bDouble;
+        memcpy(&bDouble, &b, sizeof(double));
+
+        double result = pow(aDouble, bDouble);
         int64_t outputtedResult;
         memcpy(&outputtedResult, &result, sizeof(int64_t));
 

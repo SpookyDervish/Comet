@@ -49,6 +49,8 @@ CometOperand buildAdd(CometCompiler* c, CometType resultType);
 CometOperand buildSub(CometCompiler* c, CometType resultType);
 CometOperand buildMul(CometCompiler* c, CometType resultType);
 CometOperand buildDiv(CometCompiler* c, CometType resultType);
+CometOperand buildMod(CometCompiler* c, CometType resultType);
+CometOperand buildPow(CometCompiler* c, CometType resultType);
 CometOperand buildEq(CometCompiler* c, CometType resultType);
 CometOperand buildNeq(CometCompiler* c, CometType resultType);
 CometOperand buildLt(CometCompiler* c, CometType resultType);

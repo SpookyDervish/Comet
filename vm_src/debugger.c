@@ -798,6 +798,10 @@ char* cometInstOpcodeToCStr(CometInstType instType) {
         case INST_MULF         : return "    MULF            ";
         case INST_DIVI         : return "    DIVI            ";
         case INST_DIVF         : return "    DIVF            ";
+        case INST_MODI         : return "    MODI            ";
+        case INST_MODF         : return "    MODF            ";
+        case INST_POWI         : return "    POWI            ";
+        case INST_POWF         : return "    POWF            ";
         case INST_LOAD_ARG     : return "    LOAD_ARG        ";
         case INST_RET          : return "    RET             ";
         case INST_CALL         : return "    CALL            ";
@@ -862,6 +866,10 @@ CometOperand instArgToOperand(CometInstType opcode, uint32_t arg, uint32_t index
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_MULF
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_DIVI
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_DIVF
+        {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_MODI
+        {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_MODF
+        {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_POWI
+        {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_POWF
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_EQI
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_EQF
         {COMET_VOID,  COMET_VOID, COMET_VOID}, // INST_NEQI

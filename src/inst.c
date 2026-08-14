@@ -275,6 +275,34 @@ CometOperand buildDiv(CometCompiler* c, CometType resultType) {
 
     return dest;
 }
+CometOperand buildMod(CometCompiler* c, CometType resultType) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_MODI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_MODF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
+
+    return dest;
+}
+CometOperand buildPow(CometCompiler* c, CometType resultType) {
+    popVal(c);
+    popVal(c);
+
+    CometOperand dest = pushVal(c);
+
+    if (typeIsInt(resultType)) {
+        buildInst(c, INST_POWI, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    } else {
+        buildInst(c, INST_POWF, NO_OPERAND, NO_OPERAND, NO_OPERAND);
+    }
+
+    return dest;
+}
 CometOperand buildEq(CometCompiler* c, CometType resultType) {
     popVal(c);
     popVal(c);

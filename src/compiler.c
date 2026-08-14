@@ -2665,6 +2665,14 @@ ResultType(CompiledValue, ErrorMessage) visitFieldReassignStatement(CometCompile
             buildDiv(c, resultType);
             break;
         }
+        case CT_MOD_EQ: {
+            buildMod(c, resultType);
+            break;
+        }
+        case CT_POW_EQ: {
+            buildPow(c, resultType);
+            break;
+        }
         case CT_EQ: break;
         default: {
             
@@ -2771,6 +2779,14 @@ ResultType(CompiledValue, ErrorMessage) visitArrayReassignStatement(CometCompile
             buildDiv(c, resultType);
             break;
         }
+        case CT_MOD_EQ: {
+            buildMod(c, resultType);
+            break;
+        }
+        case CT_POW_EQ: {
+            buildPow(c, resultType);
+            break;
+        }
         case CT_EQ: break;
         default: {
             
@@ -2806,43 +2822,7 @@ ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c,
     c->currentLine = node->lineNum;
     CometASTNode* expr = node->data.AST_ASSIGN_STATEMENT.expression;
 
-    ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, expr);
-    if (exprResult.error)
-        return exprResult;
-
-    if (node->data.AST_REASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // infix reassign
-
-        struct AST_INFIX_EXPRESSION leftExpr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
-
-        if (leftExpr.op.type == CT_DOT) { // struct reassign
-            return visitFieldReassignStatement(c, node);
-        } else if (leftExpr.op.type == CT_COLON) {
-            return visitArrayReassignStatement(c, node);
-        } else {
-            Estr buffer = CREATE_ESTR("Cannot use operator \"");
-            APPEND_ESTR(buffer, tokenTypeToCStr(leftExpr.op.type));
-            APPEND_ESTR(buffer, "\" in reassignment.");
-
-            ErrorMessage errMsg = createError(
-                c->inputFilePath,
-                c->sourceCode,
-                "InvalidOperator",
-                buffer.str,
-                NULL,
-                node->lineNum,
-                node->startCol,
-                node->endCol
-            );
-
-            return Error(CompiledValue, ErrorMessage, errMsg);
-        }
-        
-    }
-
-    ResultType(CometType, ErrorMessage) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
-    if (varType.error)
-        return Error(CompiledValue, ErrorMessage, varType.as.error);
-
+    // get variable record
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
     Record* varRecord = lookup(c->env, ident);
@@ -2887,6 +2867,45 @@ ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c,
     if (node->data.AST_REASSIGN_STATEMENT.op.type != CT_EQ) {
         buildLoad(c, varRecord->recordIdx);
     }
+
+    ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, expr);
+    if (exprResult.error)
+        return exprResult;
+
+    if (node->data.AST_REASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // infix reassign
+
+        struct AST_INFIX_EXPRESSION leftExpr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
+
+        if (leftExpr.op.type == CT_DOT) { // struct reassign
+            return visitFieldReassignStatement(c, node);
+        } else if (leftExpr.op.type == CT_COLON) {
+            return visitArrayReassignStatement(c, node);
+        } else {
+            Estr buffer = CREATE_ESTR("Cannot use operator \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(leftExpr.op.type));
+            APPEND_ESTR(buffer, "\" in reassignment.");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "InvalidOperator",
+                buffer.str,
+                NULL,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CompiledValue, ErrorMessage, errMsg);
+        }
+        
+    }
+
+    ResultType(CometType, ErrorMessage) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    if (varType.error)
+        return Error(CompiledValue, ErrorMessage, varType.as.error);
+
+    
 
     ResultType(CometType, ErrorMessage) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
     if (exprType.error)
@@ -2955,6 +2974,14 @@ ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c,
         }
         case CT_DIVIDE_EQ: {
             buildDiv(c, resultType);
+            break;
+        }
+        case CT_MOD_EQ: {
+            buildMod(c, resultType);
+            break;
+        }
+        case CT_POW_EQ: {
+            buildPow(c, resultType);
             break;
         }
         case CT_EQ: break;
@@ -3280,13 +3307,13 @@ ResultType(CompiledValue, ErrorMessage) visitInfixExpression(CometCompiler* c, C
     if (expr.op.type == CT_OR || expr.op.type == CT_AND) { // we need this for short
         return visitLogicalOpExpr(c, node);
     }
-    
+
     // left
     ResultType(CompiledValue, ErrorMessage) leftValue = visitValue(c, expr.left);
     if (leftValue.error)
         return leftValue;
 
-    if (typesAreEqual(leftType.as.success, resultType)) {
+    if (!typesAreEqual(leftType.as.success, resultType)) {
         leftType.as.success = buildCast(c, leftType.as.success, resultType);
     }
 
@@ -3295,7 +3322,7 @@ ResultType(CompiledValue, ErrorMessage) visitInfixExpression(CometCompiler* c, C
     if (rightValue.error)
         return rightValue;
 
-    if (typesAreEqual(rightType.as.success, resultType)) {
+    if (!typesAreEqual(rightType.as.success, resultType)) {
         rightType.as.success = buildCast(c, rightType.as.success, resultType);
     }
 
@@ -3318,6 +3345,14 @@ ResultType(CompiledValue, ErrorMessage) visitInfixExpression(CometCompiler* c, C
         }
         case CT_DIVIDE: {
             out = buildDiv(c, resultType);
+            break;
+        }
+        case CT_MOD: {
+            out = buildMod(c, resultType);
+            break;
+        }
+        case CT_POW: {
+            out = buildPow(c, resultType);
             break;
         }
 
