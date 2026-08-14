@@ -56,6 +56,11 @@ bool typesAreEqual(CometType child, CometType parent) {
         if (child.functionType->argCount != parent.functionType->argCount)
             return false;
 
+        if (child.functionType->isMethod != parent.functionType->isMethod ||
+            child.functionType->isVarArgs != parent.functionType->isVarArgs) {
+            return false;
+        }
+
         for (size_t i = 0; i < child.functionType->argCount; i++) {
             if (!typesAreEqual(child.functionType->argTypes[i], parent.functionType->argTypes[i]))
                 return false;
