@@ -86,6 +86,8 @@ CometASTNode* optimizerWalkAST(
     
     if (!ast) return NULL;
 
+    CometASTNode* out = callback(c, currentEnv, ast, parentBlock);
+
     switch (ast->nodeType) {
         case AST_PROGRAM: {
             for (size_t i = 0; i < ast->data.AST_PROGRAM.numStatements; i++) {
@@ -228,7 +230,7 @@ CometASTNode* optimizerWalkAST(
         default: break;
     }
 
-    return callback(c, currentEnv, ast, parentBlock);
+    return out;
 }
 
 CometASTNode* foldPrefixExpr(CometCompiler* c, CometASTNode* node) {
@@ -361,7 +363,8 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
         }
 
         case AST_FOR_STATEMENT:
-        case AST_WHILE_STATEMENT: {
+        case AST_WHILE_STATEMENT:
+        case AST_FUNC_DEF_STATEMENT: {
             ConstantRecord* current, *tmp;
             HASH_ITER(hh, currentEnv->records, current, tmp) {
                 removeConstant(currentEnv, current->name);

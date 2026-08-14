@@ -2822,6 +2822,43 @@ ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c,
     c->currentLine = node->lineNum;
     CometASTNode* expr = node->data.AST_ASSIGN_STATEMENT.expression;
 
+    if (node->data.AST_REASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // infix reassign
+
+        ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, expr);
+        if (exprResult.error)
+            return exprResult;
+
+        struct AST_INFIX_EXPRESSION leftExpr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
+
+        if (leftExpr.op.type == CT_DOT) { // struct reassign
+            return visitFieldReassignStatement(c, node);
+        } else if (leftExpr.op.type == CT_COLON) {
+            return visitArrayReassignStatement(c, node);
+        } else {
+            Estr buffer = CREATE_ESTR("Cannot use operator \"");
+            APPEND_ESTR(buffer, tokenTypeToCStr(leftExpr.op.type));
+            APPEND_ESTR(buffer, "\" in reassignment.");
+
+            ErrorMessage errMsg = createError(
+                c->inputFilePath,
+                c->sourceCode,
+                "InvalidOperator",
+                buffer.str,
+                NULL,
+                node->lineNum,
+                node->startCol,
+                node->endCol
+            );
+
+            return Error(CompiledValue, ErrorMessage, errMsg);
+        }
+        
+    }
+
+    ResultType(CometType, ErrorMessage) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
+    if (varType.error)
+        return Error(CompiledValue, ErrorMessage, varType.as.error);
+
     // get variable record
     char* ident = node->data.AST_ASSIGN_STATEMENT.ident->data.AST_IDENTIFIER.ident;
 
@@ -2871,41 +2908,6 @@ ResultType(CompiledValue, ErrorMessage) visitReassignStatement(CometCompiler* c,
     ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, expr);
     if (exprResult.error)
         return exprResult;
-
-    if (node->data.AST_REASSIGN_STATEMENT.ident->nodeType == AST_INFIX_EXPRESSION) { // infix reassign
-
-        struct AST_INFIX_EXPRESSION leftExpr = node->data.AST_REASSIGN_STATEMENT.ident->data.AST_INFIX_EXPRESSION;
-
-        if (leftExpr.op.type == CT_DOT) { // struct reassign
-            return visitFieldReassignStatement(c, node);
-        } else if (leftExpr.op.type == CT_COLON) {
-            return visitArrayReassignStatement(c, node);
-        } else {
-            Estr buffer = CREATE_ESTR("Cannot use operator \"");
-            APPEND_ESTR(buffer, tokenTypeToCStr(leftExpr.op.type));
-            APPEND_ESTR(buffer, "\" in reassignment.");
-
-            ErrorMessage errMsg = createError(
-                c->inputFilePath,
-                c->sourceCode,
-                "InvalidOperator",
-                buffer.str,
-                NULL,
-                node->lineNum,
-                node->startCol,
-                node->endCol
-            );
-
-            return Error(CompiledValue, ErrorMessage, errMsg);
-        }
-        
-    }
-
-    ResultType(CometType, ErrorMessage) varType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.ident);
-    if (varType.error)
-        return Error(CompiledValue, ErrorMessage, varType.as.error);
-
-    
 
     ResultType(CometType, ErrorMessage) exprType = resolveType(c, node->data.AST_REASSIGN_STATEMENT.expression);
     if (exprType.error)
