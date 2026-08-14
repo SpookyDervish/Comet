@@ -1512,8 +1512,6 @@ ResultType(CometType, ErrorMessage) getFunctionType(CometCompiler* c, CometASTNo
     funcType->isVarArgs = false;
     funcType->blockIdx = 0;
     funcType->isExternal = false;
-
-    printf("%s\n", typeToString(outType));
     
     return Success(CometType, ErrorMessage, outType);
 }
