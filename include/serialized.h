@@ -73,6 +73,7 @@ struct CometSerializedFunc {
     uint32_t numArgs;
     bool isExternal;
     bool isVarArgs;
+    bool returnsVoid;
     int8_t libIdx;
     uint32_t externFuncIndex;
 };

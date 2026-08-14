@@ -5522,7 +5522,8 @@ ResultType(voidPtr, ErrorMessage) outputToFile(CometCompiler* c, const char* fil
             .numArgs = func->argCount,
             .isExternal = func->isExternal,
             .libIdx = func->libIdx,
-            .isVarArgs = func->isVarArgs
+            .isVarArgs = func->isVarArgs,
+            .returnsVoid = func->returnType.typeKind == COMET_VOID
         };
         strcpy(serializedFunc.name, func->name);
 

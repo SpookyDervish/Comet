@@ -32,7 +32,7 @@ CometSerializedStruct* serializeStruct(CometStruct* structType, uint32_t idx) {
     *serialized = (CometSerializedStruct){
         .numFields = structType->fieldCount,
         .vtable = calloc(structType->numMethods, sizeof(CometSerializedFunc)),
-        .numMethods = structType->numMethods
+        .numMethods = structType->numMethods,
     };
 
     size_t nameLen = strlen(structType->name) + 1;

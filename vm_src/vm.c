@@ -122,7 +122,8 @@ void callFunction(CometVM* vm, CometSerializedFunc* function, uint8_t callArgs) 
             vmThrow(vm, exceptionName, exceptionMsg, obj);
         }
 
-        pushValue(vm, returnValue.as.success);
+        if (!function->returnsVoid)
+            pushValue(vm, returnValue.as.success);
 
         return;
     }

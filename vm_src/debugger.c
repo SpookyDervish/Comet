@@ -424,6 +424,7 @@ void printFuncInfo(CometSerializedFunc func, uint32_t idx) {
     printf("        - Start IP:      %zu\n", func.startIdx);
     printf("        - # Args:        %d\n", func.numArgs);
     printf("        - Variadic Args: %d\n", func.isVarArgs);
+    printf("        - Returns Void:  %s\n", func.returnsVoid ? "yes" : "no");
     printf("        - Is External:   %s\n", func.isExternal ? "yes" : "no");
 
     if (func.isExternal) {
