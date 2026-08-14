@@ -340,7 +340,7 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
             CometASTNode* expr = ast->data.AST_ASSIGN_STATEMENT.expression;
             
             if (expr && nodeIsALiteral(expr)) {
-                defineConstant(currentEnv, varName, expr);
+                defineConstant(currentEnv, varName, deepCopyNode(expr));
             } else { // x isnt constant
                 removeConstant(currentEnv, varName);
             }
@@ -353,7 +353,7 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
             CometToken op = ast->data.AST_REASSIGN_STATEMENT.op;
 
             if (nodeIsALiteral(expr) && op.type == CT_EQ) {
-                defineConstant(currentEnv, varName, expr);
+                defineConstant(currentEnv, varName, deepCopyNode(expr));
             } else { // x isnt constant
                 removeConstant(currentEnv, varName);
             }
@@ -439,7 +439,7 @@ CometASTNode* constantPropogate(CometCompiler* c, ConstantEnv* currentEnv, Comet
             ConstantRecord* constantValue = findConstant(currentEnv, varName);
 
             if (constantValue && constantValue->value) {
-                return constantValue->value;
+                return deepCopyNode(constantValue->value);
             }
             break;
         }
