@@ -2219,12 +2219,7 @@ ResultType(CometType, ErrorMessage) resolveType(CometCompiler* c, CometASTNode* 
             if (type.error)
                 return type;
 
-            CometType structType = (CometType){
-                .typeKind = COMET_STRUCT,
-                .structType = type.as.success.structType
-            };
-
-            return Success(CometType, ErrorMessage, structType);
+            return Success(CometType, ErrorMessage, type.as.success);
         }
 
         case AST_AS_EXPR: {
@@ -4955,8 +4950,24 @@ ResultType(CompiledValue, ErrorMessage) visitNewStatement(CometCompiler* c, Come
     if (structType.error)
         return Error(CompiledValue, ErrorMessage, structType.as.error);
 
-    if (structType.as.success.typeKind == COMET_ARRAY) {
-        buildUninitList(c);
+    if (structType.as.success.typeKind != COMET_STRUCT) {
+        Estr buffer = CREATE_ESTR("Cannot initialize non-struct type \"");
+        APPEND_ESTR(buffer, typeToString(structType.as.success));
+        APPEND_ESTR(buffer, "\"");
+
+        ErrorMessage errMsg = createError(
+            c->inputFilePath,
+            c->sourceCode,
+            "TypeError",
+            buffer.str,
+            "Add '[]' if you intended to initialize an array",
+            node->lineNum,
+            node->startCol,
+            node->endCol
+        );
+
+        return Error(CompiledValue, ErrorMessage, errMsg);
+
     }
     
     char* structName = structType.as.success.structType->name;
