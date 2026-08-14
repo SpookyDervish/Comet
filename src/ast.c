@@ -746,6 +746,9 @@ CometASTNode* deepCopyNode(CometASTNode* node) {
             nodeList shape = newList(astNodePtr);
             uint32_t dims = node->data.AST_TYPE.dimensions;
 
+            nodeList argTypes = newList(astNodePtr);
+            
+
             for (size_t i = 0; i < node->data.AST_TYPE.baseType.count; i++) {
                 append(baseType, deepCopyNode(*get(node->data.AST_TYPE.baseType, i)));
             }
@@ -755,6 +758,14 @@ CometASTNode* deepCopyNode(CometASTNode* node) {
             for (size_t i = 0; i < node->data.AST_TYPE.shape.count; i++) {
                 append(shape, deepCopyNode(*get(node->data.AST_TYPE.shape, i)));
             }
+            for (size_t i = 0; i < node->data.AST_TYPE.funcType.argTypes.count; i++) {
+                append(shape, deepCopyNode(*get(node->data.AST_TYPE.funcType.argTypes, i)));
+            }
+
+            ASTFuncType funcType = {
+                .argTypes = argTypes,
+                .returnType = deepCopyNode(node->data.AST_TYPE.funcType.returnType)
+            };
 
             out = AST_NODE(
                 AST_TYPE,
@@ -762,7 +773,9 @@ CometASTNode* deepCopyNode(CometASTNode* node) {
                 baseType,
                 genericTypes,
                 shape,
-                dims
+                dims,
+                node->data.AST_TYPE.isFunction,
+                funcType
             );
             break;
         }

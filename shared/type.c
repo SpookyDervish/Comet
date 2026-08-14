@@ -1,5 +1,6 @@
 #include "../include/type.h"
 #include "../include/struct.h"
+#include "../include/function.h"
 #include <string.h>
 
 CometType cometTypeSmall  = (CometType){.typeKind = COMET_SMALL };
@@ -46,6 +47,19 @@ bool typeIsPointer(CometType type) {
 bool typesAreEqual(CometType child, CometType parent) {
     if (child.typeKind != parent.typeKind) {
         return false;
+    }
+
+    if (child.typeKind == COMET_FUNCTION) {
+        if (!typesAreEqual(child.functionType->returnType, parent.functionType->returnType))
+            return false;
+
+        if (child.functionType->argCount != parent.functionType->argCount)
+            return false;
+
+        for (size_t i = 0; i < child.functionType->argCount; i++) {
+            if (!typesAreEqual(child.functionType->argTypes[i], parent.functionType->argTypes[i]))
+                return false;
+        }
     }
 
     if (child.typeKind == COMET_GENERIC) {

@@ -1264,23 +1264,6 @@ ResultType(cometTypePtr, ErrorMessage) findBuiltinType(CometCompiler* c, CometAS
     }
 
     return Success(cometTypePtr, ErrorMessage, NULL);
-
-    /*Estr buffer = CREATE_ESTR("Unkown type \"");
-    APPEND_ESTR(buffer, baseTypeName);
-    APPEND_ESTR(buffer, "\"");
-
-    ErrorMessage errMsg = createError(
-        c->inputFilePath,
-        c->sourceCode,
-        "UnkownType",
-        buffer.str,
-        NULL,
-        node->lineNum,
-        node->startCol,
-        node->endCol
-    );
-
-    return Error(cometTypePtr, ErrorMessage, errMsg);*/
 }
 
 ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList chain, nodeList genericTypes) {
@@ -1489,8 +1472,59 @@ ResultType(cometTypePtr, ErrorMessage) getBaseType(CometCompiler* c, nodeList ch
     return Error(cometTypePtr, ErrorMessage, errMsg);
 }
 
+ResultType(CometType, ErrorMessage) getFunctionType(CometCompiler* c, CometASTNode* typeNode) {
+    ASTFuncType astFuncType = typeNode->data.AST_TYPE.funcType;
+
+    CometFunction* funcType = malloc(sizeof(CometFunction));
+    CometType outType = {
+        .typeKind = COMET_FUNCTION,
+        .functionType = funcType
+    };
+
+
+    CometType* argTypes = calloc(astFuncType.argTypes.count, sizeof(CometType));
+    funcType->argTypes = argTypes;
+    funcType->argCount = astFuncType.argTypes.count;
+
+    for (size_t i = 0; i < astFuncType.argTypes.count; i++) {
+        ResultType(CometType, ErrorMessage) argType = getType(c, *get(astFuncType.argTypes, i));
+        if (argType.error) {
+            free(argTypes);
+            free(funcType);
+            return argType;
+        }
+
+        argTypes[i] = argType.as.success;
+    }
+
+    ResultType(CometType, ErrorMessage) returnType = getType(c, astFuncType.returnType);
+    if (returnType.error) {
+        free(argTypes);
+        free(funcType);
+        return returnType;
+    }
+
+    funcType->returnType = returnType.as.success;
+    funcType->name[0] = 0;
+    funcType->funcDef = NULL;
+    funcType->isMethod = false;
+    funcType->libIdx = -1;
+    funcType->isVarArgs = false;
+    funcType->blockIdx = 0;
+    funcType->isExternal = false;
+
+    printf("%s\n", typeToString(outType));
+    
+    return Success(CometType, ErrorMessage, outType);
+}
+
 ResultType(CometType, ErrorMessage) getType(CometCompiler* c, CometASTNode* typeNode) {
     struct AST_TYPE type = typeNode->data.AST_TYPE;
+
+    // if its a function type do that  i guess
+    if (typeNode->data.AST_TYPE.isFunction) {
+        return getFunctionType(c, typeNode);
+    }
 
     // get base type
     ResultType(cometTypePtr, ErrorMessage) baseType = getBaseType(c, type.baseType, typeNode->data.AST_TYPE.genericTypes);
@@ -3607,7 +3641,7 @@ ResultType(CompiledValue, ErrorMessage) visitFuncDefStatement(CometCompiler* c, 
 
     if (funcDef.inlineExpr != NULL) { // its an inline function
         // build the functions body
-        ResultType(CompiledValue, ErrorMessage) exprResult = compile(c, funcDef.inlineExpr);
+        ResultType(CompiledValue, ErrorMessage) exprResult = visitValue(c, funcDef.inlineExpr);
         if (exprResult.error)
             return exprResult;
 

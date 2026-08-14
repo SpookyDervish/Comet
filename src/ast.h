@@ -15,8 +15,6 @@ Note:
     we have statements and expressions and whatnot
 */
 
-
-
 typedef enum {
     // literals
     AST_INT,
@@ -70,6 +68,11 @@ typedef CometASTNode* astNodePtr;
 
 UseList(astNodePtr);
 
+typedef struct {
+    List(astNodePtr) argTypes;
+    CometASTNode* returnType;
+} ASTFuncType;
+
 struct CometASTNode {
     CometASTNodeType nodeType;
     
@@ -90,6 +93,8 @@ struct CometASTNode {
             List(astNodePtr) genericTypes;
             List(astNodePtr) shape;
             uint32_t dimensions;
+            bool isFunction;
+            ASTFuncType funcType;
         } AST_TYPE;
 
         struct AST_PROGRAM { CometASTNode** statements; size_t numStatements; size_t statementsArraySize; } AST_PROGRAM;
