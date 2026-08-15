@@ -3599,9 +3599,10 @@ ResultType(CompiledValue, ErrorMessage) visitFuncDefStatement(CometCompiler* c, 
     ResultType(CometType, ErrorMessage) returnType = getType(c, funcDef.returnType);
     if (returnType.error)
         return Error(CompiledValue, ErrorMessage, returnType.as.error);
-
     
     // build the function start and define the function in the current scope
+    CometFunction* previousFunction = c->currentFunction;
+
     CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count, returnType.as.success, argTypes, false, false, false, -1, node);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
@@ -3663,6 +3664,8 @@ ResultType(CompiledValue, ErrorMessage) visitFuncDefStatement(CometCompiler* c, 
     // return back to the parent scope
     c->env = destroyEnv(c->env);
     endBlock(c);
+
+    c->currentFunction = previousFunction;
 
     return Success(CompiledValue, ErrorMessage, NO_VALUE);
 }
@@ -4163,6 +4166,7 @@ ResultType(CompiledValue, ErrorMessage) visitConstructorDefStatement(CometCompil
     }
     argTypes[0] = structType;
 
+    CometFunction* previousFunction = c->currentFunction;
     buildFunction(c, constructorName, constDef.args.count + 1, structType, argTypes, false, true, false, -1, node); // add 1 arg for self
 
     // create the new scope for the function
@@ -4289,6 +4293,7 @@ ResultType(CompiledValue, ErrorMessage) visitConstructorDefStatement(CometCompil
     // return back to the parent scope
     c->env = destroyEnv(funcEnv);
     endBlock(c);
+    c->currentFunction = previousFunction;
 
     return Success(CompiledValue, ErrorMessage, NO_VALUE);
 }
@@ -4301,6 +4306,7 @@ ResultType(CompiledValue, ErrorMessage) visitDestructorDefStatement(CometCompile
     CometType* argTypes = malloc(sizeof(CometType));
     *argTypes = structType;
 
+    CometFunction* previousFunction = c->currentFunction;
     buildFunction(c, destructorName, constDef.args.count + 1, (CometType){ .typeKind = COMET_VOID }, argTypes, false, true, false, -1, node); // add 1 arg for self
 
     // create the new scope for the function
@@ -4356,6 +4362,7 @@ ResultType(CompiledValue, ErrorMessage) visitDestructorDefStatement(CometCompile
     // return back to the parent scope
     c->env = destroyEnv(funcEnv);
     endBlock(c);
+    c->currentFunction = previousFunction;
 
     return Success(CompiledValue, ErrorMessage, NO_VALUE);
 }
@@ -4391,6 +4398,8 @@ ResultType(CompiledValue, ErrorMessage) visitMethodDefStatement(CometCompiler* c
         return Error(CompiledValue, ErrorMessage, returnType.as.error);
 
     // build the function start and define the function in the current scope
+    CometFunction* previousFunction = c->currentFunction;
+
     CometOperand funcValue = buildFunction(c, funcName, funcDef.args.count+1, returnType.as.success, argTypes, false, true, false, -1, node);
     CometType funcType = {
         .typeKind = COMET_FUNCTION,
@@ -4463,6 +4472,7 @@ ResultType(CompiledValue, ErrorMessage) visitMethodDefStatement(CometCompiler* c
     // return back to the parent scope
     c->env = destroyEnv(c->env);
     endBlock(c);
+    c->currentFunction = previousFunction;
 
     return Success(CompiledValue, ErrorMessage, FALLS_THROUGH(funcValue));
 }
@@ -4487,6 +4497,7 @@ ResultType(CompiledValue, ErrorMessage) visitAsFuncDef(CometCompiler* c, CometAS
     APPEND_ESTR(funcName, typeToString(returnType.as.success));
 
     // build the function start
+    CometFunction* previousFunction = c->currentFunction;
     CometOperand funcValue = buildFunction(c, funcName.str, 1, returnType.as.success, argTypes, false, true, false, -1, node);
 
     // create the new scope for the function
@@ -4530,6 +4541,7 @@ ResultType(CompiledValue, ErrorMessage) visitAsFuncDef(CometCompiler* c, CometAS
     // return back to the parent scope
     c->env = destroyEnv(c->env);
     endBlock(c);
+    c->currentFunction = previousFunction;
 
     return Success(CompiledValue, ErrorMessage, FALLS_THROUGH(funcValue));
 }

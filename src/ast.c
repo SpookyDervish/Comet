@@ -354,6 +354,23 @@ void appendNodeToBuff(CometASTNode* node, StringBuffer* buff) {
             break;
             
         case AST_TYPE: {
+            if (node->data.AST_TYPE.isFunction) {
+                sbAppend(buff, "func(");
+
+                nodeList argTypes = node->data.AST_TYPE.funcType.argTypes;
+                for (size_t i = 0; i < argTypes.count; i++) {
+                    appendNodeToBuff(*get(argTypes, i), buff);
+                    if (i < argTypes.count - 1) {
+                        sbAppend(buff, ", ");
+                    }
+                }
+
+                sbAppend(buff, ") -> ");
+                appendNodeToBuff(node->data.AST_TYPE.funcType.returnType, buff);
+
+                break;
+            }
+
             for (size_t i = 0; i < node->data.AST_TYPE.baseType.count; i++) {
                 appendNodeToBuff(*get(node->data.AST_TYPE.baseType, i), buff);
                 if (i < node->data.AST_TYPE.baseType.count - 1)
