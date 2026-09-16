@@ -36,16 +36,22 @@ impl Compiler {
     }
 
     // VISIT METHODS //
-    fn visit_program(&self, node: ASTNode) -> Result<(), String> {
-        let nodes: Vec<ASTNode>;
+    fn visit_program(&self, node: &ASTNode) -> Result<(), String> {
+        let nodes: &Vec<ASTNode>;
         match node.node_type() {
-            ASTNodeType::Program(value) nodes = value,
+            ASTNodeType::Program(value) => { nodes = value; },
             _ => unreachable!()
         }
+
+        for node in nodes {
+            self.compile(node)?;
+        }
+
+        Ok(())
     }
     // END OF VISIT METHODS //
 
-    pub fn compile(&self, ast: ASTNode) -> Result<(), String> {
+    pub fn compile(&self, ast: &ASTNode) -> Result<(), String> {
         match ast.node_type() {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },
 

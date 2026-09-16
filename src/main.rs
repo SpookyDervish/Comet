@@ -32,7 +32,7 @@ fn main() -> std::io::Result<()> {
     let ast = parser.parse().unwrap();
 
     let compiler = compiler::Compiler::new().unwrap();
-    compiler.compile(ast).unwrap();
+    compiler.compile(&ast).unwrap();
 
     let bytes = compiler.end_module().unwrap();
 
