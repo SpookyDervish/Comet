@@ -182,8 +182,6 @@ impl Parser {
         self.expect_peek(TokenType::OpenParen)?;
         let args = self.parse_func_def_args()?;
 
-        println!("{:#?}", self.peek_token().unwrap());
-
         // check if function has return type
         let mut return_type: Option<Box<ASTNode>> = None;
         if self.peek_token_is(&TokenType::ColonColon) {
@@ -306,9 +304,9 @@ impl Parser {
         let mut root = ASTNode::new(ASTNodeType::Program(Vec::new()));
 
         while self.peek_token().is_some() {
-            let stmtResult = self.parse_statement();
+            let stmt_result = self.parse_statement();
 
-            match stmtResult {
+            match stmt_result {
                 Ok(stmt) => {
                     match root.node_type_mut() {
                         ASTNodeType::Program(stmts) => stmts.push(stmt),

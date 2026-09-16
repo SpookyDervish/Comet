@@ -1,6 +1,6 @@
 use crate::position::Position;
 use crate::range::Range;
-use crate::token::{self, Token, TokenType};
+use crate::token::{Token, TokenType};
 
 pub struct Lexer<'file> {
     current_char: char,

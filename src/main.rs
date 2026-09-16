@@ -5,8 +5,10 @@ mod position;
 mod ast;
 mod precedence;
 mod parser;
+mod compiler;
 
 use std::fs;
+use std::io::Write;
 use clap::{Parser};
 
 #[derive(Parser, Debug)]
@@ -29,6 +31,11 @@ fn main() -> std::io::Result<()> {
     let mut parser = parser::Parser::new(tokens);
     let ast = parser.parse().unwrap();
 
-    println!("{:#?}", ast);
+    let compiler = compiler::Compiler::new(ast).unwrap();
+    let bytes = compiler.compile().unwrap();
+
+    let mut file = std::fs::File::create(args.output)?;
+    file.write_all(&bytes)?;
+
     Ok(())
 }
