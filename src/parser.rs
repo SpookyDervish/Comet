@@ -70,6 +70,7 @@ impl Parser {
             // literals
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
+            TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
             _ => None
         }
     }
@@ -127,11 +128,12 @@ impl Parser {
     fn parse_func_def_args(&mut self) -> Result<Vec<ASTNode>, String> {
         let mut args = Vec::new();
 
-        while self.peek_token().is_some() {
-            if self.peek_token_is(&TokenType::CloseParen) {
-                break;
-            }
+        if self.peek_token_is(&TokenType::CloseParen) {
+            self.advance_token();
+            return Ok(args);
+        }
 
+        while self.peek_token().is_some() {
             self.expect_peek(TokenType::Identifier(String::new()))?;
 
             let arg_name = self.current_token()
@@ -143,14 +145,19 @@ impl Parser {
             
             let type_ = self.parse_type()?;
 
-            args.push(ASTNode::new(ASTNodeType::FuncArgDefinition { name: arg_name, type_: Box::new(type_) }));
+            args.push(ASTNode::new(ASTNodeType::FuncArgDefinition { 
+                name: Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(arg_name))),
+                type_: Box::new(type_) 
+            }));
 
             if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
                 continue;
             }
-        }
 
-        self.advance_token();
+            self.expect_peek(TokenType::CloseParen)?;
+            break;
+        }
 
         Ok(args)
     }
@@ -175,6 +182,8 @@ impl Parser {
         self.expect_peek(TokenType::OpenParen)?;
         let args = self.parse_func_def_args()?;
 
+        println!("{:#?}", self.peek_token().unwrap());
+
         // check if function has return type
         let mut return_type: Option<Box<ASTNode>> = None;
         if self.peek_token_is(&TokenType::ColonColon) {
@@ -187,7 +196,12 @@ impl Parser {
         let body = self.parse_block_statement()?;
 
         // return
-        let stmt = ASTNode::new(ASTNodeType::FuncDefinitionStatement { name: name, args: args, return_type: return_type, body: Box::new(body) });
+        let stmt = ASTNode::new(ASTNodeType::FuncDefinitionStatement { 
+            name: Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(name))),
+            args: args,
+            return_type: return_type,
+            body: Box::new(body) 
+        });
         Ok(stmt)
     }
     // END OF STATEMENT METHODS //
@@ -270,6 +284,17 @@ impl Parser {
                 }
 
                 return Ok(ASTNode::new(ASTNodeType::FloatLiteral(result.unwrap())));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn parse_identifier_literal(&mut self) -> Result<ASTNode, String> {
+        let token = self.current_token().unwrap();
+
+        match token.token_type() {
+            TokenType::Identifier(value) => {
+                return Ok(ASTNode::new(ASTNodeType::IdentifierLiteral(value.clone())));
             }
             _ => unreachable!(),
         }

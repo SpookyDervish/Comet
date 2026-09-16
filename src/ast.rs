@@ -6,11 +6,11 @@ pub enum ASTNodeType {
     Program(Vec<ASTNode>),
     Block(Vec<ASTNode>),
 
-    FuncArgDefinition { name: String, type_: Box<ASTNode> },
+    FuncArgDefinition { name: Box<ASTNode>, type_: Box<ASTNode> },
 
     // statements
     ExpressionStatement(Box<ASTNode>),
-    FuncDefinitionStatement { name: String, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
+    FuncDefinitionStatement { name: Box<ASTNode>, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
