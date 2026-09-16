@@ -1,15 +1,18 @@
 mod lexer;
 mod token;
 mod range;
-mod error;
 mod position;
+mod ast;
+mod precedence;
+mod parser;
 
 fn main() {
-    let source = String::from("var x = 123");
+    let source = String::from("1 + 2 * 2");
     let mut lexer = lexer::Lexer::new("<stdin>", &source);
     let tokens = lexer.lex().unwrap();
 
-    for tok in &tokens {
-        println!("{:?}", tok);
-    }
+    let mut parser = parser::Parser::new(tokens);
+    let ast = parser.parse().unwrap();
+
+    println!("{:#?}", ast);
 }
