@@ -4,16 +4,22 @@ use crate::token::Token;
 #[derive(Debug)]
 pub enum ASTNodeType {
     Program(Vec<ASTNode>),
+    Block(Vec<ASTNode>),
+
+    FuncArgDefinition { name: String, type_: Box<ASTNode> },
 
     // statements
     ExpressionStatement(Box<ASTNode>),
+    FuncDefinitionStatement { name: String, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
 
     // expressions
-    InfixExpression { left: Box<ASTNode>, right: Box<ASTNode>, op: Token },
+    InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
 
     // literals
     IntLiteral(u64),
-    FloatLiteral(f64)
+    FloatLiteral(f64),
+    IdentifierLiteral(String),
+    TypeLiteral { identifier: Box<ASTNode> },
 }
 
 #[derive(Debug)]

@@ -4,12 +4,16 @@ use crate::range::Range;
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     // words
-    Identifier(String), Keyword(String),
+    Identifier(String),
+
+    // keywords,
+    Func,
 
     // symbols
     Plus, Minus, Times, Divide, Eq,
     OpenParen, CloseParen,
     OpenCurly, CloseCurly,
+    Colon, Comma, ColonColon,
     Dot,
 
     // literals
@@ -29,13 +33,21 @@ impl TokenType {
             _ => PrecedenceType::Lowest
         }
     }
-}
 
-pub const COMET_KEYWORDS: [&str; 3] = [
-    "func",
-    "struct",
-    "return"
-];
+    pub fn keyword(word: &str) -> Option<Self> {
+        match word {
+            "func" => Some(TokenType::Func),
+            _ => None
+        }
+    }
+
+    pub fn as_identifier(&self) -> Option<&String> {
+        match self {
+            TokenType::Identifier(value) => Some(&value),
+            _ => None 
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Token {

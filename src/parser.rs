@@ -1,5 +1,4 @@
 use crate::precedence::PrecedenceType;
-use crate::range::Range;
 use crate::token::{Token, TokenType};
 use crate::ast::{ASTNode, ASTNodeType};
 
@@ -30,7 +29,7 @@ impl Parser {
     }
 
     fn peek_token_is(&self, token_type: &TokenType) -> bool {
-        return self.peek_token().unwrap().token_type() == token_type;
+        return self.peek_token().is_some() && (std::mem::discriminant(self.peek_token().unwrap().token_type()) == std::mem::discriminant(token_type));
     }
 
     fn expect_peek(&mut self, token_type: TokenType) -> Result<(), String> {
@@ -39,7 +38,13 @@ impl Parser {
             return Ok(());
         }
 
-        Err(format!("Expected next token to be {:?}, got {:?} instead.", token_type, self.peek_token().unwrap().token_type()))
+        let peek = self.peek_token();
+
+        if peek.is_none() {
+            Err(format!("Expected next token to be {:?}, got <EOF> instead.", token_type))
+        } else {
+            Err(format!("Expected next token to be {:?}, got {:?} instead.", token_type, peek.unwrap().token_type()))
+        }
     }
 
     fn current_precedence(&self) -> PrecedenceType {
@@ -62,6 +67,7 @@ impl Parser {
 
     fn get_prefix_parse_func(&self, token_type: &TokenType) -> Option<fn(&mut Parser) -> Result<ASTNode, String>> {
         match token_type {
+            // literals
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
             _ => None
@@ -81,12 +87,107 @@ impl Parser {
 
     // STATEMENT METHODS //
     fn parse_statement(&mut self) -> Result<ASTNode, String> {
-        self.parse_expression_statement()
+        match self.current_token().unwrap().token_type() {
+            TokenType::Func => self.parse_func_def_statement(),
+            _ => self.parse_expression_statement()
+        }
     }
 
     fn parse_expression_statement(&mut self) -> Result<ASTNode, String> {
         let expr = self.parse_expression(PrecedenceType::Lowest)?;
         let stmt = ASTNode::new(ASTNodeType::ExpressionStatement(Box::new(expr)));
+        Ok(stmt)
+    }
+
+    fn parse_block_statement(&mut self) -> Result<ASTNode, String> {
+        self.expect_peek(TokenType::OpenCurly)?;
+
+        self.advance_token();
+
+        let mut statements: Vec<ASTNode> = Vec::new();
+
+        while self.peek_token().is_some() {
+            if self.peek_token_is(&TokenType::CloseCurly) {
+                break;
+            }
+
+            statements.push(self.parse_statement()?);
+        }
+
+        Ok(ASTNode::new(ASTNodeType::Block(statements)))
+    }
+
+    fn parse_type(&mut self) -> Result<ASTNode, String> {
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+        Ok(ASTNode::new(ASTNodeType::TypeLiteral {
+            identifier: Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(self.current_token().unwrap().token_type().as_identifier().cloned().unwrap())))
+        }))
+    }
+
+    fn parse_func_def_args(&mut self) -> Result<Vec<ASTNode>, String> {
+        let mut args = Vec::new();
+
+        while self.peek_token().is_some() {
+            if self.peek_token_is(&TokenType::CloseParen) {
+                break;
+            }
+
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+
+            let arg_name = self.current_token()
+                .and_then(|token| token.token_type().as_identifier())
+                .cloned()
+                .ok_or_else(|| String::from("Expected an identifier argument"))?;
+
+            self.expect_peek(TokenType::Colon)?;
+            
+            let type_ = self.parse_type()?;
+
+            args.push(ASTNode::new(ASTNodeType::FuncArgDefinition { name: arg_name, type_: Box::new(type_) }));
+
+            if self.peek_token_is(&TokenType::Comma) {
+                continue;
+            }
+        }
+
+        self.advance_token();
+
+        Ok(args)
+    }
+
+    fn parse_func_def_statement(&mut self) -> Result<ASTNode, String> {
+        /*
+
+        - Example syntax: -
+
+        func add(a: i32, b: i32) :: i32 {
+            /// code here
+        }
+
+         */
+        
+
+        // parse func name
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+        let name = self.current_token().unwrap().token_type().as_identifier().cloned().unwrap();
+
+        // parse func args
+        self.expect_peek(TokenType::OpenParen)?;
+        let args = self.parse_func_def_args()?;
+
+        // check if function has return type
+        let mut return_type: Option<Box<ASTNode>> = None;
+        if self.peek_token_is(&TokenType::ColonColon) {
+            // parse return type
+            self.advance_token();
+            return_type = Some(Box::new(self.parse_type()?));
+        }
+
+        // parse function body
+        let body = self.parse_block_statement()?;
+
+        // return
+        let stmt = ASTNode::new(ASTNodeType::FuncDefinitionStatement { name: name, args: args, return_type: return_type, body: Box::new(body) });
         Ok(stmt)
     }
     // END OF STATEMENT METHODS //
@@ -126,8 +227,8 @@ impl Parser {
 
         Ok(ASTNode::new(ASTNodeType::InfixExpression {
             left: Box::new(left_node),
-            right: Box::new(right_node),
-            op: op
+            op: op,
+            right: Box::new(right_node)
         }))
     }
 

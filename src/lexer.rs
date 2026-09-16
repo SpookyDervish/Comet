@@ -39,8 +39,9 @@ impl<'file> Lexer<'file> {
 
         range.end(&self.pos);
 
-        if token::COMET_KEYWORDS.contains(&word_string.as_str()) {
-            Token::new(TokenType::Keyword(word_string), range)
+        let keyword = TokenType::keyword(&word_string);
+        if keyword.is_some() {
+            Token::new(keyword.unwrap(), range)
         } else {
             Token::new(TokenType::Identifier(word_string), range)
         }
@@ -78,7 +79,7 @@ impl<'file> Lexer<'file> {
         }
     }
 
-    pub fn lex(&mut self) -> Result<Vec<Token>, ()> {
+    pub fn lex(&mut self) -> Result<Vec<Token>, String> {
         let mut tokens: Vec<Token> = Vec::new();
 
         // get current and peak character
@@ -127,6 +128,24 @@ impl<'file> Lexer<'file> {
                     tokens.push(Token::new(TokenType::CloseCurly, Range::from(&self.pos)));
                     self.consume();
                 }
+                ':' => {
+                    let mut range = Range::from(&self.pos);
+                    self.consume();
+
+                    if self.current_char != ':' {
+                        tokens.push(Token::new(TokenType::Colon, range));
+                    } else {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::ColonColon, range));
+                        self.consume();
+                    }
+                    
+                    
+                }
+                ',' => {
+                    tokens.push(Token::new(TokenType::Comma, Range::from(&self.pos)));
+                    self.consume();
+                }
                 '.' => {
                     tokens.push(Token::new(TokenType::Dot, Range::from(&self.pos)));
                     self.consume();
@@ -138,7 +157,7 @@ impl<'file> Lexer<'file> {
                     } else if self.current_char.is_alphanumeric() {
                         tokens.push(self.lex_word());
                     } else {
-                        return Err(());
+                        return Err(format!("Unexpected character \'{}\'", self.current_char));
                     }
                 }
             }
