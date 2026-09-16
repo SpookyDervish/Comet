@@ -1,21 +1,15 @@
 use cranelift_codegen::settings;
-use cranelift_jit::JITBuilder;
 use cranelift_module::default_libcall_names;
 use cranelift_object::{ObjectBuilder, ObjectModule};
-use target_lexicon::Triple;
 
-use crate::ast::ASTNode;
+use crate::ast::{ASTNode, ASTNodeType};
 
 pub struct Compiler {
-    ast: ASTNode,
-
     module: ObjectModule
 }
 
 impl Compiler {
-    pub fn new(ast: ASTNode) -> Result<Self, Box<dyn std::error::Error>> {
-        let triple = Triple::host();
-
+    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
         let isa_builder = cranelift_native::builder()?;
         let isa = isa_builder.finish(settings::Flags::new(settings::builder()))?;
 
@@ -28,13 +22,11 @@ impl Compiler {
         let module = ObjectModule::new(obj_builder);
 
         Ok(Compiler {
-            ast: ast,
-
             module: module
         })
     }
 
-    fn end_module(self) -> Result<Vec<u8>, cranelift_object::object::write::Error> {
+    pub fn end_module(self) -> Result<Vec<u8>, cranelift_object::object::write::Error> {
         let module = self.module;
 
         let product = module.finish();
@@ -43,9 +35,23 @@ impl Compiler {
         return bytes;
     }
 
-    pub fn compile(self) -> Result<Vec<u8>, cranelift_object::object::write::Error> {
-        
+    // VISIT METHODS //
+    fn visit_program(&self, node: ASTNode) -> Result<(), String> {
+        let nodes: Vec<ASTNode>;
+        match node.node_type() {
+            ASTNodeType::Program(value) nodes = value,
+            _ => unreachable!()
+        }
+    }
+    // END OF VISIT METHODS //
 
-        self.end_module()
+    pub fn compile(&self, ast: ASTNode) -> Result<(), String> {
+        match ast.node_type() {
+            ASTNodeType::Program(_) => { return self.visit_program(ast); },
+
+            _ => {
+                Err(format!("No compiler visit method for {:?}", ast.node_type()))
+            }
+        }
     }
 }

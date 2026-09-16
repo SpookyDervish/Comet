@@ -31,8 +31,10 @@ fn main() -> std::io::Result<()> {
     let mut parser = parser::Parser::new(tokens);
     let ast = parser.parse().unwrap();
 
-    let compiler = compiler::Compiler::new(ast).unwrap();
-    let bytes = compiler.compile().unwrap();
+    let compiler = compiler::Compiler::new().unwrap();
+    compiler.compile(ast).unwrap();
+
+    let bytes = compiler.end_module().unwrap();
 
     let mut file = std::fs::File::create(args.output)?;
     file.write_all(&bytes)?;
