@@ -19,7 +19,7 @@ pub enum ASTNodeType {
     IntLiteral(u64),
     FloatLiteral(f64),
     IdentifierLiteral(String),
-    TypeLiteral { identifier: Box<ASTNode> },
+    TypeLiteral(Box<ASTNode>),
 }
 
 #[derive(Debug)]

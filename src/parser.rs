@@ -120,9 +120,9 @@ impl Parser {
 
     fn parse_type(&mut self) -> Result<ASTNode, String> {
         self.expect_peek(TokenType::Identifier(String::new()))?;
-        Ok(ASTNode::new(ASTNodeType::TypeLiteral {
-            identifier: Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(self.current_token().unwrap().token_type().as_identifier().cloned().unwrap())))
-        }))
+
+        // best rust code EVER
+        Ok(ASTNode::new(ASTNodeType::TypeLiteral(Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(self.current_token().unwrap().token_type().as_identifier().cloned().unwrap()))))))
     }
 
     fn parse_func_def_args(&mut self) -> Result<Vec<ASTNode>, String> {

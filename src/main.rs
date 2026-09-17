@@ -6,6 +6,8 @@ mod ast;
 mod precedence;
 mod parser;
 mod compiler;
+mod scope;
+mod comet_type;
 
 use std::fs;
 use std::io::Write;
