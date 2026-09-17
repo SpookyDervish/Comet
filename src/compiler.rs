@@ -1,11 +1,11 @@
 use cranelift_codegen::isa::TargetFrontendConfig;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{InstBuilder, types};
+use cranelift_codegen::ir::{self, InstBuilder, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, scope::Scope};
+use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, scope::Scope, token::TokenType};
 
 pub struct Compiler <'a> {
     module: ObjectModule,
@@ -29,10 +29,11 @@ impl <'a> Compiler <'a> {
 
         type_map.insert("i64", CometType::new(types::I64));
         type_map.insert("i32", CometType::new(types::I32));
+        type_map.insert("i16", CometType::new(types::I16));
+        type_map.insert("i8", CometType::new(types::I8));
 
         Ok(Compiler {
             module: module,
-
             type_map: type_map
         })
     }
@@ -64,7 +65,7 @@ impl <'a> Compiler <'a> {
     // END OF UTIL METHODS
 
     // VISIT METHODS //
-    fn visit_program(&self, node: &ASTNode) -> Result<(), String> {
+    fn visit_program(&mut self, node: &ASTNode) -> Result<(), String> {
         let nodes = match node.node_type() {
             ASTNodeType::Program(value) => value,
             _ => unreachable!()
@@ -77,7 +78,61 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_func_def(&self, node: &ASTNode) -> Result<(), String> {
+    fn visit_block(&mut self, node: &ASTNode) -> Result<(), String> {
+        let nodes = match node.node_type() {
+            ASTNodeType::Block(value) => value,
+            _ => unreachable!()
+        };
+
+        for node in nodes {
+            self.compile(node)?;
+        }
+
+        Ok(())
+    }
+
+    fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
+        match node.node_type() {
+            ASTNodeType::InfixExpression { left, op, right } => self.visit_infix_expression(node, builder),
+            _ => Err(format!("bru"))
+        }
+    }
+
+    fn visit_infix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
+        let (left, op, right) = match node.node_type() {
+            ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
+            _ => unreachable!()
+        };
+
+        let left_side = self.visit_value(left)?;
+        let right_side = self.visit_value(left)?;
+
+        let out: ir::Value;
+        match op.token_type() {
+            TokenType::Plus => {
+                out = builder.ins().iadd(left_side, right_side);
+            }
+
+            _ => {
+                return Err(format!("Invalid operator for infix expression '{:?}'", op.token_type()));
+            }
+        }
+
+        Ok(out)
+    }
+
+    fn visit_expression_statement(&mut self, node: &ASTNode) -> Result<(), String> {
+        match node.node_type() {
+            ASTNodeType::ExpressionStatement(expr) => {
+                self.visit_value(expr)?;
+            },
+            _ => unreachable!()
+        }
+
+        Ok(())
+    }
+
+    fn visit_func_def(&mut self, node: &ASTNode) -> Result<(), String> {
         let mut ctx = self.module.make_context();
 
         let mut sig = self.module.make_signature();
@@ -113,25 +168,27 @@ impl <'a> Compiler <'a> {
         builder.switch_to_block(entry_block);
 
         // generate code
+        self.compile(body, Some(&mut builder))?;
 
         builder.seal_block(entry_block);
-
         builder.ins().return_(&[]);
-
+        
         let target_config = self.module.isa().frontend_config();
-
         builder.finalize(target_config);
 
-        println!("{}", ctx.func.display());
+        //println!("{}", ctx.func.display());
+        
 
         Ok(())
     }
     // END OF VISIT METHODS //
 
-    pub fn compile(&self, ast: &ASTNode) -> Result<(), String> {
+    pub fn compile(&mut self, ast: &ASTNode, builder: Option<&mut FunctionBuilder>) -> Result<(), String> {
         match ast.node_type() {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },
+            ASTNodeType::Block(_) => { return self.visit_block(ast); },
             ASTNodeType::FuncDefinitionStatement {name: _, args: _, return_type: _, body: _ } => { return self.visit_func_def(ast); },
+            ASTNodeType::ExpressionStatement(_) => { return self.visit_expression_statement(ast); },
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))
