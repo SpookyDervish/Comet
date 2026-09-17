@@ -90,6 +90,7 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<ASTNode, String> {
         match self.current_token().unwrap().token_type() {
             TokenType::Func => self.parse_func_def_statement(),
+            TokenType::Ret => self.parse_ret_statement(),
             _ => self.parse_expression_statement()
         }
     }
@@ -202,6 +203,13 @@ impl Parser {
         });
         Ok(stmt)
     }
+
+    fn parse_ret_statement(&mut self) -> Result<ASTNode, String> {
+        self.advance_token();
+        let result = self.parse_expression(PrecedenceType::Lowest)?;
+
+        Ok(ASTNode::new(ASTNodeType::ReturnStatement(Some(Box::new(result)))))
+    }
     // END OF STATEMENT METHODS //
 
     // EXPRESSION METHODS //
@@ -288,7 +296,9 @@ impl Parser {
     }
 
     fn parse_identifier_literal(&mut self) -> Result<ASTNode, String> {
-        let token = self.current_token().unwrap();
+        let token = self.current_token().cloned().unwrap();
+
+        self.advance_token();
 
         match token.token_type() {
             TokenType::Identifier(value) => {

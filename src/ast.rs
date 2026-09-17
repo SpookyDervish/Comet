@@ -11,6 +11,7 @@ pub enum ASTNodeType {
     // statements
     ExpressionStatement(Box<ASTNode>),
     FuncDefinitionStatement { name: Box<ASTNode>, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
+    ReturnStatement(Option<Box<ASTNode>>),
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },

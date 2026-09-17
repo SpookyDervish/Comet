@@ -34,7 +34,7 @@ fn main() -> std::io::Result<()> {
     let ast = parser.parse().unwrap();
 
     let mut compiler = compiler::Compiler::new().unwrap();
-    compiler.compile(&ast).unwrap();
+    compiler.compile(&ast, None).unwrap();
 
     let bytes = compiler.end_module().unwrap();
 

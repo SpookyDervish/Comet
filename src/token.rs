@@ -7,7 +7,7 @@ pub enum TokenType {
     Identifier(String),
 
     // keywords,
-    Func,
+    Func, Ret,
 
     // symbols
     Plus, Minus, Times, Divide, Eq,
@@ -37,6 +37,7 @@ impl TokenType {
     pub fn keyword(word: &str) -> Option<Self> {
         match word {
             "func" => Some(TokenType::Func),
+            "ret" => Some(TokenType::Ret),
             _ => None
         }
     }
