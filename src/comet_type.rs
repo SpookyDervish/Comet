@@ -1,6 +1,7 @@
 use cranelift_codegen::ir::{Type, Value, types};
 use cranelift_frontend::FunctionBuilder;
 use cranelift::prelude::InstBuilder;
+use cranelift_native::builder;
 
 #[derive(Clone, Eq)]
 pub struct CometType {
@@ -18,18 +19,18 @@ impl CometType {
         let value_type = builder.func.dfg.value_type(value);
         let their_type = target_type.cranelift_type;
 
-        println!("value type: {}, target type: {}", value_type, their_type);
-
         let out: Value;
         if value_type.is_int() && their_type.is_int() {
-            if value_type.bits() < their_type.bits() {
+            if value_type.bits() < their_type.bits() { // cast from smaller to bigger int
                 out = builder.ins().sextend(target_type.cranelift_type, value);
+            } else if value_type.bits() > their_type.bits() { // cast from bigger to smaller int
+                out = builder.ins().ireduce(their_type, value);
             } else {
                 return Err(format!("Cannot convert int type '{}' to type '{}'", value_type, their_type));
             }
-        } else if value_type.is_int() && their_type.is_float() {
+        } else if value_type.is_int() && their_type.is_float() { // cast from int to float
             out = builder.ins().fcvt_from_sint(their_type, value);
-        } else if value_type.is_float() && their_type.is_int() {
+        } else if value_type.is_float() && their_type.is_int() { // cast from float to int
             out = builder.ins().fcvt_to_sint(their_type, value);
         } else {
             return Err(format!("Cannot implicitly cast type '{}' to type '{}'", value_type, their_type));

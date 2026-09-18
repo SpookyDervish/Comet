@@ -1,25 +1,27 @@
 use std::collections::HashMap;
 
-pub struct Scope <'a, K, V> {
-    local: HashMap<K, V>,
-    parent: Option<&'a Scope<'a, K, V>>
+use cranelift_frontend::Variable;
+
+use crate::comet_type::CometType;
+
+pub enum CometVarType {
+    Local(Variable),
+    FuncArg(usize) // stores func arg index
 }
 
-impl <'a, K: std::hash::Hash + Eq, V> Scope<'a, K, V> {
-    pub fn new(parent: Option<&'a Scope<'a, K, V>>) -> Self {
-        Self {
-            local: HashMap::new(),
-            parent: parent
-        }
-    }
+pub struct CometVariable {
+    pub type_: CometType,
+    pub var_type: CometVarType,
+    pub mutable: bool
+}
 
-    pub fn insert(&mut self, key: K, value: V) {
-        self.local.insert(key, value);
-    }
+pub struct ScopeFrame <'a> {
+    pub variables: HashMap<&'a str, CometVariable>,
+    pub types: HashMap<&'a str, CometType>
+}
 
-    pub fn get(&self, key: &K) -> Option<&V> {
-        self.local.get(key).or_else(|| {
-            self.parent.and_then(|p| p.get(key))
-        })
+impl <'a> ScopeFrame <'a> {
+    pub fn new() -> Self {
+        ScopeFrame { variables: HashMap::new(), types: HashMap::new() }
     }
 }

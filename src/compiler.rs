@@ -4,18 +4,12 @@ use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
-use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, scope::Scope, token::TokenType};
-
-pub struct CometVariable {
-    type_: CometType,
-    var: Variable
-}
+use crate::scope::{CometVarType, CometVariable, ScopeFrame};
+use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
 
 pub struct Compiler <'a> {
     module: ObjectModule,
-    type_map: Scope<'a, &'a str, CometType>,
-
-    var_map: Scope<'a, &'a str, CometVariable>,
+    scopes: Vec<ScopeFrame<'a>>,
 
     var_index: u32
 }
@@ -33,21 +27,20 @@ impl <'a> Compiler <'a> {
 
         let module = ObjectModule::new(obj_builder);
 
-        let mut type_map = Scope::new(None);
-        type_map.insert("i8", CometType::new(types::I8));
-        type_map.insert("i16", CometType::new(types::I16));
-        type_map.insert("i32", CometType::new(types::I32));
-        type_map.insert("i64", CometType::new(types::I64));
-        type_map.insert("f16", CometType::new(types::F16));
-        type_map.insert("f32", CometType::new(types::F32));
-        type_map.insert("f64", CometType::new(types::F64));
+        let mut base_frame = ScopeFrame::new();
+
+        base_frame.types.insert("i8", CometType::new(types::I8));
+        base_frame.types.insert("i16", CometType::new(types::I16));
+        base_frame.types.insert("i32", CometType::new(types::I32));
+        base_frame.types.insert("i64", CometType::new(types::I64));
+        base_frame.types.insert("f16", CometType::new(types::F16));
+        base_frame.types.insert("f32", CometType::new(types::F32));
+        base_frame.types.insert("f64", CometType::new(types::F64));
         
 
         Ok(Compiler {
             module: module,
-            type_map: type_map,
-
-            var_map: Scope::new(None),
+            scopes: vec!{base_frame},
 
             var_index: 0
         })
@@ -63,6 +56,14 @@ impl <'a> Compiler <'a> {
     }
 
     // UTIL METHODS //
+    fn get_variable(&self, name: &str) -> Option<&CometVariable> {
+        self.scopes.iter().rev().find_map(|scope| scope.variables.get(name))
+    }
+
+    fn get_type(&self, name: &str) -> Option<&CometType> {
+        self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
+    }
+
     fn get_type_literal_type <'b> (&'b self, node: &'b ASTNode) -> Result<&'b CometType, String> {
         let ident_node = match node.node_type() {
             ASTNodeType::TypeLiteral(value) => &**value,
@@ -74,7 +75,7 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
-        let comet_type = self.type_map.get(&ident.as_str());
+        let comet_type = self.get_type(&ident.as_str());
         comet_type.ok_or(format!("Unkown type '{}'", ident))
     }
 
@@ -114,7 +115,7 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::IdentifierLiteral(name) => {
-                let var = self.var_map.get(&name.as_str()).ok_or(format!("Use of undefined variable '{}'", name)).unwrap();
+                let var = self.get_variable(&name.as_str()).ok_or(format!("Use of undefined variable '{}'", name)).unwrap();
 
                 Ok(var.type_.clone())
             },
@@ -177,9 +178,17 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::IdentifierLiteral(var_name) => {
-                let var = self.var_map.get(&var_name.as_str()).ok_or(format!("Use of undefined variable '{}'", var_name));
+                let comet_var = self.get_variable(&var_name.as_str()).ok_or(format!("Use of undefined variable '{}'", var_name)).unwrap();
 
-                Ok(builder.use_var(var.unwrap().var))
+                match comet_var.var_type {
+                    CometVarType::Local(var) => Ok(builder.use_var(var)),
+                    CometVarType::FuncArg(index) => {
+                        let params = builder.block_params(builder.current_block().unwrap());
+                        Ok(params[index])
+                    },
+                    _ => unreachable!()
+                }
+                
             },
 
             _ => Err(format!("Cannot compile r-value '{:?}'", node.node_type()))
@@ -234,17 +243,32 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
+        
+        self.scopes.push(ScopeFrame::new());
+
         let func_id = self.module.declare_function(name, Linkage::Export, &sig).unwrap();
 
         let mut builder_context = FunctionBuilderContext::new();
 
-        for arg in funcArgs {
-            let (arg_name, arg_type)= match arg.node_type() {
+        for (i, arg) in funcArgs.iter().enumerate() {
+            let (arg_name_node, arg_type_node)= match arg.node_type() {
                 ASTNodeType::FuncArgDefinition { name, type_ } => (name, type_),
                 _ => unreachable!()
             };
 
-            sig.params.push(AbiParam::new(self.get_type_literal_type(arg_type)?.cranelift_type));
+            let arg_type = self.get_type_literal_type(arg_type_node)?.clone();
+
+            let arg_name = match arg_name_node.node_type() {
+                ASTNodeType::IdentifierLiteral(name) => name,
+                _ => unreachable!()
+            }; 
+
+            sig.params.push(AbiParam::new(arg_type.cranelift_type));
+            self.scopes.last_mut().unwrap().variables.insert(arg_name, CometVariable {
+                type_: arg_type,
+                var_type: CometVarType::FuncArg(i),
+                mutable: false
+            });
         }
 
         if return_type_optional.is_some() {
@@ -266,10 +290,17 @@ impl <'a> Compiler <'a> {
         builder.switch_to_block(entry_block);
 
         // generate code
-        self.compile(body, Some(&mut builder))?;
+        let result = (|| {
+            self.compile(body, Some(&mut builder))
+        })();
+
+        self.scopes.pop();
+        result?;
 
         builder.seal_block(entry_block);
+
         
+
         let target_config = self.module.isa().frontend_config();
         builder.finalize(target_config);
 
@@ -314,8 +345,12 @@ impl <'a> Compiler <'a> {
         // build variable value
         let mut value = self.visit_value(value_node, builder)?;
 
-        let existing_var = self.var_map.get(&ident.as_str());
+        let existing_var = self.get_variable(&ident.as_str());
         if existing_var.is_some() {
+            if !existing_var.unwrap().mutable {
+                return Err(format!("Cannot reassign immutable variable"));
+            }
+
             let var_type = &existing_var.unwrap().type_;
             if value_type != *var_type {
                 return Err(format!("Attempted to change type of variable '{}' at runtime", ident));
@@ -325,24 +360,21 @@ impl <'a> Compiler <'a> {
                 return Err(format!("Cannot type annotate reassignment"));
             }
 
-            builder.def_var(existing_var.unwrap().var, value);
+            match existing_var.unwrap().var_type {
+                CometVarType::Local(var) => { builder.def_var(var, value); },
+                _ => unreachable!()
+            }
 
             return Ok(());
         }
 
-        
-        
         let new_variable = Variable::from_u32(self.var_index);
         self.var_index += 1;
-
-        
         
         let mut final_type = &value_type;
         if type_node.is_some() {
             // get type of type annotation
             let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
-
-            println!("{}, {}", var_type.cranelift_type, value_type.cranelift_type);
 
             if var_type != &value_type {
                 value = CometType::try_implicit_cast(value, &var_type, builder)?;
@@ -357,10 +389,11 @@ impl <'a> Compiler <'a> {
 
         let comet_var = CometVariable {
             type_: final_type.clone(),
-            var: new_variable
+            var_type: CometVarType::Local(new_variable),
+            mutable: true
         };
 
-        self.var_map.insert(ident.as_str(), comet_var);
+        self.scopes.last_mut().unwrap().variables.insert(ident.as_str(), comet_var);
 
         Ok(())
     }
