@@ -12,7 +12,7 @@ pub enum ASTNodeType {
     ExpressionStatement(Box<ASTNode>),
     FuncDefinitionStatement { name: Box<ASTNode>, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
     ReturnStatement(Option<Box<ASTNode>>),
-    LetStatement { ident: Box<ASTNode>, type_: Option<Box<ASTNode>>, value: Box<ASTNode> },
+    AssignStatement { ident: Box<ASTNode>, type_: Option<Box<ASTNode>>, value: Box<ASTNode> },
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },

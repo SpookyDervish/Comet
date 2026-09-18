@@ -1,5 +1,5 @@
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, Function, InstBuilder, UserFuncName, types};
+use cranelift_codegen::ir::{self, Function, InstBuilder, Type, UserFuncName, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
@@ -78,8 +78,60 @@ impl <'a> Compiler <'a> {
         comet_type.ok_or(format!("Unkown type '{}'", ident))
     }
 
+    fn rank_type(&self, type_: &CometType) -> u8 {
+        match type_.cranelift_type {
+            types::I8 => 0,
+            types::I16 => 1,
+            types::I32 => 2,
+            types::I64 => 3,
+            types::F16 => 4,
+            types::F32 => 5,
+            types::F64 => 6,
+            _ => 0
+        }
+    }
+
+    fn unify_types(&self, a: &'a CometType, b: &'a CometType) -> &CometType {
+        if self.rank_type(a) > self.rank_type(b) {
+            a
+        } else {
+            b
+        }
+    }
+
     fn resolve_type(&self, node: &ASTNode) -> Result<CometType, String> {
         match node.node_type() {
+            ASTNodeType::IntLiteral(_) => {
+                Ok(CometType {
+                    cranelift_type: types::I64
+                })
+            },
+
+            ASTNodeType::FloatLiteral(_) => {
+                Ok(CometType {
+                    cranelift_type: types::F64
+                })
+            },
+
+            ASTNodeType::IdentifierLiteral(name) => {
+                let var = self.var_map.get(&name.as_str()).ok_or(format!("Use of undefined variable '{}'", name)).unwrap();
+
+                Ok(var.type_.clone())
+            },
+
+            ASTNodeType::InfixExpression { left, op, right } => {
+                let left_value = self.resolve_type(left)?;
+
+                match op.token_type() {
+                    TokenType::Divide => { return Ok(CometType { cranelift_type: types::F64 }); },
+
+                    _ => {}
+                }
+
+                let right_value = self.resolve_type(right)?;
+                return Ok(self.unify_types(&left_value, &right_value).clone());
+            },
+
             _ => Err(format!("Can't resolve type of '{:?}'", node.node_type()))
         }
     }
@@ -122,6 +174,12 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::FloatLiteral(num) => {
                 Ok(builder.ins().f64const(*num as f64))
+            },
+
+            ASTNodeType::IdentifierLiteral(var_name) => {
+                let var = self.var_map.get(&var_name.as_str()).ok_or(format!("Use of undefined variable '{}'", var_name));
+
+                Ok(builder.use_var(var.unwrap().var))
             },
 
             _ => Err(format!("Cannot compile r-value '{:?}'", node.node_type()))
@@ -239,9 +297,9 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_let_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_assign_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
         let (ident_node, type_node, value_node) = match node.node_type() {
-            ASTNodeType::LetStatement { ident, type_, value } => (ident, type_, value),
+            ASTNodeType::AssignStatement { ident, type_, value } => (ident, type_, value),
             _ => unreachable!()
         };
 
@@ -250,22 +308,55 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
+        // get type of the value we're setting the variable to
+        let value_type = self.resolve_type(value_node)?;
+
+        // build variable value
+        let mut value = self.visit_value(value_node, builder)?;
+
         let existing_var = self.var_map.get(&ident.as_str());
         if existing_var.is_some() {
-            return Err(format!("Redeclaration of variable '{}'", ident));
+            let var_type = &existing_var.unwrap().type_;
+            if value_type != *var_type {
+                return Err(format!("Attempted to change type of variable '{}' at runtime", ident));
+            }
+
+            if type_node.is_some() {
+                return Err(format!("Cannot type annotate reassignment"));
+            }
+
+            builder.def_var(existing_var.unwrap().var, value);
+
+            return Ok(());
         }
 
-        let value = self.visit_value(value_node, builder)?;
+        
         
         let new_variable = Variable::from_u32(self.var_index);
         self.var_index += 1;
 
+        
+        
+        let mut final_type = &value_type;
+        if type_node.is_some() {
+            // get type of type annotation
+            let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
+
+            println!("{}, {}", var_type.cranelift_type, value_type.cranelift_type);
+
+            if var_type != &value_type {
+                value = CometType::try_implicit_cast(value, &var_type, builder)?;
+                final_type = var_type;
+            } else {
+                final_type = self.unify_types(&final_type, &var_type);
+            }
+        }
+
+        builder.declare_var(final_type.cranelift_type);
         builder.def_var(new_variable, value);
 
-        let var_type = self.resolve_type(value_node)?;
-
         let comet_var = CometVariable {
-            type_: var_type,
+            type_: final_type.clone(),
             var: new_variable
         };
 
@@ -283,7 +374,7 @@ impl <'a> Compiler <'a> {
             ASTNodeType::FuncDefinitionStatement {name: _, args: _, return_type: _, body: _ } => { return self.visit_func_def(ast); },
             ASTNodeType::ExpressionStatement(_) => { return self.visit_expression_statement(ast, builder.unwrap()); },
             ASTNodeType::ReturnStatement(_) => { return self.visit_ret_statement(ast, builder.unwrap()); }
-            ASTNodeType::LetStatement { ident: _, type_: _, value: _ } => { return self.visit_let_statement(ast, builder.unwrap()); }
+            ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))

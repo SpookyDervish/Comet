@@ -89,9 +89,11 @@ impl Parser {
     // STATEMENT METHODS //
     fn parse_statement(&mut self) -> Result<ASTNode, String> {
         match self.current_token().unwrap().token_type() {
-            TokenType::Func => self.parse_func_def_statement(),
+            TokenType::Fun => self.parse_func_def_statement(),
             TokenType::Ret => self.parse_ret_statement(),
-            TokenType::Let => self.parse_let_statement(),
+
+            TokenType::Identifier(_) => self.parse_assign_statement(),
+
             _ => self.parse_expression_statement()
         }
     }
@@ -212,9 +214,7 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::ReturnStatement(Some(Box::new(result)))))
     }
 
-    fn parse_let_statement(&mut self) -> Result<ASTNode, String> {
-
-        self.expect_peek(TokenType::Identifier(String::new()))?;
+    fn parse_assign_statement(&mut self) -> Result<ASTNode, String> {
 
         let ident = match self.current_token().unwrap().token_type() {
             TokenType::Identifier(value) => ASTNode::new(ASTNodeType::IdentifierLiteral(value.clone())),
@@ -232,8 +232,10 @@ impl Parser {
         self.advance_token();
 
         let value = self.parse_expression(PrecedenceType::Lowest)?;
+            self.advance_token();
+
         
-        Ok(ASTNode::new(ASTNodeType::LetStatement { ident: Box::new(ident), type_: type_, value: Box::new(value) }))
+        Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(ident), type_: type_, value: Box::new(value) }))
     }
     // END OF STATEMENT METHODS //
 
@@ -245,6 +247,7 @@ impl Parser {
         }
 
         let mut left_expr = prefix_fn.unwrap()(self)?;
+
 
         while precedence < self.peek_precedence() {
             let infix_fn = self.get_infix_parse_func(self.peek_token().unwrap().token_type());
@@ -291,7 +294,8 @@ impl Parser {
     fn parse_int_literal(&mut self) -> Result<ASTNode, String> {
         let token = self.current_token().cloned().unwrap();
 
-        self.advance_token();
+            
+
 
         match token.token_type() {
             TokenType::IntLiteral(value) => {
@@ -309,8 +313,6 @@ impl Parser {
     fn parse_float_literal(&mut self) -> Result<ASTNode, String> {
         let token = self.current_token().cloned().unwrap();
 
-        self.advance_token();
-
         match token.token_type() {
             TokenType::FloatLiteral(value) => {
                 let result = value.parse::<f64>();
@@ -326,7 +328,6 @@ impl Parser {
 
     fn parse_identifier_literal(&mut self) -> Result<ASTNode, String> {
         let token = self.current_token().cloned().unwrap();
-        self.advance_token();
 
         match token.token_type() {
             TokenType::Identifier(value) => {
