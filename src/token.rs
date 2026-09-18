@@ -30,6 +30,7 @@ impl TokenType {
             TokenType::Minus => PrecedenceType::Sum,
             TokenType::Times => PrecedenceType::Product,
             TokenType::Divide => PrecedenceType::Product,
+            TokenType::OpenParen => PrecedenceType::Call,
             _ => PrecedenceType::Lowest
         }
     }

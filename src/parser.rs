@@ -32,6 +32,10 @@ impl Parser {
         return self.peek_token().is_some() && (std::mem::discriminant(self.peek_token().unwrap().token_type()) == std::mem::discriminant(token_type));
     }
 
+    fn current_token_is(&self, token_type: &TokenType) -> bool {
+        return self.current_token().is_some() && (std::mem::discriminant(self.current_token().unwrap().token_type()) == std::mem::discriminant(token_type));
+    }
+
     fn expect_peek(&mut self, token_type: TokenType) -> Result<(), String> {
         if self.peek_token_is(&token_type) {
             self.advance_token();
@@ -81,6 +85,7 @@ impl Parser {
             TokenType::Minus => Some(Parser::parse_infix_expression),
             TokenType::Times => Some(Parser::parse_infix_expression),
             TokenType::Divide => Some(Parser::parse_infix_expression),
+            TokenType::OpenParen => Some(Parser::parse_func_call),
             _ => None
         }
     }
@@ -118,6 +123,8 @@ impl Parser {
 
             statements.push(self.parse_statement()?);
         }
+
+        self.expect_peek(TokenType::CloseCurly)?;
 
         Ok(ASTNode::new(ASTNodeType::Block(statements)))
     }
@@ -248,7 +255,6 @@ impl Parser {
 
         let mut left_expr = prefix_fn.unwrap()(self)?;
 
-
         while precedence < self.peek_precedence() {
             let infix_fn = self.get_infix_parse_func(self.peek_token().unwrap().token_type());
             if infix_fn.is_none() {
@@ -278,6 +284,33 @@ impl Parser {
             op: op,
             right: Box::new(right_node)
         }))
+    }
+
+    fn parse_func_call(&mut self, left_node: ASTNode) -> Result<ASTNode, String> {
+        let mut func_call_args: Vec<ASTNode> = Vec::new();
+
+        let mut should_loop = true;
+        if self.peek_token_is(&TokenType::CloseParen) {
+            self.advance_token();
+            should_loop = false;
+        }
+        
+        while should_loop {
+            self.advance_token();
+
+            let arg = self.parse_expression(PrecedenceType::Lowest)?;
+            func_call_args.push(arg);
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            self.expect_peek(TokenType::CloseParen)?;
+            break;
+        }
+
+        Ok(ASTNode::new(ASTNodeType::FuncCall { left: Box::new(left_node), args: func_call_args } ))
     }
 
     fn parse_grouped_expression(&mut self) -> Result<ASTNode, String> {

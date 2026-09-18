@@ -16,6 +16,7 @@ pub enum ASTNodeType {
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
+    FuncCall { left: Box<ASTNode>, args: Vec<ASTNode> },
 
     // literals
     IntLiteral(u64),
