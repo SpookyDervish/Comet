@@ -7,12 +7,14 @@ pub enum ASTNodeType {
     Block(Vec<ASTNode>),
 
     FuncArgDefinition { name: Box<ASTNode>, type_: Box<ASTNode> },
+    MatchNode { expressions: Vec<ASTNode>, block: Box<ASTNode> },
 
     // statements
     ExpressionStatement(Box<ASTNode>),
     FuncDefinitionStatement { name: Box<ASTNode>, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
     ReturnStatement(Option<Box<ASTNode>>),
     AssignStatement { ident: Box<ASTNode>, type_: Option<Box<ASTNode>>, value: Box<ASTNode> },
+    MatchStatement { expr: Box<ASTNode>, nodes: Vec<ASTNode> },
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },

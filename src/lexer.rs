@@ -32,7 +32,7 @@ impl<'file> Lexer<'file> {
         let mut word_string = String::new();
         let mut range = Range::start(&self.pos);
 
-        while self.current_char != '\0' && self.current_char.is_alphanumeric() {
+        while self.current_char != '\0' && (self.current_char.is_alphanumeric() || self.current_char == '_') {
             word_string.push(self.current_char);
             self.consume();
         }
@@ -150,11 +150,19 @@ impl<'file> Lexer<'file> {
                     tokens.push(Token::new(TokenType::Dot, Range::from(&self.pos)));
                     self.consume();
                 }
+                '|' => {
+                    tokens.push(Token::new(TokenType::BitwiseOr, Range::from(&self.pos)));
+                    self.consume();
+                }
+                '&' => {
+                    tokens.push(Token::new(TokenType::BitwiseAnd, Range::from(&self.pos)));
+                    self.consume();
+                }
 
                 _ => {
                     if self.current_char.is_ascii_digit() || self.current_char == '.' {
                         tokens.push(self.lex_number());
-                    } else if self.current_char.is_alphanumeric() {
+                    } else if self.current_char.is_alphanumeric() || self.current_char == '_' {
                         tokens.push(self.lex_word());
                     } else {
                         return Err(format!("Unexpected character \'{}\'", self.current_char));

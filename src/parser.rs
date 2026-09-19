@@ -97,6 +97,7 @@ impl Parser {
         match self.current_token().unwrap().token_type() {
             TokenType::Fun => self.parse_func_def_statement(),
             TokenType::Ret => self.parse_ret_statement(),
+            TokenType::Match => self.parse_match_statement(),
 
             TokenType::Identifier(_) => self.parse_assign_statement(),
 
@@ -106,6 +107,9 @@ impl Parser {
 
     fn parse_expression_statement(&mut self) -> Result<ASTNode, String> {
         let expr = self.parse_expression(PrecedenceType::Lowest)?;
+
+        self.advance_token();
+
         let stmt = ASTNode::new(ASTNodeType::ExpressionStatement(Box::new(expr)));
         Ok(stmt)
     }
@@ -117,15 +121,10 @@ impl Parser {
 
         let mut statements: Vec<ASTNode> = Vec::new();
 
-        while self.peek_token().is_some() {
-            if self.peek_token_is(&TokenType::CloseCurly) {
-                break;
-            }
-
+        while !self.current_token_is(&TokenType::CloseCurly) {
+            println!("current token: {:?}", self.current_token().unwrap());
             statements.push(self.parse_statement()?);
         }
-
-        self.expect_peek(TokenType::CloseCurly)?;
 
         Ok(ASTNode::new(ASTNodeType::Block(statements)))
     }
@@ -219,6 +218,8 @@ impl Parser {
         self.advance_token();
         let result = self.parse_expression(PrecedenceType::Lowest)?;
 
+        self.advance_token();
+
         Ok(ASTNode::new(ASTNodeType::ReturnStatement(Some(Box::new(result)))))
     }
 
@@ -243,6 +244,55 @@ impl Parser {
         self.advance_token();
 
         Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(ident), type_: type_, value: Box::new(value) }))
+    }
+
+    fn parse_match_statement(&mut self) -> Result<ASTNode, String> {
+        let mut nodes: Vec<ASTNode> = vec![];
+
+        self.advance_token(); // skip 'match'
+
+        let match_expr = self.parse_expression(PrecedenceType::Lowest)?;
+
+        self.expect_peek(TokenType::OpenCurly)?;
+
+        self.advance_token(); // skip '{'
+
+        loop {
+            let mut expressions: Vec<ASTNode> = vec![];
+
+            loop {
+                let node_expr = self.parse_expression(PrecedenceType::Lowest)?;
+                expressions.push(node_expr);
+
+                if self.peek_token_is(&TokenType::OpenCurly) {
+                    break;
+                }
+
+                self.expect_peek(TokenType::Or)?;
+
+                self.advance_token(); // skip 'or'
+            }
+
+
+            let block = self.parse_block_statement()?;
+
+
+
+            nodes.push(ASTNode::new(ASTNodeType::MatchNode { expressions: expressions, block: Box::new(block) }));
+
+            if self.peek_token_is(&TokenType::CloseCurly) {
+                break;
+            }
+
+            self.expect_peek(TokenType::Comma)?;
+
+            self.advance_token();
+        }
+
+        self.expect_peek(TokenType::CloseCurly)?;
+        self.advance_token(); // skip extra '}'
+
+        Ok(ASTNode::new(ASTNodeType::MatchStatement { expr: Box::new(match_expr), nodes: nodes }))
     }
     // END OF STATEMENT METHODS //
 

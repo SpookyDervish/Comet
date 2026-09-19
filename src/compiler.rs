@@ -1,3 +1,4 @@
+use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::isa::CallConv;
 use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, InstBuilder, Signature, Value, types};
@@ -264,7 +265,13 @@ impl <'a> Compiler <'a> {
         match op.token_type() {
             TokenType::Plus => {
                 out = builder.ins().iadd(left_side, right_side);
-            }
+            },
+            TokenType::Minus => {
+                out = builder.ins().isub(left_side, right_side);
+            },
+            TokenType::Times => {
+                out = builder.ins().imul(left_side, right_side);
+            },
 
             _ => {
                 return Err(format!("Invalid operator for infix expression '{:?}'", op.token_type()));
@@ -369,7 +376,7 @@ impl <'a> Compiler <'a> {
         self.scopes.pop();
         result?;
 
-        builder.seal_block(entry_block);
+        builder.seal_all_blocks();
 
         
         // finalize func
@@ -477,6 +484,74 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
+    fn visit_match_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+        let (expr_node, match_nodes) = match node.node_type() {
+            ASTNodeType::MatchStatement { expr, nodes } => (expr, nodes),
+            _ => unreachable!()
+        };
+
+        let expr = self.visit_value(expr_node, builder)?;
+        let end_block = builder.create_block();
+
+        let mut compare_block = builder.current_block().unwrap();
+
+        for (arm_index, match_node) in match_nodes.iter().enumerate() {
+
+            let (match_expr_nodes, match_block) = match match_node.node_type() {
+                ASTNodeType::MatchNode { expressions, block } => (expressions, block),
+                _ => unreachable!()
+            };
+
+            let arm_block = builder.create_block();
+
+            for (expr_index, match_expr_node) in match_expr_nodes.iter().enumerate() {
+                if builder.current_block() != Some(compare_block) {
+                    builder.switch_to_block(compare_block);
+                }
+
+                let match_expr = self.visit_value(match_expr_node, builder)?;
+                let is_equal = builder.ins().icmp(IntCC::Equal, expr, match_expr);
+
+                let false_block = if expr_index + 1 < match_expr_nodes.len() {
+                    builder.create_block()
+                } else if arm_index + 1 < match_nodes.len() {
+                    builder.create_block()
+                } else {
+                    end_block
+                };
+
+                builder.ins().brif(is_equal, arm_block, &[], false_block, &[]);
+                builder.seal_block(compare_block);
+                compare_block = false_block;
+            }
+
+            builder.switch_to_block(arm_block);
+
+
+            self.compile(match_block, Some(builder))?;
+
+            let arm_is_terminated = builder
+                    .func
+                    .layout
+                    .last_inst(arm_block)
+                    .map(|inst| builder.func.dfg.insts[inst].opcode().is_terminator())
+                    .unwrap_or(false);
+
+            if !arm_is_terminated {
+                builder.ins().jump(end_block, &[]);
+            }
+
+            builder.seal_block(arm_block);
+        }
+
+        builder.switch_to_block(end_block);
+        builder.ensure_inserted_block();
+
+        println!("{}", builder.func);
+
+        Ok(())
+    }
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &'a ASTNode, builder: Option<&mut FunctionBuilder>) -> Result<(), String> {
@@ -488,6 +563,7 @@ impl <'a> Compiler <'a> {
             ASTNodeType::ExpressionStatement(_) => { return self.visit_expression_statement(ast, builder.unwrap()); },
             ASTNodeType::ReturnStatement(_) => { return self.visit_ret_statement(ast, builder.unwrap()); }
             ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
+            ASTNodeType::MatchStatement { expr: _, nodes: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))
