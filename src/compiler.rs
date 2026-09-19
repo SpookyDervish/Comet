@@ -1,10 +1,12 @@
-use cranelift_codegen::entity::EntityRef;
+use cranelift_codegen::isa::CallConv;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, FuncRef, InstBuilder, MemFlags, types};
+use cranelift_codegen::ir::{self, InstBuilder, Signature, Value, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
+use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
+use std::cell::RefCell;
 
+use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
 
@@ -63,10 +65,6 @@ impl <'a> Compiler <'a> {
 
     fn get_type(&self, name: &str) -> Option<&CometType> {
         self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
-    }
-
-    fn get_function(&self, name: &str) -> Option<&FuncId> {
-        self.scopes.iter().rev().find_map(|scope| scope.functions.get(name))
     }
 
     fn get_type_literal_type <'b> (&'b self, node: &'b ASTNode) -> Result<&'b CometType, String> {
@@ -138,22 +136,27 @@ impl <'a> Compiler <'a> {
                 return Ok(self.unify_types(&left_value, &right_value).clone());
             },
 
+            ASTNodeType::FuncCall { left, args } => {
+                /*let decls = self.module.declarations();
+
+                let func_id = self.get_function(left)?;
+                let func_decl = decls.get_function_decl(func_id);
+                let returns = &func_decl.signature.returns;
+
+                let out_type: CometType;
+                if returns.len() == 0 {
+                    out_type = CometType { cranelift_type: types::INVALID }
+                } else {
+                    out_type = CometType { cranelift_type: returns[0].value_type }
+                }*/
+
+                // TODO:
+                let out_type = CometType { cranelift_type: types::I64 };
+
+                Ok(out_type)
+            }
+
             _ => Err(format!("Can't resolve type of '{:?}'", node.node_type()))
-        }
-    }
-
-    fn get_func_from_expr(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<FuncRef, String> {
-        match node.node_type() {
-            ASTNodeType::IdentifierLiteral(name) => {
-                let func = self.get_function(&name.as_str());
-                if func.is_none() {
-                    return Err(format!("Undefined function {}", name));
-                }
-
-                Ok(self.module.declare_func_in_func(*func.unwrap(), builder.func))
-            },
-
-            _ => Err(format!("Cannot get function from {:?}", node.node_type()))
         }
     }
     // END OF UTIL METHODS
@@ -200,6 +203,12 @@ impl <'a> Compiler <'a> {
             ASTNodeType::IdentifierLiteral(var_name) => {
                 let comet_var = self.get_variable(&var_name.as_str()).ok_or(format!("Use of undefined variable '{}'", var_name)).unwrap();
 
+                if let Some(func_id) = comet_var.function_id {
+                    let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+                    let pointer_type = self.module.isa().frontend_config().pointer_type();
+                    return Ok(builder.ins().func_addr(pointer_type, func_ref));
+                }
+
                 match comet_var.var_type {
                     CometVarType::Local(var) => Ok(builder.use_var(var)),
                     CometVarType::FuncArg(index) => {
@@ -210,19 +219,37 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::FuncCall { left, args } => {
-                let func = self.get_func_from_expr(left, builder)?;
+                let func_ptr = self.visit_value(left, builder)?;
+
+                println!("{}", func_ptr);
 
                 let mut compiled_args: Vec<ir::Value> = vec![];
                 for arg in args {
                     compiled_args.push(self.visit_value(arg, builder)?);
                 }
 
-                let call_inst = builder.ins().call(func, &compiled_args);
+                let func_id = match left.node_type() {
+                    ASTNodeType::IdentifierLiteral(name) => self.get_variable(name)
+                        .and_then(|variable| variable.function_id)
+                        .ok_or(format!("'{}' is not a callable function", name))?,
+                    _ => return Err("Function calls require a function identifier".to_string())
+                };
+
+                let decls = self.module.declarations();
+                let func_decl_cell = RefCell::new(decls.get_function_decl(func_id));
+                let func_decl = func_decl_cell.borrow();
+
+                let sig = func_decl.signature.clone();
+                println!("calling func (func_id: {}, sig: {})", func_id, sig);
+
+                let sig_ref = builder.import_signature(sig);
+
+                println!("func ptr = {}", func_ptr);
+                let call_inst = builder.ins().call_indirect(sig_ref, func_ptr, &compiled_args);
                 let results = builder.inst_results(call_inst);
 
-                println!("{:?}", func);
-
                 Ok(results[0])
+                
             },
 
             _ => Err(format!("Cannot compile r-value '{:?}'", node.node_type()))
@@ -277,9 +304,6 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
-        
-        self.scopes.push(ScopeFrame::new());
-
         let mut builder_context = FunctionBuilderContext::new();
 
         for (i, arg) in func_args.iter().enumerate() {
@@ -299,7 +323,8 @@ impl <'a> Compiler <'a> {
             self.scopes.last_mut().unwrap().variables.insert(arg_name, CometVariable {
                 type_: arg_type,
                 var_type: CometVarType::FuncArg(i),
-                mutable: false
+                mutable: false,
+                function_id: None
             });
         }
 
@@ -315,6 +340,7 @@ impl <'a> Compiler <'a> {
 
         let mut ctx = self.module.make_context();
         ctx.func.signature = sig;
+        ctx.func.name = ir::UserFuncName::user(0, func_id.as_u32());
 
         // build body of function //
         let mut builder = FunctionBuilder::new(&mut ctx.func, &mut builder_context);
@@ -322,6 +348,25 @@ impl <'a> Compiler <'a> {
         let entry_block = builder.create_block();
         builder.append_block_params_for_function_params(entry_block);
         builder.switch_to_block(entry_block);
+
+        let target_config = self.module.isa().frontend_config();
+
+        let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+        let func_addr = builder.ins().func_addr(target_config.pointer_type(), func_ref);
+
+        let func_var = Variable::from_u32(self.var_index);
+        builder.declare_var(target_config.pointer_type());
+        builder.def_var(func_var, func_addr);
+
+        println!("{}, {}", func_addr, func_id);
+
+        self.scopes.last_mut().unwrap().variables.insert(name, CometVariable {
+            type_: CometType { cranelift_type: target_config.pointer_type() },
+            var_type: Local(func_var),
+            mutable: false,
+            function_id: Some(func_id)
+        });
+        self.scopes.push(ScopeFrame::new());
 
         // generate code
         let result = (|| {
@@ -333,16 +378,13 @@ impl <'a> Compiler <'a> {
 
         builder.seal_block(entry_block);
 
-        let target_config = self.module.isa().frontend_config();
         
         // finalize func
         builder.finalize(target_config);
 
-        
+       
 
         println!("=== BUILT FUNCTION ===\n{}", ctx.func);
-
-        self.scopes.last_mut().unwrap().functions.insert(name, func_id);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
@@ -425,10 +467,17 @@ impl <'a> Compiler <'a> {
         builder.declare_var(final_type.cranelift_type);
         builder.def_var(new_variable, value);
 
+        let function_id = match value_node.node_type() {
+            ASTNodeType::IdentifierLiteral(name) => self.get_variable(name)
+                .and_then(|variable| variable.function_id),
+            _ => None
+        };
+
         let comet_var = CometVariable {
             type_: final_type.clone(),
             var_type: CometVarType::Local(new_variable),
-            mutable: true
+            mutable: true,
+            function_id
         };
 
         self.scopes.last_mut().unwrap().variables.insert(ident.as_str(), comet_var);

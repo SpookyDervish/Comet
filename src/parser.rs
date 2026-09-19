@@ -240,9 +240,8 @@ impl Parser {
         self.advance_token();
 
         let value = self.parse_expression(PrecedenceType::Lowest)?;
-            self.advance_token();
+        self.advance_token();
 
-        
         Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(ident), type_: type_, value: Box::new(value) }))
     }
     // END OF STATEMENT METHODS //

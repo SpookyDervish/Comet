@@ -3,7 +3,7 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift::prelude::InstBuilder;
 use cranelift_native::builder;
 
-#[derive(Clone, Eq)]
+#[derive(Clone, Eq, Debug)]
 pub struct CometType {
     pub cranelift_type: types::Type
 }
