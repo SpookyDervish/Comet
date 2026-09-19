@@ -221,8 +221,6 @@ impl <'a> Compiler <'a> {
             ASTNodeType::FuncCall { left, args } => {
                 let func_ptr = self.visit_value(left, builder)?;
 
-                println!("{}", func_ptr);
-
                 let mut compiled_args: Vec<ir::Value> = vec![];
                 for arg in args {
                     compiled_args.push(self.visit_value(arg, builder)?);
@@ -240,11 +238,8 @@ impl <'a> Compiler <'a> {
                 let func_decl = func_decl_cell.borrow();
 
                 let sig = func_decl.signature.clone();
-                println!("calling func (func_id: {}, sig: {})", func_id, sig);
-
                 let sig_ref = builder.import_signature(sig);
 
-                println!("func ptr = {}", func_ptr);
                 let call_inst = builder.ins().call_indirect(sig_ref, func_ptr, &compiled_args);
                 let results = builder.inst_results(call_inst);
 
@@ -357,8 +352,6 @@ impl <'a> Compiler <'a> {
         let func_var = Variable::from_u32(self.var_index);
         builder.declare_var(target_config.pointer_type());
         builder.def_var(func_var, func_addr);
-
-        println!("{}, {}", func_addr, func_id);
 
         self.scopes.last_mut().unwrap().variables.insert(name, CometVariable {
             type_: CometType { cranelift_type: target_config.pointer_type() },
