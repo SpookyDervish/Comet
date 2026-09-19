@@ -122,7 +122,6 @@ impl Parser {
         let mut statements: Vec<ASTNode> = Vec::new();
 
         while !self.current_token_is(&TokenType::CloseCurly) {
-            println!("current token: {:?}", self.current_token().unwrap());
             statements.push(self.parse_statement()?);
         }
 
@@ -257,29 +256,44 @@ impl Parser {
 
         self.advance_token(); // skip '{'
 
+        let mut default_branch: Option<Box<ASTNode>> = None;
+
         loop {
             let mut expressions: Vec<ASTNode> = vec![];
 
-            loop {
-                let node_expr = self.parse_expression(PrecedenceType::Lowest)?;
-                expressions.push(node_expr);
+            // default branch
+            if self.current_token_is(&TokenType::Default) {
+                let block = self.parse_block_statement()?;
 
-                if self.peek_token_is(&TokenType::OpenCurly) {
-                    break;
+                default_branch = Some(Box::new(block));
+            } else { // expressions
+                loop {
+                    let node_expr = self.parse_expression(PrecedenceType::Lowest)?;
+                    expressions.push(node_expr);
+
+                    
+
+                    if self.peek_token_is(&TokenType::OpenCurly) {
+                        break;
+                    }
+
+                    self.expect_peek(TokenType::Or)?;
+
+                    self.advance_token(); // skip 'or'
                 }
 
-                self.expect_peek(TokenType::Or)?;
+                let block = self.parse_block_statement()?;
 
-                self.advance_token(); // skip 'or'
+
+
+                nodes.push(ASTNode::new(ASTNodeType::MatchNode { expressions: expressions, block: Box::new(block) }));
+
             }
 
-
-            let block = self.parse_block_statement()?;
-
+            
 
 
-            nodes.push(ASTNode::new(ASTNodeType::MatchNode { expressions: expressions, block: Box::new(block) }));
-
+            
             if self.peek_token_is(&TokenType::CloseCurly) {
                 break;
             }
@@ -292,7 +306,7 @@ impl Parser {
         self.expect_peek(TokenType::CloseCurly)?;
         self.advance_token(); // skip extra '}'
 
-        Ok(ASTNode::new(ASTNodeType::MatchStatement { expr: Box::new(match_expr), nodes: nodes }))
+        Ok(ASTNode::new(ASTNodeType::MatchStatement { expr: Box::new(match_expr), nodes: nodes, default: default_branch }))
     }
     // END OF STATEMENT METHODS //
 

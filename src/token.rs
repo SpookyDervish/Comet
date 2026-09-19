@@ -7,7 +7,7 @@ pub enum TokenType {
     Identifier(String),
 
     // keywords,
-    Fun, Ret, Match,
+    Fun, Ret, Match, Default,
 
     // symbols
     Plus, Minus, Times, Divide, Eq,
@@ -42,6 +42,7 @@ impl TokenType {
             "fun" => Some(TokenType::Fun),
             "ret" => Some(TokenType::Ret),
             "match" => Some(TokenType::Match),
+            "default" => Some(TokenType::Default),
 
             "or" => Some(TokenType::Or),
             "and" => Some(TokenType::And),

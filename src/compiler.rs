@@ -486,13 +486,14 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_match_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
-        let (expr_node, match_nodes) = match node.node_type() {
-            ASTNodeType::MatchStatement { expr, nodes } => (expr, nodes),
+        let (expr_node, match_nodes, default_branch) = match node.node_type() {
+            ASTNodeType::MatchStatement { expr, nodes, default } => (expr, nodes, default),
             _ => unreachable!()
         };
 
         let expr = self.visit_value(expr_node, builder)?;
         let end_block = builder.create_block();
+        let default_block = default_branch.as_ref().map(|_| builder.create_block()); // only create a block if the default_branch exists
 
         let mut compare_block = builder.current_block().unwrap();
 
@@ -518,7 +519,7 @@ impl <'a> Compiler <'a> {
                 } else if arm_index + 1 < match_nodes.len() {
                     builder.create_block()
                 } else {
-                    end_block
+                    default_block.unwrap_or(end_block)
                 };
 
                 builder.ins().brif(is_equal, arm_block, &[], false_block, &[]);
@@ -545,10 +546,28 @@ impl <'a> Compiler <'a> {
             builder.seal_block(arm_block);
         }
 
+        if let Some(default_branch) = default_branch {
+            let default_block = default_block.unwrap();
+            builder.switch_to_block(default_block);
+
+            self.compile(default_branch, Some(builder))?;
+
+            let default_is_terminated = builder
+                    .func
+                    .layout
+                    .last_inst(default_block)
+                    .map(|inst| builder.func.dfg.insts[inst].opcode().is_terminator())
+                    .unwrap_or(false);
+
+            if !default_is_terminated {
+                builder.ins().jump(end_block, &[]);
+            }
+
+            builder.seal_block(default_block);
+        }
+
         builder.switch_to_block(end_block);
         builder.ensure_inserted_block();
-
-        println!("{}", builder.func);
 
         Ok(())
     }
@@ -563,7 +582,7 @@ impl <'a> Compiler <'a> {
             ASTNodeType::ExpressionStatement(_) => { return self.visit_expression_statement(ast, builder.unwrap()); },
             ASTNodeType::ReturnStatement(_) => { return self.visit_ret_statement(ast, builder.unwrap()); }
             ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
-            ASTNodeType::MatchStatement { expr: _, nodes: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
+            ASTNodeType::MatchStatement { expr: _, nodes: _, default: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))

@@ -14,7 +14,7 @@ pub enum ASTNodeType {
     FuncDefinitionStatement { name: Box<ASTNode>, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
     ReturnStatement(Option<Box<ASTNode>>),
     AssignStatement { ident: Box<ASTNode>, type_: Option<Box<ASTNode>>, value: Box<ASTNode> },
-    MatchStatement { expr: Box<ASTNode>, nodes: Vec<ASTNode> },
+    MatchStatement { expr: Box<ASTNode>, nodes: Vec<ASTNode>, default: Option<Box<ASTNode>> },
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
