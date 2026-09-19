@@ -75,6 +75,7 @@ impl Parser {
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
             TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
+            TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
         }
     }

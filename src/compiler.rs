@@ -1,7 +1,8 @@
+use cranelift_codegen::entity::EntityRef;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, Function, InstBuilder, Type, UserFuncName, types};
+use cranelift_codegen::ir::{self, FuncRef, InstBuilder, MemFlags, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
@@ -62,6 +63,10 @@ impl <'a> Compiler <'a> {
 
     fn get_type(&self, name: &str) -> Option<&CometType> {
         self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
+    }
+
+    fn get_function(&self, name: &str) -> Option<&FuncId> {
+        self.scopes.iter().rev().find_map(|scope| scope.functions.get(name))
     }
 
     fn get_type_literal_type <'b> (&'b self, node: &'b ASTNode) -> Result<&'b CometType, String> {
@@ -136,6 +141,21 @@ impl <'a> Compiler <'a> {
             _ => Err(format!("Can't resolve type of '{:?}'", node.node_type()))
         }
     }
+
+    fn get_func_from_expr(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<FuncRef, String> {
+        match node.node_type() {
+            ASTNodeType::IdentifierLiteral(name) => {
+                let func = self.get_function(&name.as_str());
+                if func.is_none() {
+                    return Err(format!("Undefined function {}", name));
+                }
+
+                Ok(self.module.declare_func_in_func(*func.unwrap(), builder.func))
+            },
+
+            _ => Err(format!("Cannot get function from {:?}", node.node_type()))
+        }
+    }
     // END OF UTIL METHODS
 
     // VISIT METHODS //
@@ -167,7 +187,7 @@ impl <'a> Compiler <'a> {
 
     fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
         match node.node_type() {
-            ASTNodeType::InfixExpression { left, op, right } => self.visit_infix_expression(node, builder),
+            ASTNodeType::InfixExpression { left: _, op: _, right: _ } => self.visit_infix_expression(node, builder),
 
             ASTNodeType::IntLiteral(num) => {
                 Ok(builder.ins().iconst(types::I64, *num as i64))
@@ -185,10 +205,24 @@ impl <'a> Compiler <'a> {
                     CometVarType::FuncArg(index) => {
                         let params = builder.block_params(builder.current_block().unwrap());
                         Ok(params[index])
-                    },
-                    _ => unreachable!()
+                    }
+                }  
+            },
+
+            ASTNodeType::FuncCall { left, args } => {
+                let func = self.get_func_from_expr(left, builder)?;
+
+                let mut compiled_args: Vec<ir::Value> = vec![];
+                for arg in args {
+                    compiled_args.push(self.visit_value(arg, builder)?);
                 }
-                
+
+                let call_inst = builder.ins().call(func, &compiled_args);
+                let results = builder.inst_results(call_inst);
+
+                println!("{:?}", func);
+
+                Ok(results[0])
             },
 
             _ => Err(format!("Cannot compile r-value '{:?}'", node.node_type()))
@@ -233,7 +267,7 @@ impl <'a> Compiler <'a> {
 
         let mut sig = self.module.make_signature();
 
-        let (name_node, funcArgs, return_type_optional, body) = match node.node_type() {
+        let (name_node, func_args, return_type_optional, body) = match node.node_type() {
             ASTNodeType::FuncDefinitionStatement {name, args, return_type, body } => (name, args, return_type, body),
             _ => unreachable!()
         };
@@ -246,11 +280,9 @@ impl <'a> Compiler <'a> {
         
         self.scopes.push(ScopeFrame::new());
 
-        let func_id = self.module.declare_function(name, Linkage::Export, &sig).unwrap();
-
         let mut builder_context = FunctionBuilderContext::new();
 
-        for (i, arg) in funcArgs.iter().enumerate() {
+        for (i, arg) in func_args.iter().enumerate() {
             let (arg_name_node, arg_type_node)= match arg.node_type() {
                 ASTNodeType::FuncArgDefinition { name, type_ } => (name, type_),
                 _ => unreachable!()
@@ -279,11 +311,13 @@ impl <'a> Compiler <'a> {
             
         }
 
+        let func_id = self.module.declare_function(name, Linkage::Export, &sig).unwrap();
+
         let mut ctx = self.module.make_context();
         ctx.func.signature = sig;
 
+        // build body of function //
         let mut builder = FunctionBuilder::new(&mut ctx.func, &mut builder_context);
-        
 
         let entry_block = builder.create_block();
         builder.append_block_params_for_function_params(entry_block);
@@ -299,12 +333,16 @@ impl <'a> Compiler <'a> {
 
         builder.seal_block(entry_block);
 
-        
-
         let target_config = self.module.isa().frontend_config();
+        
+        // finalize func
         builder.finalize(target_config);
 
+        
+
         println!("=== BUILT FUNCTION ===\n{}", ctx.func);
+
+        self.scopes.last_mut().unwrap().functions.insert(name, func_id);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
