@@ -33,7 +33,7 @@ fn main() -> std::io::Result<()> {
     let mut parser = parser::Parser::new(tokens);
     let ast = parser.parse().unwrap();
 
-    //println!("{:#?}", ast);
+    println!("{:#?}", ast);
 
     let mut compiler = compiler::Compiler::new().unwrap();
     compiler.compile(&ast, None).unwrap();

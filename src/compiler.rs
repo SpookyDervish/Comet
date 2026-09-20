@@ -1,7 +1,7 @@
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::isa::CallConv;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, InstBuilder, Signature, Value, types};
+use cranelift_codegen::ir::{self, Block, InstBuilder, Signature, Value, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
@@ -393,6 +393,7 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_ret_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+        println!("return stmt: {:?}", node);
         let ret_value_node = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
@@ -532,13 +533,7 @@ impl <'a> Compiler <'a> {
 
             self.compile(match_block, Some(builder))?;
 
-            let arm_is_terminated = builder
-                    .func
-                    .layout
-                    .last_inst(arm_block)
-                    .map(|inst| builder.func.dfg.insts[inst].opcode().is_terminator())
-                    .unwrap_or(false);
-
+            let arm_is_terminated = self.block_is_terminated(arm_block, builder);
             if !arm_is_terminated {
                 builder.ins().jump(end_block, &[]);
             }
@@ -552,13 +547,7 @@ impl <'a> Compiler <'a> {
 
             self.compile(default_branch, Some(builder))?;
 
-            let default_is_terminated = builder
-                    .func
-                    .layout
-                    .last_inst(default_block)
-                    .map(|inst| builder.func.dfg.insts[inst].opcode().is_terminator())
-                    .unwrap_or(false);
-
+            let default_is_terminated = self.block_is_terminated(default_block, builder);
             if !default_is_terminated {
                 builder.ins().jump(end_block, &[]);
             }
@@ -568,6 +557,67 @@ impl <'a> Compiler <'a> {
 
         builder.switch_to_block(end_block);
         builder.ensure_inserted_block();
+
+        Ok(())
+    }
+
+    fn block_is_terminated(&self, block: Block, builder: &mut FunctionBuilder) -> bool {
+        let is_terminated = builder
+                    .func
+                    .layout
+                    .last_inst(block)
+                    .map(|inst| builder.func.dfg.insts[inst].opcode().is_terminator())
+                    .unwrap_or(false);
+
+        return is_terminated;
+    }
+
+    fn visit_if_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+        let (expr_node, body_node, else_body) = match node.node_type() {
+            ASTNodeType::IfStatement { expr, body, else_body } => (expr, body, else_body),
+            _ => unreachable!()
+        };
+
+        let expr = self.visit_value(expr_node, builder)?;
+
+        let then_block = builder.create_block();
+        let else_block = builder.create_block();
+        let end_block;
+        if else_body.is_some() {
+            end_block = builder.create_block();
+        } else {
+            end_block = else_block;
+        }
+
+        builder.ins().brif(expr, then_block, &[], else_block, &[]);
+        builder.seal_block(builder.current_block().unwrap());
+
+        builder.switch_to_block(then_block);
+        builder.ensure_inserted_block();
+        self.compile(body_node, Some(builder))?;
+
+        let then_block_terminated = self.block_is_terminated(then_block, builder);
+        if !then_block_terminated {
+            builder.ins().jump(end_block, &[]);
+        }
+
+        builder.seal_block(then_block);
+
+        builder.switch_to_block(else_block);
+        if else_body.is_some() {
+            self.compile(else_body.as_ref().unwrap(), Some(builder))?;
+
+            let else_block_terminated = self.block_is_terminated(else_block, builder);
+            if !else_block_terminated {
+                builder.ins().jump(end_block, &[]);
+            }
+
+            builder.seal_block(else_block);
+            builder.switch_to_block(end_block);
+            builder.ensure_inserted_block();
+        }
+
+        println!("{}", builder.func);
 
         Ok(())
     }
@@ -583,6 +633,7 @@ impl <'a> Compiler <'a> {
             ASTNodeType::ReturnStatement(_) => { return self.visit_ret_statement(ast, builder.unwrap()); }
             ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
             ASTNodeType::MatchStatement { expr: _, nodes: _, default: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
+            ASTNodeType::IfStatement { expr: _, body: _, else_body: _ } => { return self.visit_if_statement(ast, builder.unwrap()) },
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))

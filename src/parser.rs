@@ -98,6 +98,7 @@ impl Parser {
             TokenType::Fun => self.parse_func_def_statement(),
             TokenType::Ret => self.parse_ret_statement(),
             TokenType::Match => self.parse_match_statement(),
+            TokenType::If => self.parse_if_statement(),
 
             TokenType::Identifier(_) => self.parse_assign_statement(),
 
@@ -307,6 +308,31 @@ impl Parser {
         self.advance_token(); // skip extra '}'
 
         Ok(ASTNode::new(ASTNodeType::MatchStatement { expr: Box::new(match_expr), nodes: nodes, default: default_branch }))
+    }
+
+    fn parse_if_statement(&mut self) -> Result<ASTNode, String> {
+        self.advance_token(); // skip 'if'
+
+        let expr = self.parse_expression(PrecedenceType::Lowest)?;
+        let body = self.parse_block_statement()?;
+
+
+        let mut else_body: Option<Box<ASTNode>> = None;
+
+        if self.peek_token_is(&TokenType::Else) {
+            self.advance_token();
+
+            if self.peek_token_is(&TokenType::OpenCurly) {
+                else_body = Some(Box::new(self.parse_block_statement()?));
+            } else {
+                self.expect_peek(TokenType::If)?;
+                else_body = Some(Box::new(self.parse_if_statement()?));
+            }
+        }
+
+        self.advance_token();
+
+        Ok(ASTNode::new(ASTNodeType::IfStatement { expr: Box::new(expr), body: Box::new(body), else_body: else_body }))
     }
     // END OF STATEMENT METHODS //
 
