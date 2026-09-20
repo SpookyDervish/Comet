@@ -3,23 +3,28 @@ use cranelift_frontend::FunctionBuilder;
 use cranelift::prelude::InstBuilder;
 use cranelift_native::builder;
 
+use crate::comet_struct::CometStruct;
+
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
     pub cranelift_type: types::Type,
-    pub signed: bool
+    pub signed: bool,
+    pub comet_struct: Option<CometStruct>
 }
 
 impl CometType {
     pub fn new(cranelift_type: types::Type) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            signed: false
+            signed: false,
+            comet_struct: None
         }
     }
     pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            signed: signed
+            signed: signed,
+            comet_struct: None
         }
     }
 

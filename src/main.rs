@@ -8,6 +8,7 @@ mod parser;
 mod compiler;
 mod scope;
 mod comet_type;
+mod comet_struct;
 
 use std::fs;
 use std::io::Write;
@@ -23,6 +24,7 @@ struct CLIArgs {
 }
 
 fn main() -> std::io::Result<()> {
+
     let args = CLIArgs::parse();
 
     let source = fs::read_to_string(args.input)?;

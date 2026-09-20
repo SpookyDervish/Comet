@@ -1,13 +1,14 @@
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::isa::CallConv;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, Block, InstBuilder, Signature, Value, types};
+use cranelift_codegen::ir::{self, ArgumentPurpose, Block, InstBuilder, Signature, StackSlotData, StackSlotKind, Value, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_native::builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use std::cell::RefCell;
 
+use crate::comet_struct::{CometStruct, CometStructField};
 use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
@@ -74,7 +75,7 @@ impl <'a> Compiler <'a> {
         self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
     }
 
-    fn get_type_literal_type <'b> (&'b self, node: &'b ASTNode) -> Result<&'b CometType, String> {
+    fn get_type_literal_type (&self, node: &ASTNode) -> Result<&CometType, String> {
         let ident_node = match node.node_type() {
             ASTNodeType::TypeLiteral(value) => &**value,
             _ => unreachable!()
@@ -130,17 +131,11 @@ impl <'a> Compiler <'a> {
     fn resolve_type(&self, node: &ASTNode) -> Result<CometType, String> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
-                Ok(CometType {
-                    cranelift_type: types::I64,
-                    signed: false
-                })
+                Ok(CometType::new_int(types::I64, false))
             },
 
             ASTNodeType::FloatLiteral(_) => {
-                Ok(CometType {
-                    cranelift_type: types::F64,
-                    signed: false
-                })
+                Ok(CometType::new(types::F64))
             },
 
             ASTNodeType::IdentifierLiteral(name) => {
@@ -153,11 +148,11 @@ impl <'a> Compiler <'a> {
                 let left_value = self.resolve_type(left)?;
 
                 match op.token_type() {
-                    TokenType::Divide => { return Ok(CometType { cranelift_type: types::F64, signed: false }); },
+                    TokenType::Divide => { return Ok(CometType::new(types::F64)); },
 
                     TokenType::Eq | TokenType::NotEq |
                     TokenType::Gt | TokenType::Lt |
-                    TokenType::GtEq | TokenType::LtEq => { return Ok(CometType { cranelift_type: types::I8, signed: false }); },
+                    TokenType::GtEq | TokenType::LtEq => { return Ok(CometType::new_int(types::I8, false)); },
 
 
                     _ => {}
@@ -182,7 +177,7 @@ impl <'a> Compiler <'a> {
                 }*/
 
                 // TODO:
-                let out_type = CometType { cranelift_type: types::I64, signed: true };
+                let out_type = CometType::new_int(types::I64, true);
 
                 Ok(out_type)
             }
@@ -409,12 +404,22 @@ impl <'a> Compiler <'a> {
         builder.def_var(func_var, func_addr);
 
         self.scopes.last_mut().unwrap().variables.insert(name, CometVariable {
-            type_: CometType { cranelift_type: target_config.pointer_type(), signed: false },
+            type_: CometType::new(target_config.pointer_type()),
             var_type: Local(func_var),
             mutable: false,
             function_id: Some(func_id)
         });
         self.scopes.push(ScopeFrame::new());
+
+        // for testing
+        let field_x = CometStructField::new(String::from("x"), CometType::new_int(types::I32, false));
+        let field_y = CometStructField::new(String::from("y"), CometType::new_int(types::I32, false));
+        let field_z = CometStructField::new(String::from("z"), CometType::new_int(types::I32, false));
+        let my_struct = CometStruct::new(String::from("TestStruct"), vec![field_x, field_y, field_z]);
+        println!("{:?}", my_struct.get_layout());
+        let layout = my_struct.get_layout();
+
+        let struct_slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, layout.1, 24));
 
         // generate code
         let result = (|| {
@@ -682,10 +687,8 @@ impl <'a> Compiler <'a> {
 
         self.compile(body_node, Some(builder))?;
 
-        println!("{}", builder.func);
         builder.ins().jump(compare_block, &[]);
         builder.seal_block(compare_block);
-
 
         builder.seal_block(body_block);
         builder.switch_to_block(end_block);
