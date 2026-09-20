@@ -393,7 +393,6 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_ret_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
-        println!("return stmt: {:?}", node);
         let ret_value_node = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
@@ -582,12 +581,7 @@ impl <'a> Compiler <'a> {
 
         let then_block = builder.create_block();
         let else_block = builder.create_block();
-        let end_block;
-        if else_body.is_some() {
-            end_block = builder.create_block();
-        } else {
-            end_block = else_block;
-        }
+        let end_block = else_body.as_ref().map(|_| builder.create_block()).unwrap_or(else_block);
 
         builder.ins().brif(expr, then_block, &[], else_block, &[]);
         builder.seal_block(builder.current_block().unwrap());
@@ -616,8 +610,6 @@ impl <'a> Compiler <'a> {
             builder.switch_to_block(end_block);
             builder.ensure_inserted_block();
         }
-
-        println!("{}", builder.func);
 
         Ok(())
     }
