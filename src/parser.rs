@@ -75,6 +75,7 @@ impl Parser {
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
             TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
+
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
         }
@@ -86,6 +87,12 @@ impl Parser {
             TokenType::Minus => Some(Parser::parse_infix_expression),
             TokenType::Times => Some(Parser::parse_infix_expression),
             TokenType::Divide => Some(Parser::parse_infix_expression),
+            TokenType::EqEq => Some(Parser::parse_infix_expression),
+            TokenType::NotEq => Some(Parser::parse_infix_expression),
+            TokenType::Lt => Some(Parser::parse_infix_expression),
+            TokenType::Gt => Some(Parser::parse_infix_expression),
+            TokenType::LtEq => Some(Parser::parse_infix_expression),
+            TokenType::GtEq => Some(Parser::parse_infix_expression),
             TokenType::OpenParen => Some(Parser::parse_func_call),
             _ => None
         }
@@ -99,6 +106,7 @@ impl Parser {
             TokenType::Ret => self.parse_ret_statement(),
             TokenType::Match => self.parse_match_statement(),
             TokenType::If => self.parse_if_statement(),
+            TokenType::While => self.parse_while_statement(),
 
             TokenType::Identifier(_) => self.parse_assign_statement(),
 
@@ -333,6 +341,17 @@ impl Parser {
         self.advance_token();
 
         Ok(ASTNode::new(ASTNodeType::IfStatement { expr: Box::new(expr), body: Box::new(body), else_body: else_body }))
+    }
+
+    fn parse_while_statement(&mut self) -> Result<ASTNode, String> {
+        self.advance_token(); // skip 'while'
+
+        let expr = self.parse_expression(PrecedenceType::Lowest)?;
+        let body = self.parse_block_statement()?;
+
+        self.advance_token();
+
+        Ok(ASTNode::new(ASTNodeType::WhileStatement { expr: Box::new(expr), body: Box::new(body) }))
     }
     // END OF STATEMENT METHODS //
 

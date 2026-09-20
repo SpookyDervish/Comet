@@ -5,19 +5,32 @@ use cranelift_native::builder;
 
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
-    pub cranelift_type: types::Type
+    pub cranelift_type: types::Type,
+    pub signed: bool
 }
 
 impl CometType {
     pub fn new(cranelift_type: types::Type) -> Self {
         CometType { 
-            cranelift_type: cranelift_type
+            cranelift_type: cranelift_type,
+            signed: false
+        }
+    }
+    pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
+        CometType { 
+            cranelift_type: cranelift_type,
+            signed: signed
         }
     }
 
-    pub fn try_implicit_cast(value: Value, target_type: &CometType, builder: &mut FunctionBuilder) -> Result<Value, String> {
-        let value_type = builder.func.dfg.value_type(value);
+    pub fn try_implicit_cast(value: Value, value_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder) -> Result<Value, String> {
         let their_type = target_type.cranelift_type;
+
+        if value_type == target_type {
+            return Ok(value);
+        }
+
+        let value_type = value_type.cranelift_type;
 
         let out: Value;
         if value_type.is_int() && their_type.is_int() {
@@ -46,7 +59,7 @@ impl PartialEq for CometType {
         let parent_type = self.cranelift_type;
         let child_type = other.cranelift_type;
 
-        if (parent_type.is_int() && child_type.is_int()) && parent_type.wider_or_equal(child_type) {
+        if ((parent_type.is_int() && child_type.is_int()) && parent_type.wider_or_equal(child_type)) && self.signed == other.signed {
             return true;
         }
 

@@ -109,8 +109,60 @@ impl<'file> Lexer<'file> {
                     self.consume();
                 }
                 '=' => {
-                    tokens.push(Token::new(TokenType::Eq, Range::from(&self.pos)));
+                    let mut range = Range::from(&self.pos);
                     self.consume();
+
+                    if self.current_char != '=' {
+                        tokens.push(Token::new(TokenType::Eq, range));
+                    } else {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::EqEq, range));
+                        self.consume();
+                    }
+                    
+                    
+                }
+                '!' => {
+                    let mut range = Range::from(&self.pos);
+                    self.consume();
+
+                    if self.current_char != '=' {
+                        tokens.push(Token::new(TokenType::Not, range));
+                    } else {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::NotEq, range));
+                        self.consume();
+                    }
+                    
+                    
+                }
+                '>' => {
+                    let mut range = Range::from(&self.pos);
+                    self.consume();
+
+                    if self.current_char != '=' {
+                        tokens.push(Token::new(TokenType::Gt, range));
+                    } else {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::GtEq, range));
+                        self.consume();
+                    }
+                    
+                    
+                }
+                '<' => {
+                    let mut range = Range::from(&self.pos);
+                    self.consume();
+
+                    if self.current_char != '=' {
+                        tokens.push(Token::new(TokenType::Lt, range));
+                    } else {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::LtEq, range));
+                        self.consume();
+                    }
+                    
+                    
                 }
                 '(' => {
                     tokens.push(Token::new(TokenType::OpenParen, Range::from(&self.pos)));

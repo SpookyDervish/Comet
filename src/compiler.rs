@@ -4,6 +4,7 @@ use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, Signature, Value, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
+use cranelift_native::builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use std::cell::RefCell;
 
@@ -33,10 +34,15 @@ impl <'a> Compiler <'a> {
 
         let mut base_frame = ScopeFrame::new();
 
-        base_frame.types.insert("i8", CometType::new(types::I8));
-        base_frame.types.insert("i16", CometType::new(types::I16));
-        base_frame.types.insert("i32", CometType::new(types::I32));
-        base_frame.types.insert("i64", CometType::new(types::I64));
+        base_frame.types.insert("bool", CometType::new(types::I8));
+        base_frame.types.insert("i8", CometType::new_int(types::I8, true));
+        base_frame.types.insert("i16", CometType::new_int(types::I16, true));
+        base_frame.types.insert("i32", CometType::new_int(types::I32, true));
+        base_frame.types.insert("i64", CometType::new_int(types::I64, true));
+        base_frame.types.insert("u8", CometType::new_int(types::I8, false));
+        base_frame.types.insert("u16", CometType::new_int(types::I16, false));
+        base_frame.types.insert("u32", CometType::new_int(types::I32, false));
+        base_frame.types.insert("u64", CometType::new_int(types::I64, false));
         base_frame.types.insert("f16", CometType::new(types::F16));
         base_frame.types.insert("f32", CometType::new(types::F32));
         base_frame.types.insert("f64", CometType::new(types::F64));
@@ -104,17 +110,36 @@ impl <'a> Compiler <'a> {
         }
     }
 
+    fn ensure_share_types(&mut self, left: &ASTNode, right: &ASTNode, builder: &mut FunctionBuilder) -> Result<(ir::Value, ir::Value), String> {
+        let mut left_value = self.visit_value(left, builder)?;
+        let mut right_value = self.visit_value(right, builder)?;
+
+        let left_type = self.resolve_type(left)?;
+        let right_type = self.resolve_type(right)?;
+
+        let unified_type = self.unify_types(&left_type, &right_type);
+
+        if left_type != right_type {
+            left_value = CometType::try_implicit_cast(left_value, &left_type, unified_type, builder)?;
+            right_value = CometType::try_implicit_cast(right_value, &right_type, unified_type, builder)?;
+        }
+
+        Ok((left_value, right_value))
+    }
+
     fn resolve_type(&self, node: &ASTNode) -> Result<CometType, String> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
                 Ok(CometType {
-                    cranelift_type: types::I64
+                    cranelift_type: types::I64,
+                    signed: false
                 })
             },
 
             ASTNodeType::FloatLiteral(_) => {
                 Ok(CometType {
-                    cranelift_type: types::F64
+                    cranelift_type: types::F64,
+                    signed: false
                 })
             },
 
@@ -128,7 +153,12 @@ impl <'a> Compiler <'a> {
                 let left_value = self.resolve_type(left)?;
 
                 match op.token_type() {
-                    TokenType::Divide => { return Ok(CometType { cranelift_type: types::F64 }); },
+                    TokenType::Divide => { return Ok(CometType { cranelift_type: types::F64, signed: false }); },
+
+                    TokenType::Eq | TokenType::NotEq |
+                    TokenType::Gt | TokenType::Lt |
+                    TokenType::GtEq | TokenType::LtEq => { return Ok(CometType { cranelift_type: types::I8, signed: false }); },
+
 
                     _ => {}
                 }
@@ -152,7 +182,7 @@ impl <'a> Compiler <'a> {
                 }*/
 
                 // TODO:
-                let out_type = CometType { cranelift_type: types::I64 };
+                let out_type = CometType { cranelift_type: types::I64, signed: true };
 
                 Ok(out_type)
             }
@@ -258,8 +288,7 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
-        let left_side = self.visit_value(left, builder)?;
-        let right_side = self.visit_value(right, builder)?;
+        let (left_side, right_side) = self.ensure_share_types(&left, &right, builder)?;
 
         let out: ir::Value;
         match op.token_type() {
@@ -271,6 +300,25 @@ impl <'a> Compiler <'a> {
             },
             TokenType::Times => {
                 out = builder.ins().imul(left_side, right_side);
+            },
+
+            TokenType::EqEq => {
+                out = builder.ins().icmp(IntCC::Equal, left_side, right_side);
+            },
+            TokenType::NotEq => {
+                out = builder.ins().icmp(IntCC::NotEqual, left_side, right_side);
+            },
+            TokenType::Lt => {
+                out = builder.ins().icmp(IntCC::SignedLessThan, left_side, right_side);
+            },
+            TokenType::Gt => {
+                out = builder.ins().icmp(IntCC::SignedGreaterThan, left_side, right_side);
+            },
+            TokenType::LtEq => {
+                out = builder.ins().icmp(IntCC::SignedLessThanOrEqual, left_side, right_side);
+            },
+            TokenType::GtEq => {
+                out = builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, left_side, right_side);
             },
 
             _ => {
@@ -361,7 +409,7 @@ impl <'a> Compiler <'a> {
         builder.def_var(func_var, func_addr);
 
         self.scopes.last_mut().unwrap().variables.insert(name, CometVariable {
-            type_: CometType { cranelift_type: target_config.pointer_type() },
+            type_: CometType { cranelift_type: target_config.pointer_type(), signed: false },
             var_type: Local(func_var),
             mutable: false,
             function_id: Some(func_id)
@@ -457,7 +505,7 @@ impl <'a> Compiler <'a> {
             let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
 
             if var_type != &value_type {
-                value = CometType::try_implicit_cast(value, &var_type, builder)?;
+                value = CometType::try_implicit_cast(value, &value_type, &var_type, builder)?;
                 final_type = var_type;
             } else {
                 final_type = self.unify_types(&final_type, &var_type);
@@ -613,6 +661,37 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
+    fn visit_while_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+        let (expr_node, body_node) = match node.node_type() {
+            ASTNodeType::WhileStatement { expr, body } => (expr, body),
+            _ => unreachable!()
+        };
+
+        let compare_block = builder.create_block();
+        let body_block = builder.create_block();
+        let end_block = builder.create_block();
+
+        builder.ins().jump(compare_block, &[]);
+        builder.seal_block(builder.current_block().unwrap());
+        builder.switch_to_block(compare_block);
+        let expr = self.visit_value(expr_node, builder)?;
+        builder.ins().brif(expr, body_block, &[], end_block, &[]);
+
+        builder.switch_to_block(body_block);
+
+        self.compile(body_node, Some(builder))?;
+
+        println!("{}", builder.func);
+        builder.ins().jump(compare_block, &[]);
+        builder.seal_block(compare_block);
+
+
+        builder.seal_block(body_block);
+        builder.switch_to_block(end_block);
+
+        Ok(())
+    }
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &'a ASTNode, builder: Option<&mut FunctionBuilder>) -> Result<(), String> {
@@ -626,6 +705,7 @@ impl <'a> Compiler <'a> {
             ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
             ASTNodeType::MatchStatement { expr: _, nodes: _, default: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
             ASTNodeType::IfStatement { expr: _, body: _, else_body: _ } => { return self.visit_if_statement(ast, builder.unwrap()) },
+            ASTNodeType::WhileStatement { expr: _, body: _ } => { return self.visit_while_statement(ast, builder.unwrap()); }
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))

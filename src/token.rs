@@ -7,12 +7,14 @@ pub enum TokenType {
     Identifier(String),
 
     // keywords,
-    Fun, Ret, Match, Default, If, Else,
+    Fun, Ret, Match, Default, If, Else, While,
 
     // symbols
     Plus, Minus, Times, Divide, Eq,
     OpenParen, CloseParen,
     OpenCurly, CloseCurly,
+    EqEq, NotEq, Gt, Lt, LtEq, GtEq,
+    Not,
     Colon, Comma, ColonColon,
     BitwiseOr, BitwiseAnd,
     Or, And,
@@ -31,6 +33,13 @@ impl TokenType {
             TokenType::Times => PrecedenceType::Product,
             TokenType::Divide => PrecedenceType::Product,
             TokenType::OpenParen => PrecedenceType::Call,
+
+            TokenType::EqEq => PrecedenceType::Equals,
+            TokenType::NotEq => PrecedenceType::Equals,
+            TokenType::Gt => PrecedenceType::LessGreater,
+            TokenType::Lt => PrecedenceType::LessGreater,
+            TokenType::GtEq => PrecedenceType::LessGreater,
+            TokenType::LtEq => PrecedenceType::LessGreater,
             _ => PrecedenceType::Lowest
         }
     }
@@ -43,6 +52,7 @@ impl TokenType {
             "default" => Some(TokenType::Default),
             "if" => Some(TokenType::If),
             "else" => Some(TokenType::Else),
+            "while" => Some(TokenType::While),
 
             "or" => Some(TokenType::Or),
             "and" => Some(TokenType::And),
