@@ -1,4 +1,5 @@
 use std::cmp;
+use std::collections::HashMap;
 
 use crate::comet_type::CometType;
 
@@ -11,7 +12,8 @@ pub struct CometStructField {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct CometStruct {
     name: String,
-    fields: Vec<CometStructField>
+    fields: Vec<CometStructField>,
+    cached_fields: HashMap<String, usize>
 }
 
 impl CometStructField {
@@ -22,7 +24,21 @@ impl CometStructField {
 
 impl CometStruct {
     pub fn new(name: String, fields: Vec<CometStructField>) -> Self {
-        CometStruct { name: name, fields: fields }
+        let mut cached_fields = HashMap::new();
+
+        for (idx, field) in fields.iter().enumerate() {
+            cached_fields.insert(field.name.clone(), idx);
+        }
+
+        CometStruct { name: name, fields: fields, cached_fields: cached_fields }
+    }
+
+    pub fn name(&self) -> &str {
+        return &self.name;
+    }
+
+    pub fn get_field_index(&self, name: &str) -> Option<&usize> {
+        self.cached_fields.get(name)
     }
 
     /* returns field offsets and size of struct */

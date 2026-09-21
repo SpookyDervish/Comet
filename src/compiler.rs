@@ -1,7 +1,10 @@
+use cranelift_codegen::entity::EntityRef;
+use cranelift_codegen::gimli::NameAttributeValue::Offset;
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::isa::CallConv;
+use cranelift_codegen::isa::x64::external::offsets;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, ArgumentPurpose, Block, InstBuilder, Signature, StackSlotData, StackSlotKind, Value, types};
+use cranelift_codegen::ir::{self, ArgumentPurpose, Block, InstBuilder, MemFlags, MemFlagsData, Signature, StackSlotData, StackSlotKind, Value, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
 use cranelift_native::builder;
@@ -283,6 +286,7 @@ impl <'a> Compiler <'a> {
                 if struct_type.comet_struct.is_none() {
                     return Err(format!("Type '{:?}' is not a struct.", struct_type.cranelift_type));
                 }
+                let struct_type = struct_type.clone();
 
                 let comet_struct = struct_type.comet_struct.as_ref().unwrap();
                 let struct_layout = comet_struct.get_layout();
@@ -293,6 +297,32 @@ impl <'a> Compiler <'a> {
                     8
                 ));
                 let addr = builder.ins().stack_addr(types::I64, stack_slot, 0);
+
+                let fields_layout = struct_layout.0;
+
+                for field in fields {
+                    let (ident_node, value_node) = match field.node_type() {
+                        ASTNodeType::StructField { ident, value } => (ident, value),
+                        _ => unreachable!()
+                    };
+
+                    let field_name = match ident_node.node_type() {
+                        ASTNodeType::IdentifierLiteral(value) => value,
+                        _ => unreachable!()
+                    };
+
+                    let field_value = self.visit_value(&value_node, builder)?;
+
+                    let field_index = comet_struct.get_field_index(field_name);
+                    if field_index.is_none() {
+                        return Err(format!("No field with the name '{}' exists in the struct '{}'", field_name, comet_struct.name()));
+                    }
+                    let field_index = field_index.unwrap();
+
+                    let field_offset = fields_layout[*field_index];
+                    builder.ins().store(MemFlagsData::new(), field_value, addr, field_offset as i32);
+                }
+                
 
                 Ok(addr)
             },
