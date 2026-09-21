@@ -411,16 +411,6 @@ impl <'a> Compiler <'a> {
         });
         self.scopes.push(ScopeFrame::new());
 
-        // for testing
-        let field_x = CometStructField::new(String::from("x"), CometType::new_int(types::I32, false));
-        let field_y = CometStructField::new(String::from("y"), CometType::new_int(types::I32, false));
-        let field_z = CometStructField::new(String::from("z"), CometType::new_int(types::I32, false));
-        let my_struct = CometStruct::new(String::from("TestStruct"), vec![field_x, field_y, field_z]);
-        println!("{:?}", my_struct.get_layout());
-        let layout = my_struct.get_layout();
-
-        let struct_slot = builder.create_sized_stack_slot(StackSlotData::new(StackSlotKind::ExplicitSlot, layout.1, 24));
-
         // generate code
         let result = (|| {
             self.compile(body, Some(&mut builder))
@@ -727,8 +717,6 @@ impl <'a> Compiler <'a> {
 
         let new_struct = CometStruct::new(ident.clone(), fields);
         self.scopes.last_mut().unwrap().types.insert(ident, CometType::new_struct(new_struct));
-        
-        println!("{:#?}", self.scopes.last().unwrap().types);
 
         Ok(())
     }

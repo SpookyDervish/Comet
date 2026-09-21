@@ -74,7 +74,7 @@ impl Parser {
             // literals
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
-            TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
+            TokenType::Identifier(_) => Some(Parser::parse_ident_expr_start),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
@@ -464,7 +464,35 @@ impl Parser {
     }
 
     fn parse_struct_create_expr(&mut self) -> Result<ASTNode, String> {
+        let ident = self.parse_identifier_literal()?;
+        self.expect_peek(TokenType::OpenCurly)?;
+
+        let mut fields: Vec<ASTNode> = Vec::new();
+
+        while !self.peek_token_is(&TokenType::CloseCurly) {
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+            let field_ident = self.parse_identifier_literal()?;
+
+            self.expect_peek(TokenType::Colon)?;
+            self.advance_token();
+
+            let value = self.parse_expression(PrecedenceType::Lowest)?;
+
+            fields.push(ASTNode::new(ASTNodeType::StructField { ident: Box::new(field_ident), value: Box::new(value) }));
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            self.expect_peek(TokenType::CloseCurly)?;
+            self.advance_token();
+
+            break;
+        }
         
+
+        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields }))
     }
     // END OF EXPRESSION METHODS //
 
@@ -505,10 +533,6 @@ impl Parser {
     }
 
     fn parse_identifier_literal(&mut self) -> Result<ASTNode, String> {
-        if self.peek_token_is(&TokenType::OpenCurly) {
-            return self.parse_struct_create_expr();
-        }
-
         let token = self.current_token().cloned().unwrap();
 
         match token.token_type() {
@@ -517,6 +541,14 @@ impl Parser {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn parse_ident_expr_start(&mut self) -> Result<ASTNode, String> {
+        if self.peek_token_is(&TokenType::OpenCurly) {
+            return self.parse_struct_create_expr();
+        }
+
+        self.parse_identifier_literal()
     }
     // END OF PREFIX METHODS //
     

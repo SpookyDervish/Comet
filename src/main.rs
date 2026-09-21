@@ -13,6 +13,7 @@ mod comet_struct;
 use std::fs;
 use std::io::Write;
 use clap::{Parser};
+use miette::miette;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -23,27 +24,39 @@ struct CLIArgs {
     output: String
 }
 
-fn main() -> std::io::Result<()> {
+fn main() {
 
     let args = CLIArgs::parse();
 
-    let source = fs::read_to_string(args.input)?;
+    let source = fs::read_to_string(args.input).unwrap();
 
     let mut lexer = lexer::Lexer::new("<stdin>", &source);
-    let tokens = lexer.lex().unwrap();
 
-    let mut parser = parser::Parser::new(tokens);
-    let ast = parser.parse().unwrap();
+    let tokens = lexer.lex();
+    if let Err(err) = tokens {
+        println!("{}", miette!(err));
+        return;
+    }
+
+    let mut parser = parser::Parser::new(tokens.unwrap());
+    let ast = parser.parse();
+    if let Err(err) = ast {
+        println!("{}", miette!(err));
+        return;
+    }
+    let ast = ast.unwrap();
 
     //println!("{:#?}", ast);
 
     let mut compiler = compiler::Compiler::new().unwrap();
-    compiler.compile(&ast, None).unwrap();
+    let compile_result = compiler.compile(&ast, None);
+    if let Err(err) = compile_result {
+        println!("{}", miette!(err));
+        return;
+    }
 
     let bytes = compiler.end_module().unwrap();
 
-    let mut file = std::fs::File::create(args.output)?;
-    file.write_all(&bytes)?;
-
-    Ok(())
+    let mut file = std::fs::File::create(args.output);
+    file.unwrap().write_all(&bytes).unwrap();
 }
