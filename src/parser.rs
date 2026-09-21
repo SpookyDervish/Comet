@@ -462,6 +462,10 @@ impl Parser {
 
         expr
     }
+
+    fn parse_struct_create_expr(&mut self) -> Result<ASTNode, String> {
+        
+    }
     // END OF EXPRESSION METHODS //
 
     // PREFIX METHODS //
@@ -501,6 +505,10 @@ impl Parser {
     }
 
     fn parse_identifier_literal(&mut self) -> Result<ASTNode, String> {
+        if self.peek_token_is(&TokenType::OpenCurly) {
+            return self.parse_struct_create_expr();
+        }
+
         let token = self.current_token().cloned().unwrap();
 
         match token.token_type() {
