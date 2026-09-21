@@ -36,14 +36,14 @@ impl CometType {
         }
     }
 
-    pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
+    pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_comet_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
         let their_type = target_type.cranelift_type;
 
-        if value_type == target_type {
+        if value_comet_type == target_type {
             return Ok(value);
         }
 
-        let value_type = value_type.cranelift_type;
+        let value_type = value_comet_type.cranelift_type;
 
         let out: Value;
         if value_type.is_int() && their_type.is_int() {
@@ -51,6 +51,9 @@ impl CometType {
                 out = builder.ins().sextend(target_type.cranelift_type, value);
             } else if value_type.bits() > their_type.bits() { // cast from bigger to smaller int
                 out = builder.ins().ireduce(their_type, value);
+            } else if target_type.signed != value_comet_type.signed {
+                // do nothing, because ints in cranelift dont care about signedness
+                out = value;
             } else {
                 return Err(InvalidCast {
                     new_type: target_type.cranelift_type.to_string(),

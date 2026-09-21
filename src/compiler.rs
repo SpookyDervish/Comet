@@ -71,6 +71,10 @@ impl <'a> Compiler <'a> {
     }
 
     // UTIL METHODS //
+    fn named_source(&self) -> NamedSource<String> {
+        NamedSource::new(self.file_name, self.source.clone())
+    }
+
     fn get_variable(&self, name: &str) -> Option<&CometVariable> {
         self.scopes.iter().rev().find_map(|scope| scope.variables.get(name))
     }
@@ -93,7 +97,7 @@ impl <'a> Compiler <'a> {
         let comet_type = self.get_type(&ident.as_str());
         comet_type.ok_or(UnkownType {
             span: ident_node.source_span(),
-            src: NamedSource::new(self.file_name, self.source.clone()),
+            src: self.named_source(),
             type_: ident.clone()
         }.into())
     }
@@ -129,8 +133,8 @@ impl <'a> Compiler <'a> {
         let unified_type = self.unify_types(&left_type, &right_type);
 
         if left_type != right_type {
-            left_value = CometType::try_implicit_cast(left, left_value, &left_type, unified_type, builder, NamedSource::new(self.file_name, self.source.clone()))?;
-            right_value = CometType::try_implicit_cast(right, right_value, &right_type, unified_type, builder, NamedSource::new(self.file_name, self.source.clone()))?;
+            left_value = CometType::try_implicit_cast(left, left_value, &left_type, unified_type, builder, self.named_source())?;
+            right_value = CometType::try_implicit_cast(right, right_value, &right_type, unified_type, builder, self.named_source())?;
         }
 
         Ok((left_value, right_value))
@@ -156,6 +160,32 @@ impl <'a> Compiler <'a> {
                 let left_value = self.resolve_type(left)?;
 
                 match op.token_type() {
+                    TokenType::Dot => {
+                        let struct_type = left_value.comet_struct.as_ref().ok_or(InvalidOperator {
+                            op: op.token_type().clone(),
+                            span: op.source_span(),
+                            src: self.named_source(),
+                            value: String::from("on non-struct")
+                        })?;
+
+                        let field_name = match right.node_type() {
+                            ASTNodeType::IdentifierLiteral(value) => value,
+                            _ => return Err(SyntaxError {
+                                src: self.named_source(),
+                                text: format!("Expected identifier after '{:?}', got '{:?}' instead", op.token_type(), right.node_type()),
+                                span: right.source_span()
+                            }.into())
+                        };
+
+                        let field = struct_type.get_field(field_name).ok_or(UnkownField {
+                            field: field_name.clone(),
+                            struct_name: String::from(struct_type.name()),
+                            span: right.source_span(),
+                            src: self.named_source()
+                        })?;
+
+                        return Ok(field.field_type().clone());
+                    },
                     TokenType::Divide => { return Ok(CometType::new(types::F64)); },
 
                     TokenType::Eq | TokenType::NotEq |
@@ -196,7 +226,7 @@ impl <'a> Compiler <'a> {
             }
 
             _ => Err(CompilerBug {
-                src: NamedSource::new(self.file_name, self.source.clone()),
+                src: self.named_source(),
                 span: node.source_span(),
                 text: format!("Can't resolve type of '{:?}'", node.node_type())
             }.into())
@@ -233,7 +263,13 @@ impl <'a> Compiler <'a> {
 
     fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
-            ASTNodeType::InfixExpression { left: _, op: _, right: _ } => self.visit_infix_expression(node, builder),
+            ASTNodeType::InfixExpression { left: _, op, right: _ } => {
+                if op.token_type() == &TokenType::Dot {
+                    self.visit_get_field(node, builder)
+                } else {
+                    self.visit_infix_expression(node, builder)
+                }
+            },
 
             ASTNodeType::IntLiteral(num) => {
                 Ok(builder.ins().iconst(types::I64, *num as i64))
@@ -302,7 +338,7 @@ impl <'a> Compiler <'a> {
                 let struct_type = self.get_type_literal_type(type_node)?;
                 if struct_type.comet_struct.is_none() {
                     return Err(TypeMismatch {
-                        src: NamedSource::new(self.file_name, self.source.clone()),
+                        src: self.named_source(),
                         expected: String::from("struct"),
                         invalid: struct_type.cranelift_type.to_string(),
                         span: type_node.source_span()
@@ -341,7 +377,7 @@ impl <'a> Compiler <'a> {
                             field: field_name.clone(),
                             struct_name: String::from(comet_struct.name()),
                             span: ident_node.source_span(),
-                            src: NamedSource::new(self.file_name, self.source.clone())
+                            src: self.named_source()
                         }.into());
                     }
                     let field_index = field_index.unwrap();
@@ -355,7 +391,7 @@ impl <'a> Compiler <'a> {
             },
 
             _ => Err(CompilerBug {
-                src: NamedSource::new(self.file_name, self.source.clone()),
+                src: self.named_source(),
                 span: node.source_span(),
                 text: format!("Cannot compile r-value '{:?}'", node.node_type())
             }.into())
@@ -376,7 +412,7 @@ impl <'a> Compiler <'a> {
                             return Err(InvalidOperator {
                                 op: op.token_type().clone(),
                                 span: op.source_span(),
-                                src: NamedSource::new(self.file_name, self.source.clone()),
+                                src: self.named_source(),
                                 value: String::from("on non-struct")
                             }.into());
                         }
@@ -384,7 +420,7 @@ impl <'a> Compiler <'a> {
                         let field_name = match right.node_type() {
                             ASTNodeType::IdentifierLiteral(value) => value,
                             _ => { return Err(SyntaxError {
-                                src: NamedSource::new(self.file_name, self.source.clone()),
+                                src: self.named_source(),
                                 text: format!("Expected identifier after '{:?}', got '{:?}' instead", op.token_type(), right.node_type()),
                                 span: right.source_span()
                             }.into()); }
@@ -399,31 +435,25 @@ impl <'a> Compiler <'a> {
                                 field: field_name.clone(),
                                 struct_name: String::from(comet_struct.name()),
                                 span: right.source_span(),
-                                src: NamedSource::new(self.file_name, self.source.clone())
+                                src: self.named_source()
                             }.into());
                         }
-                        let field = field.unwrap();
                         let field_index = comet_struct.get_field_index(field_name).unwrap();
 
-                        Ok(builder.ins().load(
-                            field.field_type().cranelift_type,
-                            MemFlagsData::new(),
-                            left,
-                            comet_struct_layout.0[*field_index] as i32
-                        ))
+                        Ok(builder.ins().iadd_imm_s(left, comet_struct_layout.0[*field_index] as i64))
                     },
 
 
                     _ => Err(InvalidOperator {
                             op: op.token_type().clone(),
                             span: op.source_span(),
-                            src: NamedSource::new(self.file_name, self.source.clone()),
+                            src: self.named_source(),
                             value: String::from("on l-value")
                         }.into())
                 }
             },
             _ => Err(InvalidLValue {
-                src: NamedSource::new(self.file_name, self.source.clone()),
+                src: self.named_source(),
                 span: node.source_span(),
                 value: format!("{:?}", node.node_type())
             }.into())
@@ -473,13 +503,54 @@ impl <'a> Compiler <'a> {
                 return Err(InvalidOperator {
                     op: op.token_type().clone(),
                     span: op.source_span(),
-                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    src: self.named_source(),
                     value: String::from("for infix expression")
                 }.into());
             }
         }
 
         Ok(out)
+    }
+
+    fn visit_get_field(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+        let (left_node, op, right_node) = match node.node_type() {
+            ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
+            _ => unreachable!()
+        };
+
+        let left = self.visit_value(left_node, builder)?;
+        let struct_type = self.resolve_type(left_node)?;
+        if struct_type.comet_struct.is_none() {
+            return Err(TypeMismatch {
+                src: self.named_source(),
+                expected: String::from("struct"),
+                invalid: struct_type.cranelift_type.to_string(),
+                span: left_node.source_span()
+            }.into());
+        }
+
+        let field_name = match right_node.node_type() {
+            ASTNodeType::IdentifierLiteral(value) => value,
+            _ => { return Err(SyntaxError {
+                src: self.named_source(),
+                text: format!("Expected identifier after '{:?}', got '{:?}' instead", op.token_type(), right_node.node_type()),
+                span: right_node.source_span()
+            }.into()); }
+        };
+
+        let comet_struct = struct_type.comet_struct.as_ref().unwrap();
+
+        let field_index = comet_struct.get_field_index(field_name).ok_or_else(|| UnkownField {
+            struct_name: String::from(comet_struct.name()),
+            field: field_name.clone(),
+            span: right_node.source_span(),
+            src: self.named_source()
+        })?;
+        let field = comet_struct.get_field(field_name).unwrap();
+
+        let comet_struct_layout = comet_struct.get_layout();
+                        
+        Ok(builder.ins().load(field.field_type().cranelift_type, MemFlagsData::new(), left, comet_struct_layout.0[*field_index] as i32))
     }
 
     fn visit_expression_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
@@ -615,6 +686,27 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
+        if !matches!(ident_node.node_type(), ASTNodeType::IdentifierLiteral(_)) {
+            if type_node.is_some() {
+                return Err(SyntaxError {
+                    span: type_node.as_ref().unwrap().source_span(),
+                    src: self.named_source(),
+                    text: String::from("Cannot type annotate a field assignment")
+                }.into());
+            }
+
+            let target_type = self.resolve_type(ident_node)?;
+            let value_type = self.resolve_type(value_node)?;
+            if target_type != value_type {
+                CometType::try_implicit_cast(value_node, self.visit_value(value_node, builder)?, &value_type, &target_type, builder, self.named_source())?;
+            }
+
+            let value = self.visit_value(value_node, builder)?;
+            let address = self.visit_l_value(ident_node, builder)?;
+            builder.ins().store(MemFlagsData::new(), value, address, 0);
+            return Ok(());
+        }
+
         let ident = match ident_node.node_type() {
             ASTNodeType::IdentifierLiteral(value) => value,
             _ => unreachable!()
@@ -631,7 +723,7 @@ impl <'a> Compiler <'a> {
             if !existing_var.unwrap().mutable {
                 return Err(ImmutableReassignment {
                     span: ident_node.source_span(),
-                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    src: self.named_source(),
                     var_name: ident.clone()
                 }.into());
             }
@@ -642,14 +734,14 @@ impl <'a> Compiler <'a> {
                     expected: var_type.cranelift_type.to_string(),
                     invalid: value_type.cranelift_type.to_string(),
                     span: value_node.source_span(),
-                    src: NamedSource::new(self.file_name, self.source.clone())
+                    src: self.named_source()
                 }.into());
             }
 
             if type_node.is_some() {
                 return Err(SyntaxError {
                     span: type_node.as_ref().unwrap().source_span(),
-                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    src: self.named_source(),
                     text: String::from("Cannot type annotate reassignment")
                 }.into());
             }
@@ -671,7 +763,7 @@ impl <'a> Compiler <'a> {
             let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
 
             if var_type != &value_type {
-                value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, builder, NamedSource::new(self.file_name, self.source.clone()))?;
+                value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, builder, self.named_source())?;
                 final_type = var_type;
             } else {
                 final_type = self.unify_types(&final_type, &var_type);
@@ -910,7 +1002,7 @@ impl <'a> Compiler <'a> {
             _ => {
                 Err(CompilerBug {
                     span: ast.source_span(),
-                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    src: self.named_source(),
                     text: format!("No compiler visit method for {:?}", ast.node_type())
                 }.into())
             }

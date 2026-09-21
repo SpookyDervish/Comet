@@ -131,19 +131,53 @@ impl <'a> Parser <'a> {
             TokenType::While => self.parse_while_statement(),
             TokenType::Struct => self.parse_struct_def_statement(),
 
-            TokenType::Identifier(_) => self.parse_assign_statement(),
-
-            _ => self.parse_expression_statement()
+            _ => self.parse_expression_or_assignment_statement()
         }
     }
 
-    fn parse_expression_statement(&mut self) -> miette::Result<ASTNode<'a>> {
-        let expr = self.parse_expression(PrecedenceType::Lowest)?;
+    fn parse_expression_or_assignment_statement(&mut self) -> miette::Result<ASTNode<'a>> {
+        if self.current_token_is(&TokenType::Identifier(String::new()))
+            && self.peek_token_is(&TokenType::Colon)
+        {
+            let ident = self.parse_identifier_literal()?;
+
+            self.advance_token(); // skip ':'
+            let type_ = self.parse_type()?;
+
+            self.expect_peek(TokenType::Eq)?;
+            self.advance_token(); // skip '='
+
+            let value = self.parse_expression(PrecedenceType::Lowest)?;
+            self.advance_token();
+
+            return Ok(ASTNode::new(ASTNodeType::AssignStatement {
+                ident: Box::new(ident),
+                type_: Some(Box::new(type_)),
+                value: Box::new(value)
+            }));
+        }
+
+        let left = self.parse_expression(PrecedenceType::Lowest)?;
+        
+
+        if self.peek_token_is(&TokenType::Eq) {
+            self.advance_token(); // skip '='
+            self.advance_token(); // skip first value token
+
+            let value = self.parse_expression(PrecedenceType::Lowest)?;
+            self.advance_token();
+
+            return Ok(ASTNode::new(ASTNodeType::AssignStatement {
+                ident: Box::new(left),
+                type_: None,
+                value: Box::new(value)
+            }))
+
+        }
 
         self.advance_token();
 
-        let stmt = ASTNode::new(ASTNodeType::ExpressionStatement(Box::new(expr)));
-        Ok(stmt)
+        Ok(ASTNode::new(ASTNodeType::ExpressionStatement(Box::new(left))))
     }
 
     fn parse_block_statement(&mut self) -> miette::Result<ASTNode<'a>> {
@@ -252,37 +286,6 @@ impl <'a> Parser <'a> {
         self.advance_token();
 
         Ok(ASTNode::new(ASTNodeType::ReturnStatement(Some(Box::new(result)))))
-    }
-
-    fn parse_assign_statement(&mut self) -> miette::Result<ASTNode<'a>> {
-
-        let ident = match self.current_token().unwrap().token_type() {
-            TokenType::Identifier(value) => ASTNode::new(ASTNodeType::IdentifierLiteral(value.clone())),
-            _ => unreachable!()
-        };
-        
-        let mut type_: Option<Box<ASTNode>> = None;
-        if self.peek_token_is(&TokenType::Colon) {
-            self.advance_token();
-            type_ = Some(Box::new(self.parse_type()?));
-        }
-
-        let left_side: ASTNode;
-        if !self.peek_token_is(&TokenType::Eq) {
-            self.step_back_token();
-            left_side = self.parse_expression(PrecedenceType::Lowest)?;
-        } else {
-            left_side = ident;
-        }
-
-        self.expect_peek(TokenType::Eq)?;
-
-        self.advance_token();
-
-        let value = self.parse_expression(PrecedenceType::Lowest)?;
-        self.advance_token();
-
-        Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(left_side), type_: type_, value: Box::new(value) }))
     }
 
     fn parse_match_statement(&mut self) -> miette::Result<ASTNode<'a>> {
@@ -535,8 +538,6 @@ impl <'a> Parser <'a> {
 
             break;
         }
-
-        self.advance_token();
 
         Ok(ASTNode::new(ASTNodeType::StructCreateExpression { type_: Box::new(type_), fields: fields }))
     }
