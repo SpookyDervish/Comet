@@ -9,5 +9,6 @@ pub enum PrecedenceType {
     Prefix,
     Call,
     Index,
+    Dot,
     Max
 }

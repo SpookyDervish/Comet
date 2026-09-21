@@ -331,6 +331,50 @@ impl <'a> Compiler <'a> {
         }
     }
 
+    fn visit_l_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
+        match node.node_type() {
+            ASTNodeType::IdentifierLiteral(_) => self.visit_value(node, builder),
+
+            ASTNodeType::InfixExpression { left, op, right } => {
+                let left_type = self.resolve_type(left)?;
+                let left = self.visit_l_value(left, builder)?;
+
+                match op.token_type() {
+                    TokenType::Dot => {
+                        if left_type.comet_struct.is_none() {
+                            return Err(format!("Can't use operator '{:?}' on non-struct", op.token_type()));
+                        }
+
+                        let field_name = match right.node_type() {
+                            ASTNodeType::IdentifierLiteral(value) => value,
+                            _ => { return Err(format!("Expected identifier after '{:?}', got '{:?}' instead", op.token_type(), right.node_type())); }
+                        };
+
+                        let comet_struct = left_type.comet_struct.unwrap();
+                        let comet_struct_layout = comet_struct.get_layout();
+
+                        let field = comet_struct.get_field(field_name);
+                        if field.is_none() {
+                            return Err(format!("No field with the name '{}' exists in the struct '{}'", field_name, comet_struct.name()));
+                        }
+                        let field = field.unwrap();
+                        let field_index = comet_struct.get_field_index(field_name).unwrap();
+
+                        Ok(builder.ins().load(
+                            field.field_type().cranelift_type,
+                            MemFlagsData::new(),
+                            left,
+                            comet_struct_layout.0[*field_index] as i32
+                        ))
+                    },
+
+                    _ => Err(format!("Operator '{:?}' can't be used in l-value", op.token_type()))
+                }
+            },
+            _ => Err(format!("'{:?}' can't be an l-value", node.node_type()))
+        }
+    }
+
     fn visit_infix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
         let (left, op, right) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),

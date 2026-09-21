@@ -78,7 +78,8 @@ impl Parser {
             // literals
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
-            TokenType::Identifier(_) => Some(Parser::parse_ident_expr_start),
+            TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
+            TokenType::Init => Some(Parser::parse_struct_create_expr),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
@@ -97,6 +98,7 @@ impl Parser {
             TokenType::Gt => Some(Parser::parse_infix_expression),
             TokenType::LtEq => Some(Parser::parse_infix_expression),
             TokenType::GtEq => Some(Parser::parse_infix_expression),
+            TokenType::Dot => Some(Parser::parse_infix_expression),
             TokenType::OpenParen => Some(Parser::parse_func_call),
             _ => None
         }
@@ -249,6 +251,16 @@ impl Parser {
             type_ = Some(Box::new(self.parse_type()?));
         }
 
+        let left_side: ASTNode;
+        if !self.peek_token_is(&TokenType::Eq) {
+            self.step_back_token();
+            left_side = self.parse_expression(PrecedenceType::Lowest)?;
+        } else {
+            left_side = ident;
+        }
+
+        println!("left = {:?}", left_side);
+
         self.expect_peek(TokenType::Eq)?;
 
         self.advance_token();
@@ -256,7 +268,7 @@ impl Parser {
         let value = self.parse_expression(PrecedenceType::Lowest)?;
         self.advance_token();
 
-        Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(ident), type_: type_, value: Box::new(value) }))
+        Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(left_side), type_: type_, value: Box::new(value) }))
     }
 
     fn parse_match_statement(&mut self) -> Result<ASTNode, String> {
@@ -468,10 +480,10 @@ impl Parser {
     }
 
     fn parse_struct_create_expr(&mut self) -> Result<ASTNode, String> {
-        self.step_back_token();
-
         let type_ = self.parse_type()?;
         self.expect_peek(TokenType::OpenCurly)?;
+
+        
 
         let mut fields: Vec<ASTNode> = Vec::new();
 
@@ -495,6 +507,8 @@ impl Parser {
 
             break;
         }
+
+        println!("{:?}", self.peek_token());
 
         Ok(ASTNode::new(ASTNodeType::StructCreateExpression { type_: Box::new(type_), fields: fields }))
     }
@@ -545,14 +559,6 @@ impl Parser {
             }
             _ => unreachable!(),
         }
-    }
-
-    fn parse_ident_expr_start(&mut self) -> Result<ASTNode, String> {
-        if self.peek_token_is(&TokenType::OpenCurly) {
-            return self.parse_struct_create_expr();
-        }
-
-        self.parse_identifier_literal()
     }
     // END OF PREFIX METHODS //
     

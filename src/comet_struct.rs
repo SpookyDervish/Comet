@@ -20,6 +20,14 @@ impl CometStructField {
     pub fn new(name: String, field_type: CometType) -> Self {
         CometStructField { name: name, field_type: field_type }
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn field_type(&self) -> &CometType {
+        &self.field_type
+    }
 }
 
 impl CometStruct {
@@ -35,6 +43,10 @@ impl CometStruct {
 
     pub fn name(&self) -> &str {
         return &self.name;
+    }
+
+    pub fn get_field(&self, name: &str) -> Option<&CometStructField> {
+        self.get_field_index(name).map(|idx| &self.fields[*idx])
     }
 
     pub fn get_field_index(&self, name: &str) -> Option<&usize> {

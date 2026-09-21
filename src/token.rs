@@ -7,7 +7,7 @@ pub enum TokenType {
     Identifier(String),
 
     // keywords,
-    Fun, Ret, Match, Default, If, Else, While, Struct,
+    Fun, Ret, Match, Default, If, Else, While, Struct, Init,
 
     // symbols
     Plus, Minus, Times, Divide, Eq,
@@ -40,6 +40,8 @@ impl TokenType {
             TokenType::Lt => PrecedenceType::LessGreater,
             TokenType::GtEq => PrecedenceType::LessGreater,
             TokenType::LtEq => PrecedenceType::LessGreater,
+
+            TokenType::Dot => PrecedenceType::Dot,
             _ => PrecedenceType::Lowest
         }
     }
@@ -54,6 +56,7 @@ impl TokenType {
             "else" => Some(TokenType::Else),
             "while" => Some(TokenType::While),
             "struct" => Some(TokenType::Struct),
+            "init" => Some(TokenType::Init),
 
             "or" => Some(TokenType::Or),
             "and" => Some(TokenType::And),
