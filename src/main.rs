@@ -14,7 +14,7 @@ mod comet_error;
 use std::fs;
 use std::io::Write;
 use clap::{Parser};
-use miette::miette;
+use miette::{IntoDiagnostic};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -29,10 +29,10 @@ fn main() -> miette::Result<()> {
 
     let args = CLIArgs::parse();
 
-    let source = fs::read_to_string(args.input).unwrap();
-    let file_name = "<stdin>";
+    let file_name = args.input;
+    let source = fs::read_to_string(&file_name).into_diagnostic()?;
 
-    let mut lexer = lexer::Lexer::new(file_name, &source);
+    let mut lexer = lexer::Lexer::new(file_name.as_str(), &source);
 
     let tokens = lexer.lex()?;
 
@@ -41,13 +41,13 @@ fn main() -> miette::Result<()> {
 
     //println!("{:#?}", ast);
 
-    let mut compiler = compiler::Compiler::new(file_name, source.clone()).unwrap();
+    let mut compiler = compiler::Compiler::new(&file_name, source.clone()).unwrap();
     compiler.compile(&ast, None)?;
 
     let bytes = compiler.end_module().unwrap();
 
-    let mut file = std::fs::File::create(args.output);
-    file.unwrap().write_all(&bytes).unwrap();
+    let mut file = std::fs::File::create(args.output).into_diagnostic()?;
+    file.write_all(&bytes).into_diagnostic()?;
 
     Ok(())
 }

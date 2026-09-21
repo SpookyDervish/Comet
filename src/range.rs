@@ -13,13 +13,13 @@ pub struct Range {
 }
 
 impl Range {
-    pub fn new(start_line: usize, end_line: usize, start_column: usize, end_column: usize, start_pos: usize, end_pos: usize) -> Self {
+    /*pub fn new(start_line: usize, end_line: usize, start_column: usize, end_column: usize, start_pos: usize, end_pos: usize) -> Self {
         Range {
             start_line: start_line, end_line: end_line,
             start_column: start_column, end_column: end_column,
             start_pos: start_pos, end_pos: end_pos
         }
-    }
+    }*/
 
     pub fn start_pos(&self) -> usize {
         self.start_pos

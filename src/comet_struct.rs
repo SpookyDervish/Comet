@@ -21,9 +21,9 @@ impl CometStructField {
         CometStructField { name: name, field_type: field_type }
     }
 
-    pub fn name(&self) -> &str {
+    /*pub fn name(&self) -> &str {
         &self.name
-    }
+    }*/
 
     pub fn field_type(&self) -> &CometType {
         &self.field_type
@@ -57,7 +57,6 @@ impl CometStruct {
     pub fn get_layout(&self) -> (Vec<u32>, u32) {
         let mut current_offset = 0;
         let mut max_alignment = 0;
-        let mut total_size = 0;
 
         let mut field_offsets = vec![0; self.fields.len()];
 
@@ -73,11 +72,9 @@ impl CometStruct {
 
             field_offsets[i] = current_offset;
             current_offset += align;
-
-            
         }
 
-        total_size = current_offset;
+        let mut total_size = current_offset;
         if total_size % max_alignment != 0 {
             total_size += max_alignment - (total_size % max_alignment);
         }

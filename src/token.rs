@@ -99,7 +99,7 @@ impl <'a> Token <'a> {
         SourceSpan::new(SourceOffset::from(self.range.end_pos()), 1)
     }
 
-    pub fn pos(&self) -> &Position {
+    pub fn pos(&self) -> &Position<'a> {
         &self.pos
     }
 

@@ -275,8 +275,6 @@ impl <'a> Parser <'a> {
             left_side = ident;
         }
 
-        println!("left = {:?}", left_side);
-
         self.expect_peek(TokenType::Eq)?;
 
         self.advance_token();
@@ -421,28 +419,30 @@ impl <'a> Parser <'a> {
 
     // EXPRESSION METHODS //
     fn parse_expression(&mut self, precedence: PrecedenceType) -> miette::Result<ASTNode<'a>> {
-        let prefix_fn = self.get_prefix_parse_func(self.current_token().unwrap().token_type());
+        let curr = &self.current_token().unwrap();
+        let prefix_fn = self.get_prefix_parse_func(curr.token_type());
         if prefix_fn.is_none() {
-            let pos = self.current_token().unwrap().pos();
+            let pos = curr.pos();
 
             return Err(SyntaxError {
-                span: self.current_token().unwrap().source_span(),
+                span: curr.source_span(),
                 src: NamedSource::new(pos.file_name(), String::from(pos.source())),
-                text: format!("No prefix function for {:?}", self.current_token().unwrap().token_type())
+                text: format!("No prefix function for {:?}", curr.token_type())
             }.into());
         }
 
         let mut left_expr = prefix_fn.unwrap()(self)?;
 
         while precedence < self.peek_precedence() {
-            let infix_fn = self.get_infix_parse_func(self.peek_token().unwrap().token_type());
+            let peek = &self.peek_token().unwrap();
+            let infix_fn = self.get_infix_parse_func(peek.token_type());
             if infix_fn.is_none() {
-                let pos = self.peek_token().unwrap().pos();
+                let pos = peek.pos();
 
                 return Err(SyntaxError {
-                    span: self.peek_token().unwrap().source_span(),
+                    span: peek.source_span(),
                     src: NamedSource::new(pos.file_name(), String::from(pos.source())),
-                    text: format!("No infix function for {:?}", self.peek_token().unwrap().token_type())
+                    text: format!("No infix function for {:?}", peek.token_type())
                 }.into());
             }
 
@@ -536,7 +536,7 @@ impl <'a> Parser <'a> {
             break;
         }
 
-        println!("{:?}", self.peek_token());
+        self.advance_token();
 
         Ok(ASTNode::new(ASTNodeType::StructCreateExpression { type_: Box::new(type_), fields: fields }))
     }

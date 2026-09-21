@@ -1,4 +1,4 @@
-use miette::{SourceOffset, SourceSpan};
+use miette::SourceSpan;
 
 use crate::token::Token;
 
@@ -51,7 +51,7 @@ impl <'a> ASTNode <'a> {
         SourceSpan::new(0.into(), 1)
     }
 
-    pub fn node_type(&self) -> &ASTNodeType {
+    pub fn node_type(&self) -> &ASTNodeType<'a> {
         &self.node_type
     }
 

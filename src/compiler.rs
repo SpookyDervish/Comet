@@ -170,7 +170,7 @@ impl <'a> Compiler <'a> {
                 return Ok(self.unify_types(&left_value, &right_value).clone());
             },
 
-            ASTNodeType::FuncCall { left, args } => {
+            ASTNodeType::FuncCall { left: _, args: _ } => {
                 /*let decls = self.module.declarations();
 
                 let func_id = self.get_function(left)?;

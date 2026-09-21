@@ -1,7 +1,7 @@
 use miette::{Diagnostic, NamedSource, SourceSpan};
 use thiserror::Error;
 
-use crate::{ast::ASTNodeType, token::TokenType};
+use crate::token::TokenType;
 
 #[derive(Diagnostic, Debug, Error)]
 #[error("SyntaxError")]
