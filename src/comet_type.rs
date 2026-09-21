@@ -1,9 +1,9 @@
-use cranelift_codegen::ir::{Type, Value, types};
+use cranelift_codegen::ir::{Value, types};
 use cranelift_frontend::FunctionBuilder;
 use cranelift::prelude::InstBuilder;
-use cranelift_native::builder;
+use miette::NamedSource;
 
-use crate::comet_struct::CometStruct;
+use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
 
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
@@ -36,7 +36,7 @@ impl CometType {
         }
     }
 
-    pub fn try_implicit_cast(value: Value, value_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder) -> Result<Value, String> {
+    pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
         let their_type = target_type.cranelift_type;
 
         if value_type == target_type {
@@ -52,14 +52,24 @@ impl CometType {
             } else if value_type.bits() > their_type.bits() { // cast from bigger to smaller int
                 out = builder.ins().ireduce(their_type, value);
             } else {
-                return Err(format!("Cannot convert int type '{}' to type '{}'", value_type, their_type));
+                return Err(InvalidCast {
+                    new_type: target_type.cranelift_type.to_string(),
+                    old_type: value_type.to_string(),
+                    span: value_node.source_span(),
+                    src: named_source
+                }.into());
             }
         } else if value_type.is_int() && their_type.is_float() { // cast from int to float
             out = builder.ins().fcvt_from_sint(their_type, value);
         } else if value_type.is_float() && their_type.is_int() { // cast from float to int
             out = builder.ins().fcvt_to_sint(their_type, value);
         } else {
-            return Err(format!("Cannot implicitly cast type '{}' to type '{}'", value_type, their_type));
+            return Err(TypeMismatch {
+                expected: their_type.to_string(),
+                invalid: value_type.to_string(),
+                src: named_source,
+                span: value_node.source_span()
+            }.into());
         }
 
         Ok(out)

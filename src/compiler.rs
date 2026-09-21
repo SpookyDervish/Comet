@@ -1,16 +1,13 @@
-use cranelift_codegen::entity::EntityRef;
-use cranelift_codegen::gimli::NameAttributeValue::Offset;
 use cranelift_codegen::ir::condcodes::IntCC;
-use cranelift_codegen::isa::CallConv;
-use cranelift_codegen::isa::x64::external::offsets;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, ArgumentPurpose, Block, InstBuilder, MemFlags, MemFlagsData, Signature, StackSlotData, StackSlotKind, Value, types};
+use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{FuncId, Linkage, Module, default_libcall_names};
-use cranelift_native::builder;
+use cranelift_module::{Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
+use miette::NamedSource;
 use std::cell::RefCell;
 
+use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UnkownField, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
@@ -19,12 +16,14 @@ use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType
 pub struct Compiler <'a> {
     module: ObjectModule,
     scopes: Vec<ScopeFrame<'a>>,
+    file_name: &'a str,
+    source: String,
 
     var_index: u32
 }
 
 impl <'a> Compiler <'a> {
-    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn new(file_name: &'a str, source: String) -> miette::Result<Self, Box<dyn std::error::Error>> {
         let isa_builder = cranelift_native::builder()?;
         let isa = isa_builder.finish(settings::Flags::new(settings::builder()))?;
 
@@ -55,12 +54,14 @@ impl <'a> Compiler <'a> {
         Ok(Compiler {
             module: module,
             scopes: vec!{base_frame},
+            file_name: file_name,
+            source: source,
 
             var_index: 0
         })
     }
 
-    pub fn end_module(self) -> Result<Vec<u8>, cranelift_object::object::write::Error> {
+    pub fn end_module(self) -> miette::Result<Vec<u8>, cranelift_object::object::write::Error> {
         let module = self.module;
 
         let product = module.finish();
@@ -78,7 +79,7 @@ impl <'a> Compiler <'a> {
         self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
     }
 
-    fn get_type_literal_type (&self, node: &ASTNode) -> Result<&CometType, String> {
+    fn get_type_literal_type (&self, node: &ASTNode) -> miette::Result<&CometType> {
         let ident_node = match node.node_type() {
             ASTNodeType::TypeLiteral(value) => &**value,
             _ => unreachable!()
@@ -90,7 +91,11 @@ impl <'a> Compiler <'a> {
         };
 
         let comet_type = self.get_type(&ident.as_str());
-        comet_type.ok_or(format!("Unkown type '{}'", ident))
+        comet_type.ok_or(UnkownType {
+            span: ident_node.source_span(),
+            src: NamedSource::new(self.file_name, self.source.clone()),
+            type_: ident.clone()
+        }.into())
     }
 
     fn rank_type(&self, type_: &CometType) -> u8 {
@@ -114,7 +119,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn ensure_share_types(&mut self, left: &ASTNode, right: &ASTNode, builder: &mut FunctionBuilder) -> Result<(ir::Value, ir::Value), String> {
+    fn ensure_share_types(&mut self, left: &ASTNode, right: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<(ir::Value, ir::Value)> {
         let mut left_value = self.visit_value(left, builder)?;
         let mut right_value = self.visit_value(right, builder)?;
 
@@ -124,14 +129,14 @@ impl <'a> Compiler <'a> {
         let unified_type = self.unify_types(&left_type, &right_type);
 
         if left_type != right_type {
-            left_value = CometType::try_implicit_cast(left_value, &left_type, unified_type, builder)?;
-            right_value = CometType::try_implicit_cast(right_value, &right_type, unified_type, builder)?;
+            left_value = CometType::try_implicit_cast(left, left_value, &left_type, unified_type, builder, NamedSource::new(self.file_name, self.source.clone()))?;
+            right_value = CometType::try_implicit_cast(right, right_value, &right_type, unified_type, builder, NamedSource::new(self.file_name, self.source.clone()))?;
         }
 
         Ok((left_value, right_value))
     }
 
-    fn resolve_type(&self, node: &ASTNode) -> Result<CometType, String> {
+    fn resolve_type(&self, node: &ASTNode) -> miette::Result<CometType> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
                 Ok(CometType::new_int(types::I64, false))
@@ -190,13 +195,17 @@ impl <'a> Compiler <'a> {
                 Ok(struct_type.clone())
             }
 
-            _ => Err(format!("Can't resolve type of '{:?}'", node.node_type()))
+            _ => Err(CompilerBug {
+                src: NamedSource::new(self.file_name, self.source.clone()),
+                span: node.source_span(),
+                text: format!("Can't resolve type of '{:?}'", node.node_type())
+            }.into())
         }
     }
     // END OF UTIL METHODS
 
     // VISIT METHODS //
-    fn visit_program(&mut self, node: &'a ASTNode) -> Result<(), String> {
+    fn visit_program(&mut self, node: &'a ASTNode) -> miette::Result<()> {
         let nodes = match node.node_type() {
             ASTNodeType::Program(value) => value,
             _ => unreachable!()
@@ -209,7 +218,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_block(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_block(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let nodes = match node.node_type() {
             ASTNodeType::Block(value) => value,
             _ => unreachable!()
@@ -222,7 +231,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
+    fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
             ASTNodeType::InfixExpression { left: _, op: _, right: _ } => self.visit_infix_expression(node, builder),
 
@@ -263,8 +272,16 @@ impl <'a> Compiler <'a> {
                 let func_id = match left.node_type() {
                     ASTNodeType::IdentifierLiteral(name) => self.get_variable(name)
                         .and_then(|variable| variable.function_id)
-                        .ok_or(format!("'{}' is not a callable function", name))?,
-                    _ => return Err("Function calls require a function identifier".to_string())
+                        .ok_or(NotAFunction {
+                            span: (**left).source_span(),
+                            src: NamedSource::new(String::from(self.file_name), self.source.clone()),
+                            func_name: name.clone(),
+                        })?,
+                    _ => return Err(SyntaxError {
+                            span: (**left).source_span(),
+                            src: NamedSource::new(String::from(self.file_name), self.source.clone()),
+                            text: String::from("Expected identifier")
+                        }.into())
                 };
 
                 let decls = self.module.declarations();
@@ -284,7 +301,12 @@ impl <'a> Compiler <'a> {
             ASTNodeType::StructCreateExpression { type_: type_node, fields } => {
                 let struct_type = self.get_type_literal_type(type_node)?;
                 if struct_type.comet_struct.is_none() {
-                    return Err(format!("Type '{:?}' is not a struct.", struct_type.cranelift_type));
+                    return Err(TypeMismatch {
+                        src: NamedSource::new(self.file_name, self.source.clone()),
+                        expected: String::from("struct"),
+                        invalid: struct_type.cranelift_type.to_string(),
+                        span: type_node.source_span()
+                    }.into());
                 }
                 let struct_type = struct_type.clone();
 
@@ -313,9 +335,14 @@ impl <'a> Compiler <'a> {
 
                     let field_value = self.visit_value(&value_node, builder)?;
 
-                    let field_index = comet_struct.get_field_index(field_name);
+                    let field_index = comet_struct.get_field_index(&field_name);
                     if field_index.is_none() {
-                        return Err(format!("No field with the name '{}' exists in the struct '{}'", field_name, comet_struct.name()));
+                        return Err(UnkownField {
+                            field: field_name.clone(),
+                            struct_name: String::from(comet_struct.name()),
+                            span: ident_node.source_span(),
+                            src: NamedSource::new(self.file_name, self.source.clone())
+                        }.into());
                     }
                     let field_index = field_index.unwrap();
 
@@ -327,11 +354,15 @@ impl <'a> Compiler <'a> {
                 Ok(addr)
             },
 
-            _ => Err(format!("Cannot compile r-value '{:?}'", node.node_type()))
+            _ => Err(CompilerBug {
+                src: NamedSource::new(self.file_name, self.source.clone()),
+                span: node.source_span(),
+                text: format!("Cannot compile r-value '{:?}'", node.node_type())
+            }.into())
         }
     }
 
-    fn visit_l_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
+    fn visit_l_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
             ASTNodeType::IdentifierLiteral(_) => self.visit_value(node, builder),
 
@@ -342,12 +373,21 @@ impl <'a> Compiler <'a> {
                 match op.token_type() {
                     TokenType::Dot => {
                         if left_type.comet_struct.is_none() {
-                            return Err(format!("Can't use operator '{:?}' on non-struct", op.token_type()));
+                            return Err(InvalidOperator {
+                                op: op.token_type().clone(),
+                                span: op.source_span(),
+                                src: NamedSource::new(self.file_name, self.source.clone()),
+                                value: String::from("on non-struct")
+                            }.into());
                         }
 
                         let field_name = match right.node_type() {
                             ASTNodeType::IdentifierLiteral(value) => value,
-                            _ => { return Err(format!("Expected identifier after '{:?}', got '{:?}' instead", op.token_type(), right.node_type())); }
+                            _ => { return Err(SyntaxError {
+                                src: NamedSource::new(self.file_name, self.source.clone()),
+                                text: format!("Expected identifier after '{:?}', got '{:?}' instead", op.token_type(), right.node_type()),
+                                span: right.source_span()
+                            }.into()); }
                         };
 
                         let comet_struct = left_type.comet_struct.unwrap();
@@ -355,7 +395,12 @@ impl <'a> Compiler <'a> {
 
                         let field = comet_struct.get_field(field_name);
                         if field.is_none() {
-                            return Err(format!("No field with the name '{}' exists in the struct '{}'", field_name, comet_struct.name()));
+                            return Err(UnkownField {
+                                field: field_name.clone(),
+                                struct_name: String::from(comet_struct.name()),
+                                span: right.source_span(),
+                                src: NamedSource::new(self.file_name, self.source.clone())
+                            }.into());
                         }
                         let field = field.unwrap();
                         let field_index = comet_struct.get_field_index(field_name).unwrap();
@@ -368,14 +413,24 @@ impl <'a> Compiler <'a> {
                         ))
                     },
 
-                    _ => Err(format!("Operator '{:?}' can't be used in l-value", op.token_type()))
+
+                    _ => Err(InvalidOperator {
+                            op: op.token_type().clone(),
+                            span: op.source_span(),
+                            src: NamedSource::new(self.file_name, self.source.clone()),
+                            value: String::from("on l-value")
+                        }.into())
                 }
             },
-            _ => Err(format!("'{:?}' can't be an l-value", node.node_type()))
+            _ => Err(InvalidLValue {
+                src: NamedSource::new(self.file_name, self.source.clone()),
+                span: node.source_span(),
+                value: format!("{:?}", node.node_type())
+            }.into())
         }
     }
 
-    fn visit_infix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<ir::Value, String> {
+    fn visit_infix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (left, op, right) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
             _ => unreachable!()
@@ -415,14 +470,19 @@ impl <'a> Compiler <'a> {
             },
 
             _ => {
-                return Err(format!("Invalid operator for infix expression '{:?}'", op.token_type()));
+                return Err(InvalidOperator {
+                    op: op.token_type().clone(),
+                    span: op.source_span(),
+                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    value: String::from("for infix expression")
+                }.into());
             }
         }
 
         Ok(out)
     }
 
-    fn visit_expression_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_expression_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         match node.node_type() {
             ASTNodeType::ExpressionStatement(expr) => {
                 self.visit_value(expr, builder)?;
@@ -433,7 +493,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_func_def(&mut self, node: &'a ASTNode) -> Result<(), String> {
+    fn visit_func_def(&mut self, node: &'a ASTNode) -> miette::Result<()> {
 
         let mut sig = self.module.make_signature();
 
@@ -463,7 +523,7 @@ impl <'a> Compiler <'a> {
             }; 
 
             sig.params.push(AbiParam::new(arg_type.cranelift_type));
-            self.scopes.last_mut().unwrap().variables.insert(arg_name, CometVariable {
+            self.scopes.last_mut().unwrap().variables.insert(&arg_name, CometVariable {
                 type_: arg_type,
                 var_type: CometVarType::FuncArg(i),
                 mutable: false,
@@ -479,7 +539,7 @@ impl <'a> Compiler <'a> {
             
         }
 
-        let func_id = self.module.declare_function(name, Linkage::Export, &sig).unwrap();
+        let func_id = self.module.declare_function(&name, Linkage::Export, &sig).unwrap();
 
         let mut ctx = self.module.make_context();
         ctx.func.signature = sig;
@@ -501,7 +561,7 @@ impl <'a> Compiler <'a> {
         builder.declare_var(target_config.pointer_type());
         builder.def_var(func_var, func_addr);
 
-        self.scopes.last_mut().unwrap().variables.insert(name, CometVariable {
+        self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
             type_: CometType::new(target_config.pointer_type()),
             var_type: Local(func_var),
             mutable: false,
@@ -533,7 +593,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_ret_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_ret_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let ret_value_node = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
@@ -549,7 +609,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_assign_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_assign_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (ident_node, type_node, value_node) = match node.node_type() {
             ASTNodeType::AssignStatement { ident, type_, value } => (ident, type_, value),
             _ => unreachable!()
@@ -569,16 +629,29 @@ impl <'a> Compiler <'a> {
         let existing_var = self.get_variable(&ident.as_str());
         if existing_var.is_some() {
             if !existing_var.unwrap().mutable {
-                return Err(format!("Cannot reassign immutable variable"));
+                return Err(ImmutableReassignment {
+                    span: ident_node.source_span(),
+                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    var_name: ident.clone()
+                }.into());
             }
 
             let var_type = &existing_var.unwrap().type_;
             if value_type != *var_type {
-                return Err(format!("Attempted to change type of variable '{}' at runtime", ident));
+                return Err(TypeMismatch {
+                    expected: var_type.cranelift_type.to_string(),
+                    invalid: value_type.cranelift_type.to_string(),
+                    span: value_node.source_span(),
+                    src: NamedSource::new(self.file_name, self.source.clone())
+                }.into());
             }
 
             if type_node.is_some() {
-                return Err(format!("Cannot type annotate reassignment"));
+                return Err(SyntaxError {
+                    span: type_node.as_ref().unwrap().source_span(),
+                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    text: String::from("Cannot type annotate reassignment")
+                }.into());
             }
 
             match existing_var.unwrap().var_type {
@@ -598,7 +671,7 @@ impl <'a> Compiler <'a> {
             let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
 
             if var_type != &value_type {
-                value = CometType::try_implicit_cast(value, &value_type, &var_type, builder)?;
+                value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, builder, NamedSource::new(self.file_name, self.source.clone()))?;
                 final_type = var_type;
             } else {
                 final_type = self.unify_types(&final_type, &var_type);
@@ -626,7 +699,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_match_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_match_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, match_nodes, default_branch) = match node.node_type() {
             ASTNodeType::MatchStatement { expr, nodes, default } => (expr, nodes, default),
             _ => unreachable!()
@@ -712,7 +785,7 @@ impl <'a> Compiler <'a> {
         return is_terminated;
     }
 
-    fn visit_if_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_if_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, body_node, else_body) = match node.node_type() {
             ASTNodeType::IfStatement { expr, body, else_body } => (expr, body, else_body),
             _ => unreachable!()
@@ -755,7 +828,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_while_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> Result<(), String> {
+    fn visit_while_statement(&mut self, node: &'a ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, body_node) = match node.node_type() {
             ASTNodeType::WhileStatement { expr, body } => (expr, body),
             _ => unreachable!()
@@ -784,7 +857,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_struct_def_statement(&mut self, node: &'a ASTNode) -> Result<(), String> {
+    fn visit_struct_def_statement(&mut self, node: &'a ASTNode) -> miette::Result<()> {
         let (ident_node, field_nodes) = match node.node_type() {
             ASTNodeType::StructDefinitionStatement { ident, fields } => (ident, fields),
             _ => unreachable!()
@@ -814,13 +887,13 @@ impl <'a> Compiler <'a> {
         }
 
         let new_struct = CometStruct::new(ident.clone(), fields);
-        self.scopes.last_mut().unwrap().types.insert(ident, CometType::new_struct(new_struct));
+        self.scopes.last_mut().unwrap().types.insert(&ident, CometType::new_struct(new_struct));
 
         Ok(())
     }
     // END OF VISIT METHODS //
 
-    pub fn compile(&mut self, ast: &'a ASTNode, builder: Option<&mut FunctionBuilder>) -> Result<(), String> {
+    pub fn compile(&mut self, ast: &'a ASTNode, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
         match ast.node_type() {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },
             ASTNodeType::Block(_) => { return self.visit_block(ast, builder.unwrap()); },
@@ -835,7 +908,11 @@ impl <'a> Compiler <'a> {
             ASTNodeType::StructDefinitionStatement { ident: _, fields: _ } => { return self.visit_struct_def_statement(ast); },
 
             _ => {
-                Err(format!("No compiler visit method for {:?}", ast.node_type()))
+                Err(CompilerBug {
+                    span: ast.source_span(),
+                    src: NamedSource::new(self.file_name, self.source.clone()),
+                    text: format!("No compiler visit method for {:?}", ast.node_type())
+                }.into())
             }
         }
     }

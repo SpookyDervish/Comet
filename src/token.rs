@@ -1,3 +1,6 @@
+use miette::{SourceOffset, SourceSpan};
+
+use crate::position::Position;
 use crate::precedence::PrecedenceType;
 use crate::range::Range;
 
@@ -73,17 +76,31 @@ impl TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub struct Token {
+pub struct Token <'a>  {
     range: Range,
+    pos: Position <'a>,
     token_type: TokenType
 }
 
-impl Token {
-    pub fn new(token_type: TokenType, range: Range) -> Self {
+impl <'a> Token <'a> {
+    pub fn new(token_type: TokenType, range: Range, pos: Position<'a>) -> Self {
         Token {
             token_type: token_type,
-            range: range
+            range: range,
+            pos: pos
         }
+    }
+
+    pub fn source_span(&self) -> SourceSpan {
+        SourceSpan::new(SourceOffset::from(self.pos.idx()), self.range.end_pos() - self.range.start_pos())
+    }
+
+    pub fn end_span(&self) -> SourceSpan {
+        SourceSpan::new(SourceOffset::from(self.range.end_pos()), 1)
+    }
+
+    pub fn pos(&self) -> &Position {
+        &self.pos
     }
 
     pub fn token_type(&self) -> &TokenType {

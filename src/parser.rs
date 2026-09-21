@@ -1,14 +1,17 @@
+use miette::NamedSource;
+
+use crate::comet_error::SyntaxError;
 use crate::precedence::PrecedenceType;
 use crate::token::{Token, TokenType};
 use crate::ast::{ASTNode, ASTNodeType};
 
-pub struct Parser {
-    tokens: Vec<Token>,
+pub struct Parser <'a> {
+    tokens: Vec<Token<'a>>,
     token_index: usize,
 }
 
-impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+impl <'a> Parser <'a> {
+    pub fn new(tokens: Vec<Token<'a>>) -> Self {
         Parser {
             tokens: tokens,
             token_index: 0,
@@ -16,11 +19,11 @@ impl Parser {
     }
 
     // HELPER METHODS //
-    fn current_token(&self) -> Option<&Token> {
+    fn current_token(&self) -> Option<&Token<'a>> {
         self.tokens.get(self.token_index)
     }
 
-    fn peek_token(&self) -> Option<&Token> {
+    fn peek_token(&self) -> Option<&Token<'a>> {
         self.tokens.get(self.token_index + 1)
     }
 
@@ -40,7 +43,7 @@ impl Parser {
         return self.current_token().is_some() && (std::mem::discriminant(self.current_token().unwrap().token_type()) == std::mem::discriminant(token_type));
     }
 
-    fn expect_peek(&mut self, token_type: TokenType) -> Result<(), String> {
+    fn expect_peek(&mut self, token_type: TokenType) -> miette::Result<()> {
         if self.peek_token_is(&token_type) {
             self.advance_token();
             return Ok(());
@@ -48,10 +51,23 @@ impl Parser {
 
         let peek = self.peek_token();
 
+        let curr = self.current_token().unwrap();
+        let pos = curr.pos();
+
+        let err_src = NamedSource::new(pos.file_name(), String::from(pos.source()));
+
         if peek.is_none() {
-            Err(format!("Expected next token to be {:?}, got <EOF> instead.", token_type))
+            Err(SyntaxError {
+                span: curr.end_span(),
+                src: err_src,
+                text: format!("Expected next token to be {:?}, got <EOF> instead.", token_type)
+            }.into())
         } else {
-            Err(format!("Expected next token to be {:?}, got {:?} instead.", token_type, peek.unwrap().token_type()))
+            Err(SyntaxError {
+                span: curr.end_span(),
+                src: err_src,
+                text: format!("Expected next token to be {:?}, got {:?} instead.", token_type, peek.unwrap().token_type())
+            }.into())
         }
     }
 
@@ -73,7 +89,7 @@ impl Parser {
         peek_tok.unwrap().token_type().precedence()
     }
 
-    fn get_prefix_parse_func(&self, token_type: &TokenType) -> Option<fn(&mut Parser) -> Result<ASTNode, String>> {
+    fn get_prefix_parse_func(&self, token_type: &TokenType) -> Option<fn(&mut Parser<'a>) -> miette::Result<ASTNode<'a>>> {
         match token_type {
             // literals
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
@@ -86,7 +102,7 @@ impl Parser {
         }
     }
 
-    fn get_infix_parse_func(&self, token_type: &TokenType) -> Option<fn(&mut Parser, left_node: ASTNode) -> Result<ASTNode, String>> {
+    fn get_infix_parse_func(&self, token_type: &TokenType) -> Option<fn(&mut Parser<'a>, left_node: ASTNode<'a>) -> miette::Result<ASTNode<'a>>> {
         match token_type {
             TokenType::Plus => Some(Parser::parse_infix_expression),
             TokenType::Minus => Some(Parser::parse_infix_expression),
@@ -106,7 +122,7 @@ impl Parser {
     // END OF HELPER METHODS //
 
     // STATEMENT METHODS //
-    fn parse_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         match self.current_token().unwrap().token_type() {
             TokenType::Fun => self.parse_func_def_statement(),
             TokenType::Ret => self.parse_ret_statement(),
@@ -121,7 +137,7 @@ impl Parser {
         }
     }
 
-    fn parse_expression_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_expression_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         let expr = self.parse_expression(PrecedenceType::Lowest)?;
 
         self.advance_token();
@@ -130,7 +146,7 @@ impl Parser {
         Ok(stmt)
     }
 
-    fn parse_block_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_block_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         self.expect_peek(TokenType::OpenCurly)?;
 
         self.advance_token();
@@ -144,14 +160,14 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::Block(statements)))
     }
 
-    fn parse_type(&mut self) -> Result<ASTNode, String> {
+    fn parse_type(&mut self) -> miette::Result<ASTNode<'a>> {
         self.expect_peek(TokenType::Identifier(String::new()))?;
 
         // best rust code EVER
         Ok(ASTNode::new(ASTNodeType::TypeLiteral(Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(self.current_token().unwrap().token_type().as_identifier().cloned().unwrap()))))))
     }
 
-    fn parse_func_def_args(&mut self) -> Result<Vec<ASTNode>, String> {
+    fn parse_func_def_args(&mut self) -> miette::Result<Vec<ASTNode<'a>>> {
         let mut args = Vec::new();
 
         if self.peek_token_is(&TokenType::CloseParen) {
@@ -165,7 +181,7 @@ impl Parser {
             let arg_name = self.current_token()
                 .and_then(|token| token.token_type().as_identifier())
                 .cloned()
-                .ok_or_else(|| String::from("Expected an identifier argument"))?;
+                .unwrap();
 
             self.expect_peek(TokenType::Colon)?;
             
@@ -188,7 +204,7 @@ impl Parser {
         Ok(args)
     }
 
-    fn parse_func_def_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_func_def_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         /*
 
         - Example syntax: -
@@ -229,7 +245,7 @@ impl Parser {
         Ok(stmt)
     }
 
-    fn parse_ret_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_ret_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         self.advance_token();
         let result = self.parse_expression(PrecedenceType::Lowest)?;
 
@@ -238,7 +254,7 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::ReturnStatement(Some(Box::new(result)))))
     }
 
-    fn parse_assign_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_assign_statement(&mut self) -> miette::Result<ASTNode<'a>> {
 
         let ident = match self.current_token().unwrap().token_type() {
             TokenType::Identifier(value) => ASTNode::new(ASTNodeType::IdentifierLiteral(value.clone())),
@@ -271,7 +287,7 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::AssignStatement { ident: Box::new(left_side), type_: type_, value: Box::new(value) }))
     }
 
-    fn parse_match_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_match_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         let mut nodes: Vec<ASTNode> = vec![];
 
         self.advance_token(); // skip 'match'
@@ -335,7 +351,7 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::MatchStatement { expr: Box::new(match_expr), nodes: nodes, default: default_branch }))
     }
 
-    fn parse_if_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_if_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         self.advance_token(); // skip 'if'
 
         let expr = self.parse_expression(PrecedenceType::Lowest)?;
@@ -360,7 +376,7 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::IfStatement { expr: Box::new(expr), body: Box::new(body), else_body: else_body }))
     }
 
-    fn parse_while_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_while_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         self.advance_token(); // skip 'while'
 
         let expr = self.parse_expression(PrecedenceType::Lowest)?;
@@ -371,7 +387,7 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::WhileStatement { expr: Box::new(expr), body: Box::new(body) }))
     }
 
-    fn parse_struct_def_statement(&mut self) -> Result<ASTNode, String> {
+    fn parse_struct_def_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         self.expect_peek(TokenType::Identifier(String::new()))?;
 
         let ident = self.parse_identifier_literal()?;
@@ -404,10 +420,16 @@ impl Parser {
     // END OF STATEMENT METHODS //
 
     // EXPRESSION METHODS //
-    fn parse_expression(&mut self, precedence: PrecedenceType) -> Result<ASTNode, String> {
+    fn parse_expression(&mut self, precedence: PrecedenceType) -> miette::Result<ASTNode<'a>> {
         let prefix_fn = self.get_prefix_parse_func(self.current_token().unwrap().token_type());
         if prefix_fn.is_none() {
-            return Err(format!("No prefix function for {:?}", self.current_token().unwrap().token_type()));
+            let pos = self.current_token().unwrap().pos();
+
+            return Err(SyntaxError {
+                span: self.current_token().unwrap().source_span(),
+                src: NamedSource::new(pos.file_name(), String::from(pos.source())),
+                text: format!("No prefix function for {:?}", self.current_token().unwrap().token_type())
+            }.into());
         }
 
         let mut left_expr = prefix_fn.unwrap()(self)?;
@@ -415,7 +437,13 @@ impl Parser {
         while precedence < self.peek_precedence() {
             let infix_fn = self.get_infix_parse_func(self.peek_token().unwrap().token_type());
             if infix_fn.is_none() {
-                return Err(format!("No infix function for {:?}", self.peek_token().unwrap().token_type()));
+                let pos = self.peek_token().unwrap().pos();
+
+                return Err(SyntaxError {
+                    span: self.peek_token().unwrap().source_span(),
+                    src: NamedSource::new(pos.file_name(), String::from(pos.source())),
+                    text: format!("No infix function for {:?}", self.peek_token().unwrap().token_type())
+                }.into());
             }
 
             self.advance_token();
@@ -426,7 +454,7 @@ impl Parser {
         Ok(left_expr)
     }
 
-    fn parse_infix_expression(&mut self, left_node: ASTNode) -> Result<ASTNode, String> {
+    fn parse_infix_expression(&mut self, left_node: ASTNode<'a>) -> miette::Result<ASTNode<'a>> {
 
         let op = self.current_token().unwrap().clone();
 
@@ -443,7 +471,7 @@ impl Parser {
         }))
     }
 
-    fn parse_func_call(&mut self, left_node: ASTNode) -> Result<ASTNode, String> {
+    fn parse_func_call(&mut self, left_node: ASTNode<'a>) -> miette::Result<ASTNode<'a>> {
         let mut func_call_args: Vec<ASTNode> = Vec::new();
 
         let mut should_loop = true;
@@ -470,16 +498,16 @@ impl Parser {
         Ok(ASTNode::new(ASTNodeType::FuncCall { left: Box::new(left_node), args: func_call_args } ))
     }
 
-    fn parse_grouped_expression(&mut self) -> Result<ASTNode, String> {
+    fn parse_grouped_expression(&mut self) -> miette::Result<ASTNode<'a>> {
         self.advance_token();
 
-        let expr = self.parse_expression(PrecedenceType::Lowest);
+        let expr = self.parse_expression(PrecedenceType::Lowest)?;
         self.expect_peek(TokenType::CloseParen)?;
 
-        expr
+        Ok(expr)
     }
 
-    fn parse_struct_create_expr(&mut self) -> Result<ASTNode, String> {
+    fn parse_struct_create_expr(&mut self) -> miette::Result<ASTNode<'a>> {
         let type_ = self.parse_type()?;
         self.expect_peek(TokenType::OpenCurly)?;
 
@@ -515,17 +543,20 @@ impl Parser {
     // END OF EXPRESSION METHODS //
 
     // PREFIX METHODS //
-    fn parse_int_literal(&mut self) -> Result<ASTNode, String> {
+    fn parse_int_literal(&mut self) -> miette::Result<ASTNode<'a>> {
         let token = self.current_token().cloned().unwrap();
-
-            
-
 
         match token.token_type() {
             TokenType::IntLiteral(value) => {
                 let result = value.parse::<u64>();
                 if result.is_err() {
-                    return Err(String::from("failed to parse int"));
+                    let pos = token.pos();
+
+                    return Err(SyntaxError {
+                        span: token.source_span(),
+                        src: NamedSource::new(pos.file_name(), String::from(pos.source())),
+                        text: format!("failed to parse '{:?}' as an integer", token.token_type())
+                    }.into());
                 }
 
                 return Ok(ASTNode::new(ASTNodeType::IntLiteral(result.unwrap())));
@@ -534,14 +565,20 @@ impl Parser {
         }
     }
 
-    fn parse_float_literal(&mut self) -> Result<ASTNode, String> {
+    fn parse_float_literal(&mut self) -> miette::Result<ASTNode<'a>> {
         let token = self.current_token().cloned().unwrap();
 
         match token.token_type() {
             TokenType::FloatLiteral(value) => {
                 let result = value.parse::<f64>();
                 if result.is_err() {
-                    return Err(String::from("failed to parse float"));
+                    let pos = token.pos();
+
+                    return Err(SyntaxError {
+                        span: token.source_span(),
+                        src: NamedSource::new(pos.file_name(), String::from(pos.source())),
+                        text: format!("failed to parse '{:?}' as a float", token.token_type())
+                    }.into());
                 }
 
                 return Ok(ASTNode::new(ASTNodeType::FloatLiteral(result.unwrap())));
@@ -550,7 +587,7 @@ impl Parser {
         }
     }
 
-    fn parse_identifier_literal(&mut self) -> Result<ASTNode, String> {
+    fn parse_identifier_literal(&mut self) -> miette::Result<ASTNode<'a>> {
         let token = self.current_token().cloned().unwrap();
 
         match token.token_type() {
@@ -563,7 +600,7 @@ impl Parser {
     // END OF PREFIX METHODS //
     
 
-    pub fn parse(&mut self) -> Result<ASTNode, String> {
+    pub fn parse(&mut self) -> miette::Result<ASTNode<'a>> {
         let mut root = ASTNode::new(ASTNodeType::Program(Vec::new()));
 
         while self.peek_token().is_some() {
