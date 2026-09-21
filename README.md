@@ -23,50 +23,50 @@ Comet is a fast, compiled programming language built on top of C and running on 
 - [x] Variables
 - [x] Loops
   - [x] While loops
-  - [x] For loops
+  - [ ] For loops
 - [ ] Standard library
-  - [x] IO - Input/Output
-    - [x] Printing
-    - [x] File IO
+  - [ ] IO - Input/Output
+    - [ ] Printing
+    - [ ] File IO
   - [ ] Collections - data structures
     - [ ] List
     - [ ] Hashmap
   - [ ] String - string handling and management
   - [ ] Sockets
     - [ ] IPv6
-    - [x] IPv4
-    - [x] Core features
-- [x] Imports
-  - [x] Package system
-  - [x] Package manager
+    - [ ] IPv4
+    - [ ] Core features
+- [ ] Imports
+  - [ ] Package system
+  - [ ] Package manager
 - [x] Functions
   - [x] Returning
-  - [x] Inline functions
+  - [ ] Inline functions
 - [ ] Structs
   - [ ] Struct definition
     - [x] Fields
-      - [x] Private/protected/readonly
-      - [x] Default values
-      - [x] Accessing / setting fields
-    - [x] Methods
-    - [x] Special methods (as, etc...)
-    - [x] Constructor
-    - [x] Destructor
+      - [ ] Private/protected/readonly
+      - [ ] Default values
+      - [ ] Accessing / setting fields
+    - [ ] Methods
+    - [ ] Special methods (as, etc...)
+    - [ ] Constructor
+    - [ ] Destructor
   - [x] "new" keyword
-  - [x] Calling methods
-  - [x] Inheritance
+  - [ ] Calling methods
+  - [ ] Inheritance
   - [ ] Generics
-    - [x] Base generics (creation, type checking, etc...)
+    - [ ] Base generics (creation, type checking, etc...)
     - [ ] Generic constraints
 - [x] Command line args
-- [x] Arrays
-  - [x] Creation
-  - [x] Access
-  - [x] Changing values
-- [x] Exceptions
-  - [x] Throw exceptions
-  - [x] Catch exceptions
-- [x] Enums
+- [ ] Arrays
+  - [ ] Creation
+  - [ ] Access
+  - [ ] Changing values
+- [ ] Exceptions
+  - [ ] Throw exceptions
+  - [ ] Catch exceptions
+- [ ] Enums
 
 ## Syntax and Creating External Libs
 - Syntax and tutorial: [Comet Website](https://chsp.au/Comet/Comet/docs.html)
