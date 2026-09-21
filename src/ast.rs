@@ -8,6 +8,7 @@ pub enum ASTNodeType {
 
     FuncArgDefinition { name: Box<ASTNode>, type_: Box<ASTNode> },
     MatchNode { expressions: Vec<ASTNode>, block: Box<ASTNode> },
+    StructFieldDefinition { ident: Box<ASTNode>, type_: Box<ASTNode> },
 
     // statements
     ExpressionStatement(Box<ASTNode>),
@@ -17,6 +18,7 @@ pub enum ASTNodeType {
     MatchStatement { expr: Box<ASTNode>, nodes: Vec<ASTNode>, default: Option<Box<ASTNode>> },
     IfStatement { expr: Box<ASTNode>, body: Box<ASTNode>, else_body: Option<Box<ASTNode>> },
     WhileStatement { expr: Box<ASTNode>, body: Box<ASTNode> },
+    StructDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode> },
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },

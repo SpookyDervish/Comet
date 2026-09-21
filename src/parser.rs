@@ -107,6 +107,7 @@ impl Parser {
             TokenType::Match => self.parse_match_statement(),
             TokenType::If => self.parse_if_statement(),
             TokenType::While => self.parse_while_statement(),
+            TokenType::Struct => self.parse_struct_def_statement(),
 
             TokenType::Identifier(_) => self.parse_assign_statement(),
 
@@ -352,6 +353,37 @@ impl Parser {
         self.advance_token();
 
         Ok(ASTNode::new(ASTNodeType::WhileStatement { expr: Box::new(expr), body: Box::new(body) }))
+    }
+
+    fn parse_struct_def_statement(&mut self) -> Result<ASTNode, String> {
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+
+        let ident = self.parse_identifier_literal()?;
+
+        self.expect_peek(TokenType::OpenCurly)?;
+
+        let mut fields: Vec<ASTNode> = Vec::new();
+
+        while !self.peek_token_is(&TokenType::CloseCurly) {
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+
+            let field_ident = self.parse_identifier_literal()?;
+
+            self.expect_peek(TokenType::Colon)?;
+
+            let field_type = self.parse_type()?;
+            fields.push(ASTNode::new(ASTNodeType::StructFieldDefinition { ident: Box::new(field_ident), type_: Box::new(field_type) }));
+        
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            self.expect_peek(TokenType::CloseCurly)?;
+            break;
+        }
+
+        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields }))
     }
     // END OF STATEMENT METHODS //
 
