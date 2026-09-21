@@ -695,6 +695,43 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
+    fn visit_struct_def_statement(&mut self, node: &'a ASTNode) -> Result<(), String> {
+        let (ident_node, field_nodes) = match node.node_type() {
+            ASTNodeType::StructDefinitionStatement { ident, fields } => (ident, fields),
+            _ => unreachable!()
+        };
+
+        let ident = match ident_node.node_type() {
+            ASTNodeType::IdentifierLiteral(value) => value,
+            _ => unreachable!()
+        };
+
+        let mut fields: Vec<CometStructField> = Vec::new();
+
+        for field_node in field_nodes {
+            let (field_ident_node, field_type_node) = match field_node.node_type() {
+                ASTNodeType::StructFieldDefinition { ident, type_ } => (ident, type_),
+                _ => unreachable!()
+            };
+
+            let field_name = match field_ident_node.node_type() {
+                ASTNodeType::IdentifierLiteral(value) => value,
+                _ => unreachable!()
+            };
+
+            let field_type = self.get_type_literal_type(field_type_node)?;
+
+            fields.push(CometStructField::new(field_name.clone(), field_type.clone()));
+        }
+
+        let new_struct = CometStruct::new(ident.clone(), fields);
+        self.scopes.last_mut().unwrap().types.insert(ident, CometType::new_struct(new_struct));
+        
+        println!("{:#?}", self.scopes.last().unwrap().types);
+
+        Ok(())
+    }
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &'a ASTNode, builder: Option<&mut FunctionBuilder>) -> Result<(), String> {
@@ -708,7 +745,8 @@ impl <'a> Compiler <'a> {
             ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
             ASTNodeType::MatchStatement { expr: _, nodes: _, default: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
             ASTNodeType::IfStatement { expr: _, body: _, else_body: _ } => { return self.visit_if_statement(ast, builder.unwrap()) },
-            ASTNodeType::WhileStatement { expr: _, body: _ } => { return self.visit_while_statement(ast, builder.unwrap()); }
+            ASTNodeType::WhileStatement { expr: _, body: _ } => { return self.visit_while_statement(ast, builder.unwrap()); },
+            ASTNodeType::StructDefinitionStatement { ident: _, fields: _ } => { return self.visit_struct_def_statement(ast); },
 
             _ => {
                 Err(format!("No compiler visit method for {:?}", ast.node_type()))

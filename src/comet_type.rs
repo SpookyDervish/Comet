@@ -28,6 +28,14 @@ impl CometType {
         }
     }
 
+    pub fn new_struct(comet_struct: CometStruct) -> Self {
+        CometType {
+            cranelift_type: types::I64,
+            signed: false,
+            comet_struct: Some(comet_struct)
+        }
+    }
+
     pub fn try_implicit_cast(value: Value, value_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder) -> Result<Value, String> {
         let their_type = target_type.cranelift_type;
 
