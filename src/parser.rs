@@ -28,6 +28,10 @@ impl Parser {
         self.token_index += 1;
     }
 
+    fn step_back_token(&mut self) {
+        self.token_index -= 1;
+    }
+
     fn peek_token_is(&self, token_type: &TokenType) -> bool {
         return self.peek_token().is_some() && (std::mem::discriminant(self.peek_token().unwrap().token_type()) == std::mem::discriminant(token_type));
     }
@@ -464,7 +468,9 @@ impl Parser {
     }
 
     fn parse_struct_create_expr(&mut self) -> Result<ASTNode, String> {
-        let ident = self.parse_identifier_literal()?;
+        self.step_back_token();
+
+        let type_ = self.parse_type()?;
         self.expect_peek(TokenType::OpenCurly)?;
 
         let mut fields: Vec<ASTNode> = Vec::new();
@@ -486,13 +492,11 @@ impl Parser {
             }
 
             self.expect_peek(TokenType::CloseCurly)?;
-            self.advance_token();
 
             break;
         }
-        
 
-        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields }))
+        Ok(ASTNode::new(ASTNodeType::StructCreateExpression { type_: Box::new(type_), fields: fields }))
     }
     // END OF EXPRESSION METHODS //
 

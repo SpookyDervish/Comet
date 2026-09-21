@@ -24,7 +24,7 @@ pub enum ASTNodeType {
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
     FuncCall { left: Box<ASTNode>, args: Vec<ASTNode> },
-    StructCreateExpression { ident: Box<ASTNode>, fields: Vec<ASTNode> },
+    StructCreateExpression { type_: Box<ASTNode>, fields: Vec<ASTNode> },
 
     // literals
     IntLiteral(u64),

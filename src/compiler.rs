@@ -180,6 +180,11 @@ impl <'a> Compiler <'a> {
                 let out_type = CometType::new_int(types::I64, true);
 
                 Ok(out_type)
+            },
+
+            ASTNodeType::StructCreateExpression { type_, fields: _ } => {
+                let struct_type = self.get_type_literal_type(type_)?;
+                Ok(struct_type.clone())
             }
 
             _ => Err(format!("Can't resolve type of '{:?}'", node.node_type()))
@@ -271,6 +276,25 @@ impl <'a> Compiler <'a> {
 
                 Ok(results[0])
                 
+            },
+
+            ASTNodeType::StructCreateExpression { type_: type_node, fields } => {
+                let struct_type = self.get_type_literal_type(type_node)?;
+                if struct_type.comet_struct.is_none() {
+                    return Err(format!("Type '{:?}' is not a struct.", struct_type.cranelift_type));
+                }
+
+                let comet_struct = struct_type.comet_struct.as_ref().unwrap();
+                let struct_layout = comet_struct.get_layout();
+
+                let stack_slot = builder.create_sized_stack_slot(StackSlotData::new( 
+                    StackSlotKind::ExplicitSlot,
+                    struct_layout.1,
+                    8
+                ));
+                let addr = builder.ins().stack_addr(types::I64, stack_slot, 0);
+
+                Ok(addr)
             },
 
             _ => Err(format!("Cannot compile r-value '{:?}'", node.node_type()))
