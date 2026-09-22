@@ -1,11 +1,10 @@
-use miette::{NamedSource, SourceSpan};
+use miette::NamedSource;
 
 use crate::comet_error::SyntaxError;
-use crate::position::Position;
 use crate::precedence::PrecedenceType;
 use crate::range::Range;
 use crate::token::{Token, TokenType};
-use crate::ast::{ASTNode, ASTNodeType};
+use crate::ast::{ASTNode, ASTNodeType, ASTType};
 
 pub struct Parser <'a> {
     tokens: Vec<Token<'a>>,
@@ -132,6 +131,7 @@ impl <'a> Parser <'a> {
             TokenType::If => self.parse_if_statement(),
             TokenType::While => self.parse_while_statement(),
             TokenType::Struct => self.parse_struct_def_statement(),
+            TokenType::Hash => self.parse_compiler_directive(),
 
             _ => self.parse_expression_or_assignment_statement()
         }
@@ -197,12 +197,51 @@ impl <'a> Parser <'a> {
             statements.push(self.parse_statement()?);
         }
 
-        block_range.end(self.current_token().unwrap().pos());
+        block_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::Block(statements), block_range.source_span()))
     }
 
+    // TYPE PARSING //
+    fn parse_function_type(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        self.expect_peek(TokenType::Fun)?;
+        self.expect_peek(TokenType::OpenParen)?;
+
+        let mut arg_types: Vec<ASTNode> = Vec::new();
+
+        while !self.peek_token_is(&TokenType::CloseParen) {
+            let arg_type = self.parse_type()?;
+            arg_types.push(arg_type);
+
+            if self.peek_token_is(&TokenType::CloseParen) {
+                break;
+            }
+
+            self.expect_peek(TokenType::Comma)?;
+            self.advance_token();
+        }
+
+        self.advance_token();
+
+        let mut return_type = None;
+        if self.peek_token_is(&TokenType::ColonColon) {
+            self.advance_token();
+
+            return_type = Some(Box::new(self.parse_type()?));
+        }
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::TypeLiteral(ASTType::Function { arg_types: arg_types, return_type: return_type }), range.source_span() ))
+    }
+
     fn parse_type(&mut self) -> miette::Result<ASTNode<'a>> {
+        if self.peek_token_is(&TokenType::Fun) {
+            return self.parse_function_type();
+        }
+
         self.expect_peek(TokenType::Identifier(String::new()))?;
 
         let curr = &self.current_token().unwrap();
@@ -215,11 +254,9 @@ impl <'a> Parser <'a> {
 
         let source_span = curr.source_span().clone();
 
-        
-        Ok(ASTNode::new(ASTNodeType::TypeLiteral(Box::new(
-            ident_node
-        )), source_span))
+        Ok(ASTNode::new(ASTNodeType::TypeLiteral(ASTType::Identifier(Box::new(ident_node))), source_span))
     }
+    // END OF TYPE PARSING //
 
     fn parse_func_def_args(&mut self) -> miette::Result<Vec<ASTNode<'a>>> {
         let mut args = Vec::new();
@@ -244,7 +281,7 @@ impl <'a> Parser <'a> {
             self.expect_peek(TokenType::Colon)?;
             
             let type_ = self.parse_type()?;
-            arg_range.end(self.current_token().unwrap().pos());
+            arg_range.end(self.current_token().unwrap().end_pos());
 
             args.push(ASTNode::new(ASTNodeType::FuncArgDefinition { 
                 name: Box::new(ASTNode::new(ASTNodeType::IdentifierLiteral(arg_name), name_span)),
@@ -296,7 +333,7 @@ impl <'a> Parser <'a> {
         // parse function body
         let body = self.parse_block_statement()?;
 
-        func_range.end(self.current_token().unwrap().pos());
+        func_range.end(self.current_token().unwrap().end_pos());
 
         // return
         let stmt = ASTNode::new(ASTNodeType::FuncDefinitionStatement { 
@@ -316,7 +353,7 @@ impl <'a> Parser <'a> {
 
         self.advance_token();
 
-        ret_range.end(self.current_token().unwrap().pos());
+        ret_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::ReturnStatement(Some(Box::new(result))), ret_range.source_span()))
     }
@@ -365,7 +402,7 @@ impl <'a> Parser <'a> {
 
                 let block = self.parse_block_statement()?;
 
-                expressions_range.end(self.current_token().unwrap().pos());
+                expressions_range.end(self.current_token().unwrap().end_pos());
 
                 nodes.push(ASTNode::new(ASTNodeType::MatchNode { expressions: expressions, block: Box::new(block) }, expressions_range.source_span()));
 
@@ -386,7 +423,7 @@ impl <'a> Parser <'a> {
 
         self.expect_peek(TokenType::CloseCurly)?;
 
-        match_range.end(self.current_token().unwrap().pos());
+        match_range.end(self.current_token().unwrap().end_pos());
 
         self.advance_token(); // skip extra '}'
 
@@ -415,7 +452,7 @@ impl <'a> Parser <'a> {
             }
         }
 
-        if_range.end(self.current_token().unwrap().pos());
+        if_range.end(self.current_token().unwrap().end_pos());
 
         self.advance_token();
 
@@ -432,7 +469,7 @@ impl <'a> Parser <'a> {
 
         self.advance_token();
 
-        while_range.end(self.current_token().unwrap().pos());
+        while_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::WhileStatement { expr: Box::new(expr), body: Box::new(body) }, while_range.source_span()))
     }
@@ -457,7 +494,7 @@ impl <'a> Parser <'a> {
             self.expect_peek(TokenType::Colon)?;
 
             let field_type = self.parse_type()?;
-            field_range.end(self.current_token().unwrap().pos());
+            field_range.end(self.current_token().unwrap().end_pos());
 
             fields.push(ASTNode::new(
                 ASTNodeType::StructFieldDefinition { ident: Box::new(field_ident), type_: Box::new(field_type) },
@@ -473,7 +510,7 @@ impl <'a> Parser <'a> {
             break;
         }
 
-        struct_range.end(self.current_token().unwrap().pos());
+        struct_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields }, struct_range.source_span()))
     }
@@ -526,7 +563,7 @@ impl <'a> Parser <'a> {
         self.advance_token();
 
         let right_node = self.parse_expression(precedence)?;
-        expr_range.end(self.current_token().unwrap().pos());
+        expr_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::InfixExpression {
             left: Box::new(left_node),
@@ -561,7 +598,7 @@ impl <'a> Parser <'a> {
             break;
         }
 
-        func_call_range.end(self.current_token().unwrap().pos());
+        func_call_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::FuncCall { left: Box::new(left_node), args: func_call_args }, func_call_range.source_span() ))
     }
@@ -573,6 +610,25 @@ impl <'a> Parser <'a> {
         self.expect_peek(TokenType::CloseParen)?;
 
         Ok(expr)
+    }
+
+    fn parse_compiler_directive(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+        let directive = self.parse_identifier_literal()?;
+
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+
+        let value_name = self.parse_identifier_literal()?;
+
+        self.advance_token();
+
+        let value_type = self.parse_type()?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::CompilerDirectiveStatement { directive: Box::new(directive), value_name: Box::new(value_name), value_type: Box::new(value_type) }, range.source_span()))
     }
 
     fn parse_struct_create_expr(&mut self) -> miette::Result<ASTNode<'a>> {
@@ -596,7 +652,7 @@ impl <'a> Parser <'a> {
             self.advance_token();
 
             let value = self.parse_expression(PrecedenceType::Lowest)?;
-            struct_field_range.end(self.current_token().unwrap().pos());
+            struct_field_range.end(self.current_token().unwrap().end_pos());
 
             fields.push(ASTNode::new(ASTNodeType::StructField { ident: Box::new(field_ident), value: Box::new(value) }, struct_field_range.source_span()));
 
@@ -610,7 +666,7 @@ impl <'a> Parser <'a> {
             break;
         }
 
-        struct_create_range.end(self.current_token().unwrap().pos());
+        struct_create_range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::StructCreateExpression { type_: Box::new(type_), fields: fields }, struct_create_range.source_span()))
     }

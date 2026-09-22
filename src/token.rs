@@ -21,6 +21,7 @@ pub enum TokenType {
     Colon, Comma, ColonColon,
     BitwiseOr, BitwiseAnd,
     Or, And,
+    Hash,
     Dot,
 
     // literals
@@ -79,15 +80,17 @@ impl TokenType {
 pub struct Token <'a>  {
     range: Range,
     pos: Position <'a>,
+    end_pos: Position <'a>,
     token_type: TokenType
 }
 
 impl <'a> Token <'a> {
-    pub fn new(token_type: TokenType, range: Range, pos: Position<'a>) -> Self {
+    pub fn new(token_type: TokenType, range: Range, pos: Position<'a>, end_pos: Position<'a>) -> Self {
         Token {
             token_type: token_type,
             range: range,
-            pos: pos
+            pos: pos,
+            end_pos: end_pos
         }
     }
 
@@ -101,6 +104,9 @@ impl <'a> Token <'a> {
 
     pub fn pos(&self) -> &Position<'a> {
         &self.pos
+    }
+    pub fn end_pos(&self) -> &Position<'a> {
+        &self.end_pos
     }
 
     pub fn token_type(&self) -> &TokenType {

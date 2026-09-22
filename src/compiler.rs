@@ -7,8 +7,10 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::cell::RefCell;
 
+use crate::ast::ASTType;
 use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
+use crate::comet_type::{CometFunction, CometTypeKind};
 use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
@@ -83,23 +85,47 @@ impl <'a> Compiler <'a> {
         self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
     }
 
-    fn get_type_literal_type (&self, node: &ASTNode) -> miette::Result<&CometType> {
-        let ident_node = match node.node_type() {
-            ASTNodeType::TypeLiteral(value) => &**value,
+    fn get_type_literal_type (&self, node: &ASTNode) -> miette::Result<CometType> {
+
+        let ast_type = match node.node_type() {
+            ASTNodeType::TypeLiteral(value) => value,
             _ => unreachable!()
         };
 
-        let ident = match ident_node.node_type() {
-            ASTNodeType::IdentifierLiteral(value) => value,
-            _ => unreachable!()
-        };
+        match ast_type {
+            ASTType::Identifier(struct_name) => {
+                let ident_node = match struct_name.as_ref().node_type() {
+                    ASTNodeType::IdentifierLiteral(value) => value,
+                    _ => unreachable!()
+                };
 
-        let comet_type = self.get_type(&ident.as_str());
-        comet_type.ok_or(UnkownType {
-            span: ident_node.source_span(),
-            src: self.named_source(),
-            type_: ident.clone()
-        }.into())
+                self.get_type(ident_node.as_str()).cloned().ok_or(UnkownType {
+                    span: struct_name.source_span(),
+                    src: self.named_source(),
+                    type_: ident_node.clone()
+                }.into())
+            },
+
+            ASTType::Function { arg_types, return_type: return_type_node } => {
+                let compiled_arg_types: miette::Result<Vec<CometType>> = arg_types
+                                            .iter()
+                                            .map(|t| self.get_type_literal_type(t))
+                                            .collect();
+                let compiled_arg_types = compiled_arg_types?;
+
+                let return_type = return_type_node
+                    .as_deref()
+                    .map(|t| self.get_type_literal_type(t))
+                    .transpose()?
+                    .unwrap_or_else(|| CometType::new(types::INVALID));
+
+                Ok(CometType::new_function(CometFunction {
+                    arg_types: compiled_arg_types,
+                    return_type: Box::new(return_type)
+                }))
+            }
+        }
+        
     }
 
     fn rank_type(&self, type_: &CometType) -> u8 {
@@ -161,12 +187,15 @@ impl <'a> Compiler <'a> {
 
                 match op.token_type() {
                     TokenType::Dot => {
-                        let struct_type = left_value.comet_struct.as_ref().ok_or(InvalidOperator {
-                            op: op.token_type().clone(),
-                            span: op.source_span(),
-                            src: self.named_source(),
-                            value: String::from("on non-struct")
-                        })?;
+                        let struct_type = match left_value.kind {
+                            CometTypeKind::Struct(comet_struct) => comet_struct,
+                            _ => { return Err(InvalidOperator {
+                                    op: op.token_type().clone(),
+                                    span: op.source_span(),
+                                    src: self.named_source(),
+                                    value: String::from("on non-struct")
+                                }.into()); }
+                        };
 
                         let field_name = match right.node_type() {
                             ASTNodeType::IdentifierLiteral(value) => value,
@@ -340,17 +369,18 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::StructCreateExpression { type_: type_node, fields } => {
                 let struct_type = self.get_type_literal_type(type_node)?;
-                if struct_type.comet_struct.is_none() {
-                    return Err(TypeMismatch {
+
+                let comet_struct = match struct_type.kind {
+                    CometTypeKind::Struct(value) => value,
+
+                    _ => { return Err(TypeMismatch {
                         src: self.named_source(),
                         expected: String::from("struct"),
                         invalid: struct_type.cranelift_type.to_string(),
                         span: type_node.source_span()
-                    }.into());
-                }
-                let struct_type = struct_type.clone();
+                    }.into()); }
+                };
 
-                let comet_struct = struct_type.comet_struct.as_ref().unwrap();
                 let struct_layout = comet_struct.get_layout();
 
                 let stack_slot = builder.create_sized_stack_slot(StackSlotData::new( 
@@ -412,14 +442,15 @@ impl <'a> Compiler <'a> {
 
                 match op.token_type() {
                     TokenType::Dot => {
-                        if left_type.comet_struct.is_none() {
-                            return Err(InvalidOperator {
-                                op: op.token_type().clone(),
-                                span: op.source_span(),
-                                src: self.named_source(),
-                                value: String::from("on non-struct")
-                            }.into());
-                        }
+                        let comet_struct = match left_type.kind {
+                            CometTypeKind::Struct(value) => value,
+                            _ => {  return Err(InvalidOperator {
+                                        op: op.token_type().clone(),
+                                        span: op.source_span(),
+                                        src: self.named_source(),
+                                        value: String::from("on non-struct")
+                                    }.into()); }
+                        };
 
                         let field_name = match right.node_type() {
                             ASTNodeType::IdentifierLiteral(value) => value,
@@ -430,7 +461,6 @@ impl <'a> Compiler <'a> {
                             }.into()); }
                         };
 
-                        let comet_struct = left_type.comet_struct.unwrap();
                         let comet_struct_layout = comet_struct.get_layout();
 
                         let field = comet_struct.get_field(field_name);
@@ -524,14 +554,15 @@ impl <'a> Compiler <'a> {
 
         let left = self.visit_value(left_node, builder)?;
         let struct_type = self.resolve_type(left_node)?;
-        if struct_type.comet_struct.is_none() {
-            return Err(TypeMismatch {
-                src: self.named_source(),
-                expected: String::from("struct"),
-                invalid: struct_type.cranelift_type.to_string(),
-                span: left_node.source_span()
-            }.into());
-        }
+        let comet_struct = match struct_type.kind {
+            CometTypeKind::Struct(value) => value,
+            _ => {  return Err(TypeMismatch {
+                        src: self.named_source(),
+                        expected: String::from("struct"),
+                        invalid: struct_type.cranelift_type.to_string(),
+                        span: left_node.source_span()
+                    }.into()); }
+        };
 
         let field_name = match right_node.node_type() {
             ASTNodeType::IdentifierLiteral(value) => value,
@@ -541,8 +572,6 @@ impl <'a> Compiler <'a> {
                 span: right_node.source_span()
             }.into()); }
         };
-
-        let comet_struct = struct_type.comet_struct.as_ref().unwrap();
 
         let field_index = comet_struct.get_field_index(field_name).ok_or_else(|| UnkownField {
             struct_name: String::from(comet_struct.name()),
@@ -761,14 +790,13 @@ impl <'a> Compiler <'a> {
         let new_variable = Variable::from_u32(self.var_index);
         self.var_index += 1;
         
+        let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
         let mut final_type = &value_type;
         if type_node.is_some() {
             // get type of type annotation
-            let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
-
-            if var_type != &value_type {
+            if var_type != value_type {
                 value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, builder, self.named_source())?;
-                final_type = var_type;
+                final_type = &var_type;
             } else {
                 final_type = self.unify_types(&final_type, &var_type);
             }

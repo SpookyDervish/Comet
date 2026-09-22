@@ -42,12 +42,13 @@ impl<'file> Lexer<'file> {
         }
 
         range.end(&self.pos);
+        let end_pos = self.pos.clone();
 
         let keyword = TokenType::keyword(&word_string);
         if keyword.is_some() {
-            Token::new(keyword.unwrap(), range, start_pos)
+            Token::new(keyword.unwrap(), range, start_pos, end_pos)
         } else {
-            Token::new(TokenType::Identifier(word_string), range, start_pos)
+            Token::new(TokenType::Identifier(word_string), range, start_pos, end_pos)
         }
     }
 
@@ -76,11 +77,12 @@ impl<'file> Lexer<'file> {
         }
 
         range.end(&self.pos);
+        let end_pos = self.pos.clone();
 
         if dot_count > 0 {
-            Token::new(TokenType::FloatLiteral(number_string), range, start_pos)
+            Token::new(TokenType::FloatLiteral(number_string), range, start_pos, end_pos)
         } else {
-            Token::new(TokenType::IntLiteral(number_string), range, start_pos)
+            Token::new(TokenType::IntLiteral(number_string), range, start_pos, end_pos)
         }
     }
 
@@ -98,19 +100,19 @@ impl<'file> Lexer<'file> {
                 }
 
                 '+' => {
-                    tokens.push(Token::new(TokenType::Plus, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Plus, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '-' => {
-                    tokens.push(Token::new(TokenType::Minus, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Minus, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '*' => {
-                    tokens.push(Token::new(TokenType::Times, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Times, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '/' => {
-                    tokens.push(Token::new(TokenType::Divide, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Divide, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '=' => {
@@ -118,10 +120,10 @@ impl<'file> Lexer<'file> {
                     self.consume();
 
                     if self.current_char != '=' {
-                        tokens.push(Token::new(TokenType::Eq, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::Eq, range, self.pos.clone(), self.pos.clone()));
                     } else {
                         range.end(&self.pos);
-                        tokens.push(Token::new(TokenType::EqEq, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::EqEq, range, self.pos.clone(), self.pos.clone()));
                         self.consume();
                     }
                     
@@ -132,10 +134,10 @@ impl<'file> Lexer<'file> {
                     self.consume();
 
                     if self.current_char != '=' {
-                        tokens.push(Token::new(TokenType::Not, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::Not, range, self.pos.clone(), self.pos.clone()));
                     } else {
                         range.end(&self.pos);
-                        tokens.push(Token::new(TokenType::NotEq, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::NotEq, range, self.pos.clone(), self.pos.clone()));
                         self.consume();
                     }
                     
@@ -146,10 +148,10 @@ impl<'file> Lexer<'file> {
                     self.consume();
 
                     if self.current_char != '=' {
-                        tokens.push(Token::new(TokenType::Gt, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::Gt, range, self.pos.clone(), self.pos.clone()));
                     } else {
                         range.end(&self.pos);
-                        tokens.push(Token::new(TokenType::GtEq, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::GtEq, range, self.pos.clone(), self.pos.clone()));
                         self.consume();
                     }
                     
@@ -160,29 +162,29 @@ impl<'file> Lexer<'file> {
                     self.consume();
 
                     if self.current_char != '=' {
-                        tokens.push(Token::new(TokenType::Lt, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::Lt, range, self.pos.clone(), self.pos.clone()));
                     } else {
                         range.end(&self.pos);
-                        tokens.push(Token::new(TokenType::LtEq, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::LtEq, range, self.pos.clone(), self.pos.clone()));
                         self.consume();
                     }
                     
                     
                 }
                 '(' => {
-                    tokens.push(Token::new(TokenType::OpenParen, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::OpenParen, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 ')' => {
-                    tokens.push(Token::new(TokenType::CloseParen, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::CloseParen, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '{' => {
-                    tokens.push(Token::new(TokenType::OpenCurly, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::OpenCurly, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '}' => {
-                    tokens.push(Token::new(TokenType::CloseCurly, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::CloseCurly, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 ':' => {
@@ -190,29 +192,33 @@ impl<'file> Lexer<'file> {
                     self.consume();
 
                     if self.current_char != ':' {
-                        tokens.push(Token::new(TokenType::Colon, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::Colon, range, self.pos.clone(), self.pos.clone()));
                     } else {
                         range.end(&self.pos);
-                        tokens.push(Token::new(TokenType::ColonColon, range, self.pos.clone()));
+                        tokens.push(Token::new(TokenType::ColonColon, range, self.pos.clone(), self.pos.clone()));
                         self.consume();
                     }
                     
                     
                 }
                 ',' => {
-                    tokens.push(Token::new(TokenType::Comma, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Comma, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '.' => {
-                    tokens.push(Token::new(TokenType::Dot, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Dot, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '|' => {
-                    tokens.push(Token::new(TokenType::BitwiseOr, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::BitwiseOr, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '&' => {
-                    tokens.push(Token::new(TokenType::BitwiseAnd, Range::from(&self.pos), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::BitwiseAnd, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    self.consume();
+                }
+                '#' => {
+                    tokens.push(Token::new(TokenType::Hash, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
 

@@ -5,11 +5,26 @@ use miette::NamedSource;
 
 use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
 
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub struct CometFunction {
+    pub arg_types: Vec<CometType>,
+    pub return_type: Box<CometType>
+
+
+}
+
+#[derive(Clone, Eq, PartialEq, Debug)]
+pub enum CometTypeKind {
+    Struct(CometStruct),
+    Function(CometFunction),
+    Scalar
+}
+
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
     pub cranelift_type: types::Type,
     pub signed: bool,
-    pub comet_struct: Option<CometStruct>
+    pub kind: CometTypeKind
 }
 
 impl CometType {
@@ -17,22 +32,28 @@ impl CometType {
         CometType { 
             cranelift_type: cranelift_type,
             signed: false,
-            comet_struct: None
+            kind: CometTypeKind::Scalar
         }
     }
     pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
             signed: signed,
-            comet_struct: None
+            kind: CometTypeKind::Scalar
         }
     }
-
     pub fn new_struct(comet_struct: CometStruct) -> Self {
         CometType {
             cranelift_type: types::I64,
             signed: false,
-            comet_struct: Some(comet_struct)
+            kind: CometTypeKind::Struct(comet_struct)
+        }
+    }
+    pub fn new_function(comet_function: CometFunction) -> Self {
+        CometType {
+            cranelift_type: types::I64,
+            signed: false,
+            kind: CometTypeKind::Function(comet_function)
         }
     }
 

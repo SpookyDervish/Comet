@@ -2,6 +2,13 @@ use miette::{SourceOffset, SourceSpan};
 
 use crate::token::Token;
 
+#[derive(Debug)]
+pub enum ASTType<'a> {
+    Identifier(Box<ASTNode<'a>>),
+    Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } 
+    
+}
+
 // TODO: use an arena allocator instead of heap allocating all the nodes
 #[derive(Debug)]
 pub enum ASTNodeType<'a> {
@@ -22,6 +29,7 @@ pub enum ASTNodeType<'a> {
     IfStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>>, else_body: Option<Box<ASTNode<'a>>> },
     WhileStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>> },
     StructDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>> },
+    CompilerDirectiveStatement { directive: Box<ASTNode<'a>>, value_name: Box<ASTNode<'a>>, value_type: Box<ASTNode<'a>> },
 
     // expressions
     InfixExpression { left: Box<ASTNode<'a>>, op: Token<'a>, right: Box<ASTNode<'a>> },
@@ -32,7 +40,7 @@ pub enum ASTNodeType<'a> {
     IntLiteral(u64),
     FloatLiteral(f64),
     IdentifierLiteral(String),
-    TypeLiteral(Box<ASTNode<'a>>),
+    TypeLiteral(ASTType<'a>)
 }
 
 #[derive(Debug)]
