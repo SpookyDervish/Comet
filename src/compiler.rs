@@ -3,6 +3,7 @@ use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, Linkage, Module, ModuleRelocTarget, default_libcall_names};
+use cranelift_native::builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::cell::RefCell;
@@ -176,6 +177,10 @@ impl <'a> Compiler <'a> {
                 Ok(CometType::new(types::F64))
             },
 
+            ASTNodeType::StringLiteral(_) => {
+                Ok(CometType::new(self.module.isa().pointer_type()))
+            },
+
             ASTNodeType::IdentifierLiteral(name) => {
                 let var = self.get_variable(&name.as_str()).ok_or(format!("Use of undefined variable '{}'", name)).unwrap();
 
@@ -306,6 +311,29 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::FloatLiteral(num) => {
                 Ok(builder.ins().f64const(*num as f64))
+            },
+
+            ASTNodeType::StringLiteral(str) => {
+                let mut data_desc = DataDescription::new();
+                data_desc.define(str.as_bytes().to_vec().into_boxed_slice());
+
+                let data_id = self.module
+                    .declare_data("string_literal", Linkage::Local, false, false).unwrap();
+
+                self.module.define_data(data_id, &data_desc).unwrap();
+
+                let local_data_id = self.module.declare_data_in_func(data_id, &mut builder.func);
+
+                let pointer_type = self.module.isa().pointer_type();
+
+                let ptr = builder.ins().symbol_value(pointer_type, local_data_id);
+
+                Ok(builder.ins().load(
+                    pointer_type,
+                    MemFlagsData::new(),
+                    ptr,
+                    0
+                ))
             },
 
             ASTNodeType::IdentifierLiteral(var_name) => {

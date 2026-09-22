@@ -25,7 +25,7 @@ pub enum TokenType {
     Dot,
 
     // literals
-    IntLiteral(String), FloatLiteral(String)
+    IntLiteral(String), FloatLiteral(String), StringLiteral(String)
 }
 
 impl TokenType {

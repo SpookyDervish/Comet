@@ -52,6 +52,26 @@ impl<'file> Lexer<'file> {
         }
     }
 
+    pub fn lex_string(&mut self) -> Token<'file> {
+        let mut word_string = String::new();
+        let mut range = Range::start(&self.pos);
+        let start_pos = self.pos.clone();
+
+        self.consume();
+
+        while self.current_char != '"' {
+            word_string.push(self.current_char);
+            self.consume();
+        }
+
+        range.end(&self.pos);
+        let end_pos = self.pos.clone();
+
+        self.consume();
+
+        Token::new(TokenType::StringLiteral(word_string), range, start_pos, end_pos)
+    }
+
     pub fn lex_number(&mut self) -> Token<'file> {
         let mut number_string = String::new();
         let mut dot_count = 0;
@@ -97,6 +117,10 @@ impl<'file> Lexer<'file> {
                 ' ' | '\t' => self.consume(), // ignore whitespace
                 '\n' => {
                     self.consume();
+                }
+
+                '"' => {
+                    tokens.push(self.lex_string());
                 }
 
                 '+' => {

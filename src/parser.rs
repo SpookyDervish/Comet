@@ -95,6 +95,7 @@ impl <'a> Parser <'a> {
             // literals
             TokenType::IntLiteral(_) => Some(Parser::parse_int_literal),
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
+            TokenType::StringLiteral(_) => Some(Parser::parse_string_literal),
             TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
             TokenType::Init => Some(Parser::parse_struct_create_expr),
 
@@ -712,6 +713,17 @@ impl <'a> Parser <'a> {
                 }
 
                 return Ok(ASTNode::new(ASTNodeType::FloatLiteral(result.unwrap()), token.source_span()));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn parse_string_literal(&mut self) -> miette::Result<ASTNode<'a>> {
+        let token = self.current_token().cloned().unwrap();
+
+        match token.token_type() {
+            TokenType::StringLiteral(value) => {
+                return Ok(ASTNode::new(ASTNodeType::StringLiteral(value.clone()), token.source_span()));
             }
             _ => unreachable!(),
         }

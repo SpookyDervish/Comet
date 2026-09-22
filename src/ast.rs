@@ -40,6 +40,7 @@ pub enum ASTNodeType<'a> {
     IntLiteral(u64),
     FloatLiteral(f64),
     IdentifierLiteral(String),
+    StringLiteral(String),
     TypeLiteral(ASTType<'a>)
 }
 
