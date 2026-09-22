@@ -328,12 +328,7 @@ impl <'a> Compiler <'a> {
 
                 let ptr = builder.ins().symbol_value(pointer_type, local_data_id);
 
-                Ok(builder.ins().load(
-                    pointer_type,
-                    MemFlagsData::new(),
-                    ptr,
-                    0
-                ))
+                Ok(ptr)
             },
 
             ASTNodeType::IdentifierLiteral(var_name) => {
