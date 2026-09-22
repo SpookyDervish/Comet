@@ -50,8 +50,8 @@
         "functions": {
             "patterns": [
                 {
-					"comment": "Function definition: func myFunc(",
-					"match": "\\b(func)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b\\s*(?=\\()",
+					"comment": "Function definition: fun myFunc(",
+					"match": "\\b(fun)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b\\s*(?=\\()",
 					"captures": {
 						"1": { "name": "keyword.control.comet" },
 						"2": { "name": "entity.name.function.comet" }
