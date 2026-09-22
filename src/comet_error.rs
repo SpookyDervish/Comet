@@ -126,3 +126,15 @@ pub struct InvalidCast {
     pub old_type: String,
     pub new_type: String
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("UndefinedVariable")]
+pub struct UndefinedVariable {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Use of undefined variable '{var}'")]
+    pub span: SourceSpan,
+
+    pub var: String
+}

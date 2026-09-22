@@ -7,7 +7,7 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::cell::RefCell;
 
-use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UnkownField, UnkownType};
+use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
@@ -280,7 +280,11 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::IdentifierLiteral(var_name) => {
-                let comet_var = self.get_variable(&var_name.as_str()).ok_or(format!("Use of undefined variable '{}'", var_name)).unwrap();
+                let comet_var: &CometVariable = self.get_variable(&var_name.as_str()).ok_or(UndefinedVariable {
+                    span: node.source_span(),
+                    src: self.named_source(),
+                    var: var_name.clone()
+                })?;
 
                 if let Some(func_id) = comet_var.function_id {
                     let func_ref = self.module.declare_func_in_func(func_id, builder.func);

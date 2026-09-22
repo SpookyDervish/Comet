@@ -92,7 +92,7 @@ impl <'a> Token <'a> {
     }
 
     pub fn source_span(&self) -> SourceSpan {
-        SourceSpan::new(SourceOffset::from(self.pos.idx()), self.range.end_pos() - self.range.start_pos())
+        SourceSpan::new(SourceOffset::from(self.range.start_pos()), self.range.end_pos() - self.range.start_pos())
     }
 
     pub fn end_span(&self) -> SourceSpan {

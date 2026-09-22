@@ -1,3 +1,5 @@
+use miette::SourceSpan;
+
 use crate::position::Position;
 
 #[derive(Debug, Clone)]
@@ -13,13 +15,17 @@ pub struct Range {
 }
 
 impl Range {
-    /*pub fn new(start_line: usize, end_line: usize, start_column: usize, end_column: usize, start_pos: usize, end_pos: usize) -> Self {
+    pub fn new(start_line: usize, end_line: usize, start_column: usize, end_column: usize, start_pos: usize, end_pos: usize) -> Self {
         Range {
             start_line: start_line, end_line: end_line,
             start_column: start_column, end_column: end_column,
             start_pos: start_pos, end_pos: end_pos
         }
-    }*/
+    }
+
+    pub fn source_span(&self) -> SourceSpan {
+        SourceSpan::new(self.start_pos.into(), self.end_pos - self.start_pos)
+    }
 
     pub fn start_pos(&self) -> usize {
         self.start_pos
@@ -32,7 +38,7 @@ impl Range {
         Range { 
             start_line: pos.ln(), end_line: pos.ln(),
             start_column: pos.col(), end_column: pos.col(),
-            start_pos: pos.idx(), end_pos: pos.idx()
+            start_pos: pos.idx().saturating_sub(1), end_pos: pos.idx()
         }
     }
 
@@ -40,7 +46,7 @@ impl Range {
         Range {
             start_line: pos.ln(), end_line: 0,
             start_column: pos.col(), end_column: 0,
-            start_pos: pos.idx(), end_pos: 0
+            start_pos: pos.idx().saturating_sub(1), end_pos: 0
         }
     }
 

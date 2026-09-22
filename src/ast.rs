@@ -1,4 +1,4 @@
-use miette::SourceSpan;
+use miette::{SourceOffset, SourceSpan};
 
 use crate::token::Token;
 
@@ -37,18 +37,32 @@ pub enum ASTNodeType<'a> {
 
 #[derive(Debug)]
 pub struct ASTNode<'a> {
-    node_type: ASTNodeType<'a>
+    node_type: ASTNodeType<'a>,
+    source_span: SourceSpan
 }
 
 impl <'a> ASTNode <'a> {
-    pub fn new(node_type: ASTNodeType<'a>) -> Self {
+    pub fn new(node_type: ASTNodeType<'a>, source_span: SourceSpan) -> Self {
         ASTNode {
-            node_type: node_type
+            node_type: node_type,
+            source_span: source_span
         }
     }
 
+    pub fn start_pos(&self) -> SourceOffset {
+        self.source_span.offset().into()
+    }
+
+    pub fn end_pos(&self) -> SourceOffset {
+        (self.source_span.offset() + self.source_span.len()).into()
+    }
+
+    pub fn get_span(&self, to: &ASTNode) -> SourceSpan {
+        SourceSpan::new(self.start_pos(), to.end_pos().offset() - self.start_pos().offset())
+    }
+
     pub fn source_span(&self) -> SourceSpan {
-        SourceSpan::new(0.into(), 1)
+        self.source_span.clone()
     }
 
     pub fn node_type(&self) -> &ASTNodeType<'a> {

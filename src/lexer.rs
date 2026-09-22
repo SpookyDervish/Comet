@@ -34,6 +34,7 @@ impl<'file> Lexer<'file> {
     pub fn lex_word(&mut self) -> Token<'file> {
         let mut word_string = String::new();
         let mut range = Range::start(&self.pos);
+        let start_pos = self.pos.clone();
 
         while self.current_char != '\0' && (self.current_char.is_alphanumeric() || self.current_char == '_') {
             word_string.push(self.current_char);
@@ -44,9 +45,9 @@ impl<'file> Lexer<'file> {
 
         let keyword = TokenType::keyword(&word_string);
         if keyword.is_some() {
-            Token::new(keyword.unwrap(), range, self.pos.clone())
+            Token::new(keyword.unwrap(), range, start_pos)
         } else {
-            Token::new(TokenType::Identifier(word_string), range, self.pos.clone())
+            Token::new(TokenType::Identifier(word_string), range, start_pos)
         }
     }
 
@@ -55,6 +56,7 @@ impl<'file> Lexer<'file> {
         let mut dot_count = 0;
 
         let mut range = Range::start(&self.pos);
+        let start_pos = self.pos.clone();
 
         while self.current_char != '\0'
             && (self.current_char.is_ascii_digit() || self.current_char == '.')
@@ -76,9 +78,9 @@ impl<'file> Lexer<'file> {
         range.end(&self.pos);
 
         if dot_count > 0 {
-            Token::new(TokenType::FloatLiteral(number_string), range, self.pos.clone())
+            Token::new(TokenType::FloatLiteral(number_string), range, start_pos)
         } else {
-            Token::new(TokenType::IntLiteral(number_string), range, self.pos.clone())
+            Token::new(TokenType::IntLiteral(number_string), range, start_pos)
         }
     }
 
