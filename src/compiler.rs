@@ -795,8 +795,6 @@ impl <'a> Compiler <'a> {
 
         // get type of the value we're setting the variable to
         let value_type = self.resolve_type(value_node)?;
-
-        println!("{:#?}", value_type);
         
         // build variable value
         let mut value = self.visit_value(value_node, builder)?;
