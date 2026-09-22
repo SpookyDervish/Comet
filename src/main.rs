@@ -44,7 +44,7 @@ fn main() -> miette::Result<()> {
     let mut compiler = compiler::Compiler::new(&file_name, source.clone()).unwrap();
     compiler.compile(&ast, None)?;
 
-    let bytes = compiler.end_module().unwrap();
+    let bytes = compiler.end_module().into_diagnostic()?;
 
     let mut file = std::fs::File::create(args.output).into_diagnostic()?;
     file.write_all(&bytes).into_diagnostic()?;

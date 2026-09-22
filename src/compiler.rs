@@ -2,16 +2,16 @@ use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{Linkage, Module, default_libcall_names};
+use cranelift_module::{DataDescription, Linkage, Module, ModuleRelocTarget, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::cell::RefCell;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownType};
+use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometTypeKind};
-use crate::scope::CometVarType::Local;
+use crate::scope::CometVarType::{External, Local};
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
 
@@ -326,6 +326,18 @@ impl <'a> Compiler <'a> {
                     CometVarType::FuncArg(index) => {
                         let params = builder.block_params(builder.current_block().unwrap());
                         Ok(params[index])
+                    },
+                    CometVarType::External(data) => {
+                        let global_value = self.module.declare_data_in_func(data, &mut builder.func);
+                        let ptr_type = self.module.target_config().pointer_type();
+
+                        let data_ptr = builder.ins().symbol_value(ptr_type, global_value);
+                        Ok(builder.ins().load(
+                            ptr_type,
+                            MemFlagsData::new(),
+                            data_ptr,
+                            0
+                        ))
                     }
                 }  
             },
@@ -719,6 +731,7 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
+        // reassignment of struct field
         if !matches!(ident_node.node_type(), ASTNodeType::IdentifierLiteral(_)) {
             if type_node.is_some() {
                 return Err(SyntaxError {
@@ -790,15 +803,16 @@ impl <'a> Compiler <'a> {
         let new_variable = Variable::from_u32(self.var_index);
         self.var_index += 1;
         
-        let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
-        let mut final_type = &value_type;
+        let mut final_type = value_type.clone();
         if type_node.is_some() {
+            let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
+
             // get type of type annotation
             if var_type != value_type {
                 value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, builder, self.named_source())?;
-                final_type = &var_type;
+                final_type = var_type;
             } else {
-                final_type = self.unify_types(&final_type, &var_type);
+                final_type = self.unify_types(&final_type, &var_type).clone();
             }
         }
 
@@ -812,7 +826,7 @@ impl <'a> Compiler <'a> {
         };
 
         let comet_var = CometVariable {
-            type_: final_type.clone(),
+            type_: final_type,
             var_type: CometVarType::Local(new_variable),
             mutable: true,
             function_id
@@ -1015,6 +1029,84 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
+    fn visit_extern_directive(&mut self, name_node: &'a ASTNode, type_node: &'a ASTNode) -> miette::Result<()> {
+        let name = match name_node.node_type() {
+            ASTNodeType::IdentifierLiteral(value) => value,
+            _ => unreachable!()
+        };
+        
+        // make signature
+        let mut sig = self.module.make_signature();
+        let comet_type = self.get_type_literal_type(type_node)?;
+
+        let func_type = match comet_type.kind {
+            CometTypeKind::Function(v) => v,
+            _ => { return Err(CompilerBug {
+                src: self.named_source(),
+                span: type_node.source_span(),
+                text: String::from("only functions are supported with #extern")
+            }.into()); }
+        };
+
+        sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
+        for arg in func_type.arg_types {
+            sig.params.push(AbiParam::new(arg.cranelift_type))
+        }
+
+        // make external func with new sig
+        let ext_func_id = self.module
+            .declare_function(name, Linkage::Import, &sig)
+            .unwrap();
+
+        let data_id = self.module
+            .declare_data(&format!("{}_var", name), Linkage::Local, true, false)
+            .unwrap();
+
+        let mut data_desc = DataDescription::new();
+        let target_config = self.module.isa().frontend_config();
+        let pointer_size = target_config.pointer_type().bytes() as usize;
+
+        data_desc.define_zeroinit(pointer_size);
+
+        let data_func_ref = self.module.declare_func_in_data(ext_func_id, &mut data_desc);
+        data_desc.write_function_addr(0, data_func_ref);
+
+        self.module.define_data(data_id, &data_desc).unwrap();
+
+        self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
+            type_: CometType::new(target_config.pointer_type()),
+            var_type: External(data_id),
+            mutable: false,
+            function_id: Some(ext_func_id)
+        });
+
+        Ok(())
+    }
+
+    fn visit_compiler_directive(&mut self, node: &'a ASTNode) -> miette::Result<()> {
+        let (directive_node, name_node, type_node) = match node.node_type() {
+            ASTNodeType::CompilerDirectiveStatement { directive, value_name, value_type } => (directive, value_name, value_type),
+            _ => unreachable!()
+        };
+
+        let directive = match directive_node.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => unreachable!()
+        };
+
+        match directive.as_str() {
+            "extern" => {
+                self.visit_extern_directive(name_node, type_node)
+            },
+            _ => Err(InvalidCompilerDirective {
+                directive: directive.clone(),
+                span: directive_node.source_span(),
+                src: self.named_source()
+            }.into())
+        }
+        
+    }
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &'a ASTNode, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
@@ -1030,6 +1122,8 @@ impl <'a> Compiler <'a> {
             ASTNodeType::IfStatement { expr: _, body: _, else_body: _ } => { return self.visit_if_statement(ast, builder.unwrap()) },
             ASTNodeType::WhileStatement { expr: _, body: _ } => { return self.visit_while_statement(ast, builder.unwrap()); },
             ASTNodeType::StructDefinitionStatement { ident: _, fields: _ } => { return self.visit_struct_def_statement(ast); },
+
+            ASTNodeType::CompilerDirectiveStatement { directive: _, value_name: _, value_type: _ } => { return self.visit_compiler_directive(ast); },
 
             _ => {
                 Err(CompilerBug {

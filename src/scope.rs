@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 
 use cranelift_frontend::Variable;
-use cranelift_module::FuncId;
+use cranelift_module::{DataId, FuncId};
 
 use crate::comet_type::CometType;
 
 #[derive(Debug)]
 pub enum CometVarType {
     Local(Variable),
-    FuncArg(usize) // stores func arg index
+    FuncArg(usize), // stores func arg index
+    External(DataId)
 }
 
 #[derive(Debug)]

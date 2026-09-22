@@ -138,3 +138,15 @@ pub struct UndefinedVariable {
 
     pub var: String
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("InvalidCompilerDirective")]
+pub struct InvalidCompilerDirective {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Invalid compiler directive '{directive}'")]
+    pub span: SourceSpan,
+
+    pub directive: String
+}
