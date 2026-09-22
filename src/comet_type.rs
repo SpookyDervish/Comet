@@ -17,51 +17,50 @@ pub struct CometFunction {
 pub enum CometTypeKind {
     Struct(CometStruct),
     Function(CometFunction),
-    Scalar(bool)
+    Scalar(bool),
+    Pointer(Box<CometType>),
+    Void
 }
 
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
     pub cranelift_type: types::Type,
-    pub kind: CometTypeKind,
-    pub pointer: bool
+    pub kind: CometTypeKind
 }
 
 impl CometType {
     pub fn new(cranelift_type: types::Type) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            pointer: false,
             kind: CometTypeKind::Scalar(false)
         }
     }
-    pub fn new_ptr(pointer_type: types::Type) -> Self {
+    pub fn new_ptr(base_type: CometType, pointer_type: types::Type) -> Self {
         CometType {
             cranelift_type: pointer_type,
-            pointer: true,
-            kind: CometTypeKind::Scalar(false)
+            kind: CometTypeKind::Pointer(Box::new(base_type))
         }
     }
     pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            pointer: false,
             kind: CometTypeKind::Scalar(signed)
         }
     }
     pub fn new_struct(comet_struct: CometStruct) -> Self {
         CometType {
             cranelift_type: types::I64,
-            pointer: true,
             kind: CometTypeKind::Struct(comet_struct)
         }
     }
     pub fn new_function(comet_function: CometFunction) -> Self {
         CometType {
             cranelift_type: types::I64,
-            pointer: true,
             kind: CometTypeKind::Function(comet_function)
         }
+    }
+    pub fn new_void() -> Self {
+        CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Void }
     }
 
     pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_comet_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
@@ -123,10 +122,6 @@ impl PartialEq for CometType {
         let parent_type = self.cranelift_type;
         let child_type = other.cranelift_type;
 
-        if self.pointer != other.pointer {
-            return false;
-        }
-
         if (parent_type.is_int() && child_type.is_int()) && parent_type.wider_or_equal(child_type) {
             let self_signed = match self.kind {
                 CometTypeKind::Scalar(signed) => signed,
@@ -142,6 +137,11 @@ impl PartialEq for CometType {
 
         if parent_type.is_float() && child_type.is_float() {
             return true;
+        }
+
+        match &self.kind {
+            CometTypeKind::Pointer(_) => { return self.kind == other.kind; },
+            _ => {}
         }
 
         false

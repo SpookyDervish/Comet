@@ -52,7 +52,7 @@ impl <'a> Compiler <'a> {
         base_frame.types.insert("f16", CometType::new(types::F16));
         base_frame.types.insert("f32", CometType::new(types::F32));
         base_frame.types.insert("f64", CometType::new(types::F64));
-        base_frame.types.insert("ptr", CometType::new_ptr(module.isa().pointer_type()));
+        base_frame.types.insert("str", CometType::new_ptr(CometType::new_int(types::I8, true), module.isa().pointer_type()));
         
 
         Ok(Compiler {
@@ -179,7 +179,11 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::StringLiteral(_) => {
-                Ok(CometType::new_ptr(self.module.isa().pointer_type()))
+                self.get_type("str").cloned().ok_or_else(|| CompilerBug {
+                    span: node.source_span(),
+                    src: self.named_source(),
+                    text: String::from("failed to get internal \"str\" type, this is a bug!")
+                }.into())
             },
 
             ASTNodeType::IdentifierLiteral(name) => {
@@ -235,24 +239,20 @@ impl <'a> Compiler <'a> {
                 return Ok(self.unify_types(&left_value, &right_value).clone());
             },
 
-            ASTNodeType::FuncCall { left: _, args: _ } => {
-                /*let decls = self.module.declarations();
+            ASTNodeType::FuncCall { left: left, args: _ } => {
+                let function_type = self.resolve_type(left)?;
 
-                let func_id = self.get_function(left)?;
-                let func_decl = decls.get_function_decl(func_id);
-                let returns = &func_decl.signature.returns;
-
-                let out_type: CometType;
-                if returns.len() == 0 {
-                    out_type = CometType { cranelift_type: types::INVALID }
-                } else {
-                    out_type = CometType { cranelift_type: returns[0].value_type }
-                }*/
-
-                // TODO:
-                let out_type = CometType::new_int(types::I64, true);
-
-                Ok(out_type)
+                match function_type.kind {
+                    CometTypeKind::Function(function) => Ok((*function.return_type).clone()),
+                    _ => Err(NotAFunction {
+                        span: left.source_span(),
+                        src: self.named_source(),
+                        func_name: match left.node_type() {
+                            ASTNodeType::IdentifierLiteral(name) => name.clone(),
+                            _ => String::from("<expression>"),
+                        }
+                    }.into())
+                }
             },
 
             ASTNodeType::StructCreateExpression { type_, fields: _ } => {
@@ -648,6 +648,7 @@ impl <'a> Compiler <'a> {
         };
 
         let mut builder_context = FunctionBuilderContext::new();
+        let mut arg_types = Vec::new();
 
         for (i, arg) in func_args.iter().enumerate() {
             let (arg_name_node, arg_type_node)= match arg.node_type() {
@@ -663,6 +664,7 @@ impl <'a> Compiler <'a> {
             }; 
 
             sig.params.push(AbiParam::new(arg_type.cranelift_type));
+            arg_types.push(arg_type.clone());
             self.scopes.last_mut().unwrap().variables.insert(&arg_name, CometVariable {
                 type_: arg_type,
                 var_type: CometVarType::FuncArg(i),
@@ -671,13 +673,20 @@ impl <'a> Compiler <'a> {
             });
         }
 
-        if return_type_optional.is_some() {
-            let return_type_node = return_type_optional.as_ref().unwrap();
-            let return_type = self.get_type_literal_type(&return_type_node)?;
+        let return_type = return_type_optional
+            .as_ref()
+            .map(|node| self.get_type_literal_type(node))
+            .transpose()?
+            .unwrap_or_else(CometType::new_void);
 
+        if return_type.cranelift_type != types::INVALID {
             sig.returns.push(AbiParam::new(return_type.cranelift_type));
-            
         }
+
+        let function_type = CometType::new_function(CometFunction {
+            arg_types,
+            return_type: Box::new(return_type)
+        });
 
         let func_id = self.module.declare_function(&name, Linkage::Export, &sig).unwrap();
 
@@ -702,7 +711,7 @@ impl <'a> Compiler <'a> {
         builder.def_var(func_var, func_addr);
 
         self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
-            type_: CometType::new(target_config.pointer_type()),
+            type_: function_type,
             var_type: Local(func_var),
             mutable: false,
             function_id: Some(func_id)
@@ -767,6 +776,8 @@ impl <'a> Compiler <'a> {
 
             let target_type = self.resolve_type(ident_node)?;
             let value_type = self.resolve_type(value_node)?;
+
+
             if target_type != value_type {
                 CometType::try_implicit_cast(value_node, self.visit_value(value_node, builder)?, &value_type, &target_type, builder, self.named_source())?;
             }
@@ -785,6 +796,8 @@ impl <'a> Compiler <'a> {
         // get type of the value we're setting the variable to
         let value_type = self.resolve_type(value_node)?;
 
+        println!("{:#?}", value_type);
+        
         // build variable value
         let mut value = self.visit_value(value_node, builder)?;
 
@@ -824,7 +837,6 @@ impl <'a> Compiler <'a> {
             return Ok(());
         }
 
-        let new_variable = Variable::from_u32(self.var_index);
         self.var_index += 1;
         
         let mut final_type = value_type.clone();
@@ -840,7 +852,8 @@ impl <'a> Compiler <'a> {
             }
         }
 
-        builder.declare_var(final_type.cranelift_type);
+        let new_variable = builder.declare_var(final_type.cranelift_type);
+
         builder.def_var(new_variable, value);
 
         let function_id = match value_node.node_type() {
@@ -1064,7 +1077,7 @@ impl <'a> Compiler <'a> {
         let mut sig = self.module.make_signature();
         let comet_type = self.get_type_literal_type(type_node)?;
 
-        let func_type = match comet_type.kind {
+        let func_type = match &comet_type.kind {
             CometTypeKind::Function(v) => v,
             _ => { return Err(CompilerBug {
                 src: self.named_source(),
@@ -1074,7 +1087,7 @@ impl <'a> Compiler <'a> {
         };
 
         sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
-        for arg in func_type.arg_types {
+        for arg in &func_type.arg_types {
             sig.params.push(AbiParam::new(arg.cranelift_type))
         }
 
@@ -1099,7 +1112,7 @@ impl <'a> Compiler <'a> {
         self.module.define_data(data_id, &data_desc).unwrap();
 
         self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
-            type_: CometType::new(target_config.pointer_type()),
+            type_: comet_type,
             var_type: External(data_id),
             mutable: false,
             function_id: Some(ext_func_id)
