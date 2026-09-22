@@ -17,42 +17,49 @@ pub struct CometFunction {
 pub enum CometTypeKind {
     Struct(CometStruct),
     Function(CometFunction),
-    Scalar
+    Scalar(bool)
 }
 
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
     pub cranelift_type: types::Type,
-    pub signed: bool,
-    pub kind: CometTypeKind
+    pub kind: CometTypeKind,
+    pub pointer: bool
 }
 
 impl CometType {
     pub fn new(cranelift_type: types::Type) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            signed: false,
-            kind: CometTypeKind::Scalar
+            pointer: false,
+            kind: CometTypeKind::Scalar(false)
+        }
+    }
+    pub fn new_ptr(pointer_type: types::Type) -> Self {
+        CometType {
+            cranelift_type: pointer_type,
+            pointer: true,
+            kind: CometTypeKind::Scalar(false)
         }
     }
     pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            signed: signed,
-            kind: CometTypeKind::Scalar
+            pointer: false,
+            kind: CometTypeKind::Scalar(signed)
         }
     }
     pub fn new_struct(comet_struct: CometStruct) -> Self {
         CometType {
             cranelift_type: types::I64,
-            signed: false,
+            pointer: true,
             kind: CometTypeKind::Struct(comet_struct)
         }
     }
     pub fn new_function(comet_function: CometFunction) -> Self {
         CometType {
             cranelift_type: types::I64,
-            signed: false,
+            pointer: true,
             kind: CometTypeKind::Function(comet_function)
         }
     }
@@ -68,11 +75,21 @@ impl CometType {
 
         let out: Value;
         if value_type.is_int() && their_type.is_int() {
+            let target_signed = match target_type.kind {
+                CometTypeKind::Scalar(signed) => signed,
+                _ => unreachable!()
+            };
+
+            let value_signed = match value_comet_type.kind {
+                CometTypeKind::Scalar(signed) => signed,
+                _ => unreachable!()
+            };
+
             if value_type.bits() < their_type.bits() { // cast from smaller to bigger int
                 out = builder.ins().sextend(target_type.cranelift_type, value);
             } else if value_type.bits() > their_type.bits() { // cast from bigger to smaller int
                 out = builder.ins().ireduce(their_type, value);
-            } else if target_type.signed != value_comet_type.signed {
+            } else if target_signed != value_signed {
                 // do nothing, because ints in cranelift dont care about signedness
                 out = value;
             } else {
@@ -106,8 +123,21 @@ impl PartialEq for CometType {
         let parent_type = self.cranelift_type;
         let child_type = other.cranelift_type;
 
-        if ((parent_type.is_int() && child_type.is_int()) && parent_type.wider_or_equal(child_type)) && self.signed == other.signed {
-            return true;
+        if self.pointer != other.pointer {
+            return false;
+        }
+
+        if (parent_type.is_int() && child_type.is_int()) && parent_type.wider_or_equal(child_type) {
+            let self_signed = match self.kind {
+                CometTypeKind::Scalar(signed) => signed,
+                _ => unreachable!()
+            };
+            let other_signed = match other.kind {
+                CometTypeKind::Scalar(signed) => signed,
+                _ => unreachable!()
+            };
+
+            return self_signed == other_signed;
         }
 
         if parent_type.is_float() && child_type.is_float() {

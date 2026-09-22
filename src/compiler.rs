@@ -52,6 +52,7 @@ impl <'a> Compiler <'a> {
         base_frame.types.insert("f16", CometType::new(types::F16));
         base_frame.types.insert("f32", CometType::new(types::F32));
         base_frame.types.insert("f64", CometType::new(types::F64));
+        base_frame.types.insert("ptr", CometType::new_ptr(module.isa().pointer_type()));
         
 
         Ok(Compiler {
@@ -178,7 +179,7 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::StringLiteral(_) => {
-                Ok(CometType::new(self.module.isa().pointer_type()))
+                Ok(CometType::new_ptr(self.module.isa().pointer_type()))
             },
 
             ASTNodeType::IdentifierLiteral(name) => {
