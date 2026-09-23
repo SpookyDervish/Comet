@@ -44,15 +44,18 @@ impl <'a> Compiler <'a> {
 
         let mut base_frame = ScopeFrame::new();
 
+        // define all inbuilt types
         base_frame.types.insert("bool".to_string(), CometType::new(types::I8));
         base_frame.types.insert("i8".to_string(), CometType::new_int(types::I8, true));
         base_frame.types.insert("i16".to_string(), CometType::new_int(types::I16, true));
         base_frame.types.insert("i32".to_string(), CometType::new_int(types::I32, true));
         base_frame.types.insert("i64".to_string(), CometType::new_int(types::I64, true));
+        base_frame.types.insert("isize".to_string(), CometType::new_int(module.isa().pointer_type(), true));
         base_frame.types.insert("u8".to_string(), CometType::new_int(types::I8, false));
         base_frame.types.insert("u16".to_string(), CometType::new_int(types::I16, false));
         base_frame.types.insert("u32".to_string(), CometType::new_int(types::I32, false));
         base_frame.types.insert("u64".to_string(), CometType::new_int(types::I64, false));
+        base_frame.types.insert("usize".to_string(), CometType::new_int(module.isa().pointer_type(), false));
         base_frame.types.insert("f16".to_string(), CometType::new(types::F16));
         base_frame.types.insert("f32".to_string(), CometType::new(types::F32));
         base_frame.types.insert("f64".to_string(), CometType::new(types::F64));
@@ -72,6 +75,7 @@ impl <'a> Compiler <'a> {
     }
 
     pub fn end_module(self) -> miette::Result<Vec<u8>, cranelift_object::object::write::Error> {
+        /* Compile finished program. */
         let module = self.module;
 
         let product = module.finish();
@@ -98,6 +102,7 @@ impl <'a> Compiler <'a> {
     }
 
     fn get_type_literal_type (&self, node: &ASTNode) -> miette::Result<CometType> {
+        /* Takes in a type literal node and returns the type it represents. */
 
         let ast_type = match node.node_type() {
             ASTNodeType::TypeLiteral(value) => value,

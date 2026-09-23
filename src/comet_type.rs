@@ -106,6 +106,8 @@ impl CometType {
         let value_type = value_comet_type.cranelift_type;
 
         let out: Value;
+
+        // cast one int type to another
         if value_type.is_int() && their_type.is_int() {
             let target_signed = match target_type.kind {
                 CometTypeKind::Scalar(signed) => signed,
@@ -118,14 +120,19 @@ impl CometType {
             };
 
             if value_type.bits() < their_type.bits() { // cast from smaller to bigger int
-                out = builder.ins().sextend(target_type.cranelift_type, value);
+
+                if value_signed {
+                    out = builder.ins().sextend(target_type.cranelift_type, value);
+                } else {
+                    out = builder.ins().uextend(target_type.cranelift_type, value);
+                }
             } else if value_type.bits() > their_type.bits() { // cast from bigger to smaller int
                 out = builder.ins().ireduce(their_type, value);
             } else if target_signed != value_signed {
                 // do nothing, because ints in cranelift dont care about signedness
                 out = value;
             } else {
-                return Err(InvalidCast {
+                return Err(InvalidCast { // dont implicitly cast from bigger type to smaller type
                     new_type: target_type.cranelift_type.to_string(),
                     old_type: value_type.to_string(),
                     span: value_node.source_span(),
@@ -133,9 +140,38 @@ impl CometType {
                 }.into());
             }
         } else if value_type.is_int() && their_type.is_float() { // cast from int to float
-            out = builder.ins().fcvt_from_sint(their_type, value);
+            let value_signed = match value_comet_type.kind {
+                CometTypeKind::Scalar(signed) => signed,
+                _ => unreachable!()
+            };
+
+            out = if value_signed {
+                builder.ins().fcvt_from_sint(their_type, value)
+            } else {
+                builder.ins().fcvt_from_uint(their_type, value)
+            }
         } else if value_type.is_float() && their_type.is_int() { // cast from float to int
-            out = builder.ins().fcvt_to_sint(their_type, value);
+            let target_signed = match target_type.kind {
+                CometTypeKind::Scalar(signed) => signed,
+                _ => unreachable!()
+            };
+
+            out = if target_signed {
+                builder.ins().fcvt_to_sint(their_type, value)
+            } else {
+                builder.ins().fcvt_to_uint(their_type, value)
+            }
+        } else if value_type.is_float() && their_type.is_float() {
+            if value_type.bits() < their_type.bits() {
+                out = builder.ins().fpromote(their_type, value);
+            } else { // dont implicitly cast from bigger type to smaller type
+                return Err(InvalidCast { 
+                    new_type: target_type.cranelift_type.to_string(),
+                    old_type: value_type.to_string(),
+                    span: value_node.source_span(),
+                    src: named_source
+                }.into());
+            }
         } else {
             return Err(TypeMismatch {
                 expected: their_type.to_string(),
