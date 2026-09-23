@@ -48,6 +48,7 @@ impl TokenType {
             TokenType::LtEq => PrecedenceType::LessGreater,
 
             TokenType::Dot => PrecedenceType::Dot,
+            TokenType::ColonColon => PrecedenceType::Dot,
             _ => PrecedenceType::Lowest
         }
     }

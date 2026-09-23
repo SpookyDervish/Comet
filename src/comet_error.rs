@@ -150,3 +150,16 @@ pub struct InvalidCompilerDirective {
 
     pub directive: String
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("UnkownMethod")]
+pub struct UnkownMethod {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Unkown method '{method}' in struct '{struct_name}'")]
+    pub span: SourceSpan,
+
+    pub method: String,
+    pub struct_name: String
+}

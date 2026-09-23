@@ -1,6 +1,6 @@
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
+use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module, ModuleRelocTarget, default_libcall_names};
 use cranelift_native::builder;
@@ -9,11 +9,12 @@ use miette::NamedSource;
 use std::collections::HashMap;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownType};
+use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::scope::CometVarType::{External, Local};
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
+use crate::token::Token;
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
 
 pub struct Compiler <'a> {
@@ -160,7 +161,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn ensure_share_types(&mut self, left: &ASTNode, right: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<(ir::Value, ir::Value)> {
+    fn ensure_share_types(&mut self, left: &ASTNode<'a>, right: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<(ir::Value, ir::Value)> {
         let mut left_value = self.visit_value(left, builder)?;
         let mut right_value = self.visit_value(right, builder)?;
 
@@ -205,7 +206,7 @@ impl <'a> Compiler <'a> {
                 let left_value = self.resolve_type(left)?;
 
                 match op.token_type() {
-                    TokenType::Dot => {
+                    TokenType::Dot | TokenType::ColonColon => {
                         let struct_type = match left_value.kind {
                             CometTypeKind::Struct(comet_struct) => comet_struct,
                             _ => { return Err(InvalidOperator {
@@ -240,6 +241,7 @@ impl <'a> Compiler <'a> {
 
                         return Ok(field.field_type().clone());
                     },
+
                     TokenType::Divide => { return Ok(CometType::new(types::F64)); },
 
                     TokenType::Eq | TokenType::NotEq |
@@ -311,7 +313,84 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_method_call(
+        &mut self,
+        receiver_node: &ASTNode<'a>,
+        method_node: &ASTNode<'a>,
+        op: &TokenType,
+        args: &[ASTNode<'a>],
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<ir::Value> {
+        let receiver_type = self.resolve_type(receiver_node)?;
+
+        let struct_name = match &receiver_type.kind {
+            CometTypeKind::Struct(comet_struct) => comet_struct.name(),
+            _ => {
+                return Err(TypeMismatch {
+                    expected: "struct".to_string(),
+                    invalid: format!("{}", receiver_type.cranelift_type),
+                    span: receiver_node.source_span(),
+                    src: self.named_source()
+                }.into());
+            }
+        };
+
+        let method_name = match method_node.node_type() {
+            ASTNodeType::IdentifierLiteral(name) => name,
+            _ => unreachable!(),
+        };
+
+        
+
+        let receiver_value = self.visit_value(receiver_node, builder)?;
+
+        let mut compiled_args = vec![];
+
+        if op == &TokenType::Dot {
+            compiled_args.push(receiver_value);
+        }
+
+        for arg in args {
+            compiled_args.push(self.visit_value(arg, builder)?);
+        }
+
+        let method = self
+            .get_method(struct_name.to_string(), method_name.clone())
+            .ok_or(UnkownMethod {
+                method: method_name.clone(),
+                struct_name: struct_name.to_string(),
+                span: method_node.source_span(),
+                src: self.named_source()
+            })?;
+
+        // method.function.arg_types includes self as argument zero
+        let mut sig = self.module.make_signature();
+
+        for arg_type in &method.function.arg_types {
+            sig.params.push(AbiParam::new(arg_type.cranelift_type));
+        }
+
+        if method.function.return_type.cranelift_type != types::INVALID {
+            sig.returns.push(AbiParam::new(
+                method.function.return_type.cranelift_type,
+            ));
+        }
+
+        let method_ref = self
+            .module
+            .declare_func_in_func(method.func_id, builder.func);
+
+        let call_inst = builder.ins().call(method_ref, &compiled_args);
+        let results = builder.inst_results(call_inst);
+
+        if results.is_empty() {
+            Ok(builder.ins().iconst(types::I64, 0))
+        } else {
+            Ok(results[0])
+        }
+    }
+
+    fn visit_value(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
             ASTNodeType::InfixExpression { left: _, op, right: _ } => {
                 if op.token_type() == &TokenType::Dot {
@@ -389,6 +468,25 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::FuncCall { left, args } => {
+                // check if we're calling a method
+                if let ASTNodeType::InfixExpression {
+                    left,
+                    op,
+                    right
+                } = left.node_type()
+                {
+                    if op.token_type() == &TokenType::Dot || op.token_type() == &TokenType::ColonColon {
+                        return self.visit_method_call(
+                            left,
+                            right,
+                            op.token_type(),
+                            args,
+                            builder
+                        );
+                    }
+                }
+
+
                 let func_ptr = self.visit_value(left, builder)?;
                 let func_type = self.resolve_type(left)?;
 
@@ -493,7 +591,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_l_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_l_value(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
             ASTNodeType::IdentifierLiteral(_) => self.visit_value(node, builder),
 
@@ -555,7 +653,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_infix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_infix_expression(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (left, op, right) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
             _ => unreachable!()
@@ -607,7 +705,7 @@ impl <'a> Compiler <'a> {
         Ok(out)
     }
 
-    fn visit_get_field(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_get_field(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (left_node, op, right_node) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
             _ => unreachable!()
@@ -654,7 +752,7 @@ impl <'a> Compiler <'a> {
         Ok(builder.ins().load(field.field_type().cranelift_type, MemFlagsData::new(), left, comet_struct_layout.0[*field_index] as i32))
     }
 
-    fn visit_expression_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_expression_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
         match node.node_type() {
             ASTNodeType::ExpressionStatement(expr) => {
                 self.visit_value(expr, builder)?;
@@ -796,7 +894,7 @@ impl <'a> Compiler <'a> {
         
     }
 
-    fn visit_ret_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_ret_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let ret_value_node = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
