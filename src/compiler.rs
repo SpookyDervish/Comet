@@ -2,23 +2,26 @@ use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{DataDescription, Linkage, Module, ModuleRelocTarget, default_libcall_names};
+use cranelift_module::{DataDescription, FuncId, Linkage, Module, ModuleRelocTarget, default_libcall_names};
 use cranelift_native::builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
-use std::cell::RefCell;
+use std::collections::HashMap;
 
 use crate::ast::ASTType;
 use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
-use crate::comet_type::{CometFunction, CometTypeKind, FunctionOwner};
+use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::scope::CometVarType::{External, Local};
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
 
 pub struct Compiler <'a> {
     module: ObjectModule,
+
     scopes: Vec<ScopeFrame>,
+    methods: HashMap<(String, String), CometMethod>,
+
     file_name: &'a str,
     source: String,
 
@@ -61,6 +64,8 @@ impl <'a> Compiler <'a> {
             file_name: file_name,
             source: source,
 
+            methods: HashMap::new(),
+
             var_index: 0
         })
     }
@@ -85,6 +90,10 @@ impl <'a> Compiler <'a> {
 
     fn get_type(&self, name: &str) -> Option<&CometType> {
         self.scopes.iter().rev().find_map(|scope| scope.types.get(name))
+    }
+
+    fn get_method(&self, struct_name: String, method_name: String) -> Option<&CometMethod> {
+        self.methods.get(&(struct_name, method_name))
     }
 
     fn get_type_literal_type (&self, node: &ASTNode) -> miette::Result<CometType> {
@@ -215,6 +224,12 @@ impl <'a> Compiler <'a> {
                                 span: right.source_span()
                             }.into())
                         };
+
+                        let method = self.get_method(struct_type.name().to_string(), field_name.to_string());
+                        if method.is_some() { // getting method
+                            let method = method.unwrap();
+                            return Ok(CometType::new_function(method.function.clone()));
+                        }
 
                         let field = struct_type.get_field(field_name).ok_or(UnkownField {
                             field: field_name.clone(),
@@ -619,6 +634,13 @@ impl <'a> Compiler <'a> {
             }.into()); }
         };
 
+        let method = self.get_method(comet_struct.name().to_string(), field_name.to_string());
+        if method.is_some() { // getting method
+            let method = method.unwrap();
+            let method_ref = self.module.declare_func_in_func(method.func_id, &mut builder.func);
+            return Ok(builder.ins().func_addr(self.module.isa().pointer_type(), method_ref));
+        }
+
         let field_index = comet_struct.get_field_index(field_name).ok_or_else(|| UnkownField {
             struct_name: String::from(comet_struct.name()),
             field: field_name.clone(),
@@ -650,7 +672,7 @@ impl <'a> Compiler <'a> {
         return_type_node: Option<&'a ASTNode<'a>>,
         body: &'a ASTNode<'a>,
         owner: FunctionOwner
-    ) -> miette::Result<()> {
+    ) -> miette::Result<FuncId> {
         let (is_struct_impl, symbol_name) = match owner {
             FunctionOwner::Global => (false, name.to_string().clone()),
             FunctionOwner::Impl(struct_name) => (true, format!("{struct_name}_{name}"))
@@ -754,7 +776,7 @@ impl <'a> Compiler <'a> {
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
 
-        Ok(())
+        Ok(func_id)
     }
 
     fn visit_func_def(&mut self, node: &'a ASTNode) -> miette::Result<()> {
@@ -1210,7 +1232,31 @@ impl <'a> Compiler <'a> {
             };
 
             let func_owner = FunctionOwner::Impl(String::from(comet_struct.name()));
-            self.compile_function(name, func_args, return_type_optional.as_ref().map(|r| r.as_ref()), body, func_owner)?;
+            let func_id = self.compile_function(name, func_args, return_type_optional.as_ref().map(|r| r.as_ref()), body, func_owner)?;
+        
+            let mut arg_types = Vec::new();
+            for func_arg in func_args {
+                let arg_type = match func_arg.node_type() {
+                    ASTNodeType::FuncArgDefinition { name: _, type_ } => self.get_type_literal_type(type_)?,
+                    _ => unreachable!()
+                };
+
+                arg_types.push(arg_type);
+            }
+
+            let return_type = return_type_optional.as_ref().map(|t| self.get_type_literal_type(&*t))
+                .transpose()?
+                .unwrap_or(CometType::new_void());
+
+            let function = CometFunction {
+                arg_types: arg_types,
+                return_type: Box::new(return_type)
+            };
+
+            self.methods.insert((comet_struct.name().to_string(), name.clone()), CometMethod {
+                function: function,
+                func_id: func_id
+            });
         }
 
         Ok(())

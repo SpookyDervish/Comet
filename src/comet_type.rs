@@ -1,9 +1,16 @@
 use cranelift_codegen::ir::{Value, types};
 use cranelift_frontend::FunctionBuilder;
 use cranelift::prelude::InstBuilder;
+use cranelift_module::FuncId;
 use miette::NamedSource;
 
 use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
+
+#[derive(Debug)]
+pub struct CometMethod {
+    pub function: CometFunction,
+    pub func_id: FuncId
+}
 
 pub enum FunctionOwner {
     Global,
