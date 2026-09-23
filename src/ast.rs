@@ -30,6 +30,7 @@ pub enum ASTNodeType<'a> {
     WhileStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>> },
     StructDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>> },
     CompilerDirectiveStatement { directive: Box<ASTNode<'a>>, value_name: Box<ASTNode<'a>>, value_type: Box<ASTNode<'a>> },
+    ImplDefStatement { struct_type: Box<ASTNode<'a>>, functions: Vec<ASTNode<'a>> },
 
     // expressions
     InfixExpression { left: Box<ASTNode<'a>>, op: Token<'a>, right: Box<ASTNode<'a>> },

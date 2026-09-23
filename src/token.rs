@@ -10,7 +10,9 @@ pub enum TokenType {
     Identifier(String),
 
     // keywords,
-    Fun, Ret, Match, Default, If, Else, While, Struct, Init,
+    Fun, Ret,
+    Match, Default, If, Else, While,
+    Struct, Init, Impl,
 
     // symbols
     Plus, Minus, Times, Divide, Eq,
@@ -61,6 +63,7 @@ impl TokenType {
             "while" => Some(TokenType::While),
             "struct" => Some(TokenType::Struct),
             "init" => Some(TokenType::Init),
+            "impl" => Some(TokenType::Impl),
 
             "or" => Some(TokenType::Or),
             "and" => Some(TokenType::And),

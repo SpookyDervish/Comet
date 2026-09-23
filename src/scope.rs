@@ -20,12 +20,12 @@ pub struct CometVariable {
     pub function_id: Option<FuncId>
 }
 
-pub struct ScopeFrame <'a> {
-    pub variables: HashMap<&'a str, CometVariable>,
-    pub types: HashMap<&'a str, CometType>
+pub struct ScopeFrame {
+    pub variables: HashMap<String, CometVariable>,
+    pub types: HashMap<String, CometType>
 }
 
-impl <'a> ScopeFrame <'a> {
+impl ScopeFrame {
     pub fn new() -> Self {
         ScopeFrame { variables: HashMap::new(), types: HashMap::new() }
     }

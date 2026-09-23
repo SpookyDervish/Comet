@@ -5,6 +5,11 @@ use miette::NamedSource;
 
 use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
 
+pub enum FunctionOwner {
+    Global,
+    Impl(String)
+}
+
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct CometFunction {
     pub arg_types: Vec<CometType>,
