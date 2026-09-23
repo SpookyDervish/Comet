@@ -9,7 +9,7 @@ use crate::comet_type::CometType;
 pub enum CometVarType {
     Local(Variable),
     FuncArg(usize), // stores func arg index
-    External(DataId)
+    External(FuncId)
 }
 
 #[derive(Debug)]

@@ -352,17 +352,23 @@ impl <'a> Compiler <'a> {
                         let params = builder.block_params(builder.current_block().unwrap());
                         Ok(params[index])
                     },
-                    CometVarType::External(data) => {
-                        let global_value = self.module.declare_data_in_func(data, &mut builder.func);
+                    CometVarType::External(func_id) => {
+                        /*let global_value = self.module.declare_data_in_func(data, &mut builder.func);
                         let ptr_type = self.module.target_config().pointer_type();
 
                         let data_ptr = builder.ins().symbol_value(ptr_type, global_value);
+
                         Ok(builder.ins().load(
                             ptr_type,
                             MemFlagsData::new(),
                             data_ptr,
                             0
-                        ))
+                        ))*/
+
+                        let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+                        let pointer_type = self.module.isa().frontend_config().pointer_type();
+
+                        Ok(builder.ins().func_addr(pointer_type, func_ref))
                     }
                 }  
             },
@@ -1089,7 +1095,9 @@ impl <'a> Compiler <'a> {
             }.into()); }
         };
 
-        sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
+        if func_type.return_type.cranelift_type != types::INVALID {
+            sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
+        }
         for arg in &func_type.arg_types {
             sig.params.push(AbiParam::new(arg.cranelift_type))
         }
@@ -1099,7 +1107,7 @@ impl <'a> Compiler <'a> {
             .declare_function(name, Linkage::Import, &sig)
             .unwrap();
 
-        let data_id = self.module
+        /*let data_id = self.module
             .declare_data(&format!("{}_var", name), Linkage::Local, true, false)
             .unwrap();
 
@@ -1112,11 +1120,11 @@ impl <'a> Compiler <'a> {
         let data_func_ref = self.module.declare_func_in_data(ext_func_id, &mut data_desc);
         data_desc.write_function_addr(0, data_func_ref);
 
-        self.module.define_data(data_id, &data_desc).unwrap();
+        self.module.define_data(data_id, &data_desc).unwrap();*/
 
         self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
             type_: comet_type,
-            var_type: CometVarType::External(data_id),
+            var_type: CometVarType::External(ext_func_id),
             mutable: false,
             function_id: Some(ext_func_id)
         });
