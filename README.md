@@ -45,12 +45,12 @@ Any systems supported by the Cranelift backend can be compiled for. This include
       - [ ] Private/protected/readonly
       - [ ] Default values
       - [x] Accessing / setting fields
-    - [ ] Methods
+    - [x] Methods
     - [ ] Special methods (as, etc...)
-    - [ ] Constructor
+    - [x] Constructor
     - [ ] Destructor
   - [x] "new" keyword
-  - [ ] Calling methods
+  - [x] Calling methods
   - [ ] Inheritance
   - [ ] Generics
     - [ ] Base generics (creation, type checking, etc...)
