@@ -410,6 +410,8 @@ impl <'a> Compiler <'a> {
                 }
             },
 
+            ASTNodeType::PrefixExpression { op: _, right: _ } => self.visit_prefix_expression(node, builder),
+
             ASTNodeType::IntLiteral(num) => {
                 Ok(builder.ins().iconst(types::I64, *num as i64))
             },
@@ -760,6 +762,34 @@ impl <'a> Compiler <'a> {
         let comet_struct_layout = comet_struct.get_layout();
                         
         Ok(builder.ins().load(field.field_type().cranelift_type, MemFlagsData::new(), left, comet_struct_layout.0[*field_index] as i32))
+    }
+
+    fn visit_prefix_expression(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+        let (op, right_node) = match node.node_type() {
+            ASTNodeType::PrefixExpression { op, right } => (op, right),
+            _ => unreachable!()
+        };
+
+        let right_type = self.resolve_type(right_node)?;
+
+        match op.token_type() {
+            TokenType::Ampersand => {
+                let stack_slot = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    right_type.size(),
+                    right_type.align() as u8
+                ));
+
+                Ok(builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0))
+            },
+
+            _ => Err(InvalidOperator {
+                src: self.named_source(),
+                span: op.source_span(),
+                op: op.token_type().clone(),
+                value: "as a prefix operator".to_string()
+            }.into())
+        }
     }
 
     fn visit_expression_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {

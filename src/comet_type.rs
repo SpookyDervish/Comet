@@ -6,7 +6,7 @@ use miette::NamedSource;
 
 use std::fmt;
 
-use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
+use crate::{ast::{ASTNode, ASTType}, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
 
 #[derive(Debug)]
 pub struct CometMethod {
@@ -93,6 +93,25 @@ impl CometType {
         match self.kind {
             CometTypeKind::Void => true,
             _ => false
+        }
+    }
+
+    pub fn size(&self) -> u32 {
+        match &self.kind {
+            CometTypeKind::Function(_) |
+            CometTypeKind::Scalar(_) |
+            CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
+            CometTypeKind::Struct(s) => s.get_layout().1,
+            CometTypeKind::Void => 0
+        }
+    }
+    pub fn align(&self) -> u32 {
+        match &self.kind {
+            CometTypeKind::Function(_) |
+            CometTypeKind::Scalar(_) |
+            CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
+            CometTypeKind::Struct(s) => s.get_layout().2,
+            CometTypeKind::Void => 0
         }
     }
 

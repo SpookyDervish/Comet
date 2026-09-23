@@ -54,7 +54,7 @@ impl CometStruct {
     }
 
     /* returns field offsets and size of struct */
-    pub fn get_layout(&self) -> (Vec<u32>, u32) {
+    pub fn get_layout(&self) -> (Vec<u32>, u32, u32) {
         let mut current_offset = 0;
         let mut max_alignment = 0;
 
@@ -79,6 +79,6 @@ impl CometStruct {
             total_size += max_alignment - (total_size % max_alignment);
         }
 
-        (field_offsets, total_size)
+        (field_offsets, total_size, max_alignment)
     }
 }
