@@ -318,8 +318,9 @@ impl <'a> Compiler <'a> {
                 let mut data_desc = DataDescription::new();
                 data_desc.define(str.as_bytes().to_vec().into_boxed_slice());
 
+                let string_name = format!("string_literal_{}", self.var_index);
                 let data_id = self.module
-                    .declare_data("string_literal", Linkage::Local, false, false).unwrap();
+                    .declare_data(&string_name, Linkage::Local, false, false).unwrap();
 
                 self.module.define_data(data_id, &data_desc).unwrap();
 
@@ -368,38 +369,41 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::FuncCall { left, args } => {
                 let func_ptr = self.visit_value(left, builder)?;
+                let func_type = self.resolve_type(left)?;
+
+                let comet_function = match func_type.kind {
+                    CometTypeKind::Function(f) => f,
+                    _ => { return Err(NotAFunction {
+                        span: (**left).source_span(),
+                        src: NamedSource::new(String::from(self.file_name), self.source.clone()),
+                        func_name: String::from("<expression>"),
+                    }.into()); }
+                };
 
                 let mut compiled_args: Vec<ir::Value> = vec![];
                 for arg in args {
                     compiled_args.push(self.visit_value(arg, builder)?);
                 }
 
-                let func_id = match left.node_type() {
-                    ASTNodeType::IdentifierLiteral(name) => self.get_variable(name)
-                        .and_then(|variable| variable.function_id)
-                        .ok_or(NotAFunction {
-                            span: (**left).source_span(),
-                            src: NamedSource::new(String::from(self.file_name), self.source.clone()),
-                            func_name: name.clone(),
-                        })?,
-                    _ => return Err(SyntaxError {
-                            span: (**left).source_span(),
-                            src: NamedSource::new(String::from(self.file_name), self.source.clone()),
-                            text: String::from("Expected identifier")
-                        }.into())
-                };
-
-                let decls = self.module.declarations();
-                let func_decl_cell = RefCell::new(decls.get_function_decl(func_id));
-                let func_decl = func_decl_cell.borrow();
-
-                let sig = func_decl.signature.clone();
+                let mut sig = self.module.make_signature();
+                for arg_type in &comet_function.arg_types {
+                    sig.params.push(AbiParam::new(arg_type.cranelift_type));
+                }
+                if comet_function.return_type.cranelift_type != types::INVALID {
+                    sig.returns.push(AbiParam::new(comet_function.return_type.cranelift_type));
+                }
+                
                 let sig_ref = builder.import_signature(sig);
-
                 let call_inst = builder.ins().call_indirect(sig_ref, func_ptr, &compiled_args);
                 let results = builder.inst_results(call_inst);
 
-                Ok(results[0])
+
+                if results.is_empty() {
+                    // Return a dummy value or handle void returns
+                    Ok(builder.ins().iconst(types::I64, 0))
+                } else {
+                    Ok(results[0])
+                }
                 
             },
 
@@ -706,8 +710,9 @@ impl <'a> Compiler <'a> {
         let func_ref = self.module.declare_func_in_func(func_id, builder.func);
         let func_addr = builder.ins().func_addr(target_config.pointer_type(), func_ref);
 
-        let func_var = Variable::from_u32(self.var_index);
-        builder.declare_var(target_config.pointer_type());
+        //let func_var = Variable::from_u32(self.var_index);
+        //self.var_index += 1;
+        let func_var = builder.declare_var(target_config.pointer_type());
         builder.def_var(func_var, func_addr);
 
         self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
@@ -1111,7 +1116,7 @@ impl <'a> Compiler <'a> {
 
         self.scopes.last_mut().unwrap().variables.insert(&name, CometVariable {
             type_: comet_type,
-            var_type: External(data_id),
+            var_type: CometVarType::External(data_id),
             mutable: false,
             function_id: Some(ext_func_id)
         });
