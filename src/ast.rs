@@ -5,7 +5,8 @@ use crate::token::Token;
 #[derive(Debug)]
 pub enum ASTType<'a> {
     Identifier(Box<ASTNode<'a>>),
-    Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } 
+    Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } ,
+    Pointer(Box<ASTNode<'a>>)
     
 }
 
@@ -34,6 +35,7 @@ pub enum ASTNodeType<'a> {
 
     // expressions
     InfixExpression { left: Box<ASTNode<'a>>, op: Token<'a>, right: Box<ASTNode<'a>> },
+    PrefixExpression { op: Token<'a>, right: Box<ASTNode<'a>> },
     FuncCall { left: Box<ASTNode<'a>>, args: Vec<ASTNode<'a>> },
     StructCreateExpression { type_: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>> },
 

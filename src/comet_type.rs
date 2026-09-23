@@ -205,7 +205,7 @@ impl fmt::Display for CometType {
 
                 Ok(())
             },
-            CometTypeKind::Pointer(t) => write!(f, "ptr({})", (*t).to_string()),
+            CometTypeKind::Pointer(t) => write!(f, "&{}", (*t).to_string()),
             CometTypeKind::Struct(s) => write!(f, "{}{{}}", s.name()),
             CometTypeKind::Void => write!(f, "(none)"),
             _ => write!(f, "<unkown-type>")

@@ -234,11 +234,15 @@ impl<'file> Lexer<'file> {
                     self.consume();
                 }
                 '|' => {
-                    tokens.push(Token::new(TokenType::BitwiseOr, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Pipe, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '&' => {
-                    tokens.push(Token::new(TokenType::BitwiseAnd, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    tokens.push(Token::new(TokenType::Ampersand, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    self.consume();
+                }
+                '^' => {
+                    tokens.push(Token::new(TokenType::Caret, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
                 '#' => {

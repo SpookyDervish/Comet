@@ -21,7 +21,7 @@ pub enum TokenType {
     EqEq, NotEq, Gt, Lt, LtEq, GtEq,
     Not,
     Colon, Comma, ColonColon,
-    BitwiseOr, BitwiseAnd,
+    Pipe, Ampersand, Caret,
     Or, And,
     Hash,
     Dot,

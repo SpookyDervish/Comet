@@ -140,6 +140,11 @@ impl <'a> Compiler <'a> {
                     arg_types: compiled_arg_types,
                     return_type: Box::new(return_type)
                 }))
+            },
+
+            ASTType::Pointer(inner_node) => {
+                let inner_type = self.get_type_literal_type(inner_node)?;
+                Ok(CometType::new_ptr(inner_type, self.module.isa().pointer_type()))
             }
         }
         

@@ -3,6 +3,7 @@ use miette::NamedSource;
 use crate::comet_error::{NotAFunction, SyntaxError};
 use crate::precedence::PrecedenceType;
 use crate::range::Range;
+use crate::token::TokenType::Ret;
 use crate::token::{Token, TokenType};
 use crate::ast::{ASTNode, ASTNodeType, ASTType};
 
@@ -98,6 +99,11 @@ impl <'a> Parser <'a> {
             TokenType::StringLiteral(_) => Some(Parser::parse_string_literal),
             TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
             TokenType::Init => Some(Parser::parse_struct_create_expr),
+
+            // prefix exprs
+            TokenType::Not => Some(Parser::parse_prefix_expr),
+            TokenType::Ampersand => Some(Parser::parse_prefix_expr),
+            TokenType::Caret => Some(Parser::parse_prefix_expr),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
@@ -242,6 +248,19 @@ impl <'a> Parser <'a> {
     }
 
     fn parse_type(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        if self.peek_token_is(&TokenType::Ampersand) {
+            self.advance_token();
+
+            let inner_type = self.parse_type()?;
+            let ast_type = ASTType::Pointer(Box::new(inner_type));
+
+            range.end(self.current_token().unwrap().end_pos());
+
+            return Ok(ASTNode::new(ASTNodeType::TypeLiteral(ast_type), range.source_span()));
+        }
+
         if self.peek_token_is(&TokenType::Fun) {
             return self.parse_function_type();
         }
@@ -256,9 +275,9 @@ impl <'a> Parser <'a> {
             curr.source_span()
         );
 
-        let source_span = curr.source_span().clone();
+        range.end(curr.end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::TypeLiteral(ASTType::Identifier(Box::new(ident_node))), source_span))
+        Ok(ASTNode::new(ASTNodeType::TypeLiteral(ASTType::Identifier(Box::new(ident_node))), range.source_span()))
     }
     // END OF TYPE PARSING //
 
@@ -623,6 +642,20 @@ impl <'a> Parser <'a> {
         }, expr_range.source_span()))
     }
 
+    fn parse_prefix_expr(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        let op = self.current_token().unwrap().clone();
+
+        self.advance_token();
+
+        let right_expr = self.parse_expression(PrecedenceType::Prefix)?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        return Ok(ASTNode::new(ASTNodeType::PrefixExpression { op: op, right: Box::new(right_expr) }, range.source_span()));
+    }
+
     fn parse_func_call(&mut self, left_node: ASTNode<'a>) -> miette::Result<ASTNode<'a>> {
         let mut func_call_range = Range::start(self.current_token().unwrap().pos());
 
@@ -798,7 +831,7 @@ impl <'a> Parser <'a> {
 
         let mut last_token_pos = None;
         while self.peek_token().is_some() {
-            last_token_pos = self.peek_token().map(|token| token.pos().clone());
+            last_token_pos = self.peek_token().map(|token| token.pos().clone()) ;
             let stmt = self.parse_statement()?;
             stmts.push(stmt);
             self.advance_token();
