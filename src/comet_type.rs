@@ -4,6 +4,8 @@ use cranelift::prelude::InstBuilder;
 use cranelift_module::FuncId;
 use miette::NamedSource;
 
+use std::fmt;
+
 use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
 
 #[derive(Debug)]
@@ -75,6 +77,25 @@ impl CometType {
         CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Void }
     }
 
+    pub fn is_int(&self) -> bool {
+        match self.kind {
+            CometTypeKind::Scalar(_) => self.cranelift_type.is_int(),
+            _ => false
+        }
+    }
+    pub fn is_float(&self) -> bool {
+        match self.kind {
+            CometTypeKind::Scalar(_) => self.cranelift_type.is_float(),
+            _ => false
+        }
+    }
+    pub fn is_void(&self) -> bool {
+        match self.kind {
+            CometTypeKind::Void => true,
+            _ => false
+        }
+    }
+
     pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_comet_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
         let their_type = target_type.cranelift_type;
 
@@ -128,13 +149,41 @@ impl CometType {
     }
 }
 
+impl fmt::Display for CometType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.kind {
+            CometTypeKind::Scalar(v) => write!(f, "{}", v),
+            CometTypeKind::Function(func) => {
+                write!(f, "fun(")?;
+                for (i, arg_type) in func.arg_types.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", arg_type.to_string())?;
+                }
+                write!(f, ")")?;
+
+                if !func.return_type.is_void() {
+                    write!(f, " :: {}", func.return_type.to_string())?;
+                }
+
+                Ok(())
+            },
+            CometTypeKind::Pointer(t) => write!(f, "ptr({})", (*t).to_string()),
+            CometTypeKind::Struct(s) => write!(f, "{}{{}}", s.name()),
+            CometTypeKind::Void => write!(f, "(none)"),
+            _ => write!(f, "<unkown-type>")
+        }
+    }
+}
+
 impl PartialEq for CometType {
     fn eq(&self, other: &Self) -> bool {
 
         let parent_type = self.cranelift_type;
         let child_type = other.cranelift_type;
 
-        if (parent_type.is_int() && child_type.is_int()) && parent_type.wider_or_equal(child_type) {
+        if (self.is_int() && other.is_int()) && parent_type.wider_or_equal(child_type) {
             let self_signed = match self.kind {
                 CometTypeKind::Scalar(signed) => signed,
                 _ => unreachable!()
@@ -147,7 +196,7 @@ impl PartialEq for CometType {
             return self_signed == other_signed;
         }
 
-        if parent_type.is_float() && child_type.is_float() {
+        if self.is_float() && other.is_float() {
             return true;
         }
 

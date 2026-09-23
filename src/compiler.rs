@@ -328,7 +328,7 @@ impl <'a> Compiler <'a> {
             _ => {
                 return Err(TypeMismatch {
                     expected: "struct".to_string(),
-                    invalid: format!("{}", receiver_type.cranelift_type),
+                    invalid: receiver_type.to_string(),
                     span: receiver_node.source_span(),
                     src: self.named_source()
                 }.into());
@@ -535,7 +535,7 @@ impl <'a> Compiler <'a> {
                     _ => { return Err(TypeMismatch {
                         src: self.named_source(),
                         expected: String::from("struct"),
-                        invalid: struct_type.cranelift_type.to_string(),
+                        invalid: struct_type.to_string(),
                         span: type_node.source_span()
                     }.into()); }
                 };
@@ -718,7 +718,7 @@ impl <'a> Compiler <'a> {
             _ => {  return Err(TypeMismatch {
                         src: self.named_source(),
                         expected: String::from("struct"),
-                        invalid: struct_type.cranelift_type.to_string(),
+                        invalid: struct_type.to_string(),
                         span: left_node.source_span()
                     }.into()); }
         };
@@ -964,8 +964,8 @@ impl <'a> Compiler <'a> {
             let var_type = &existing_var.unwrap().type_;
             if value_type != *var_type {
                 return Err(TypeMismatch {
-                    expected: var_type.cranelift_type.to_string(),
-                    invalid: value_type.cranelift_type.to_string(),
+                    expected: var_type.to_string(),
+                    invalid: value_type.to_string(),
                     span: value_node.source_span(),
                     src: self.named_source()
                 }.into());
@@ -1310,7 +1310,7 @@ impl <'a> Compiler <'a> {
         let comet_struct = match struct_type.kind {
             CometTypeKind::Struct(s) => s,
             _ => { return Err(TypeMismatch {
-                invalid: format!("{:?}", struct_type.kind),
+                invalid: struct_type.to_string(),
                 expected: "struct".to_string(),
                 span: struct_node.source_span(),
                 src: self.named_source()
