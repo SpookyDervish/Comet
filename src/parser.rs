@@ -97,7 +97,7 @@ impl <'a> Parser <'a> {
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
             TokenType::StringLiteral(_) => Some(Parser::parse_string_literal),
             TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
-            TokenType::Init => Some(Parser::parse_struct_create_expr),
+            TokenType::New => Some(Parser::parse_struct_create_expr),
 
             // prefix exprs
             TokenType::Not => Some(Parser::parse_prefix_expr),
@@ -139,7 +139,7 @@ impl <'a> Parser <'a> {
             TokenType::If => self.parse_if_statement(),
             TokenType::While => self.parse_while_statement(),
             TokenType::Struct => self.parse_struct_def_statement(),
-            TokenType::Impl => self.parse_impl_block(),
+            TokenType::Imp => self.parse_impl_block(),
 
             TokenType::Hash => self.parse_compiler_directive(),
 
@@ -785,7 +785,7 @@ impl <'a> Parser <'a> {
 
             let field_ident = self.parse_identifier_literal()?;
 
-            self.expect_peek(TokenType::Colon)?;
+            self.expect_peek(TokenType::Eq)?;
             self.advance_token();
 
             let value = self.parse_expression(PrecedenceType::Lowest)?;
