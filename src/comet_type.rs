@@ -77,6 +77,12 @@ impl CometType {
         CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Void }
     }
 
+    pub fn is_signed(&self) -> bool {
+        match self.kind {
+            CometTypeKind::Scalar(s) => s,
+            _ => false
+        }
+    }
     pub fn is_int(&self) -> bool {
         match self.kind {
             CometTypeKind::Scalar(_) => self.cranelift_type.is_int(),
@@ -213,7 +219,7 @@ impl CometType {
 impl fmt::Display for CometType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
-            CometTypeKind::Scalar(v) => write!(f, "{}", v),
+            CometTypeKind::Scalar(v) => write!(f, "{}{}", if *v {"signed-"} else {""}, self.cranelift_type),
             CometTypeKind::Function(func) => {
                 write!(f, "fun(")?;
                 for (i, arg_type) in func.arg_types.iter().enumerate() {

@@ -164,10 +164,49 @@ impl <'a> Compiler <'a> {
     }
 
     fn unify_types(&self, a: &'a CometType, b: &'a CometType) -> &CometType {
-        if self.rank_type(a) > self.rank_type(b) {
-            a
+        if self.rank_type(a) >= 4 || self.rank_type(b) >= 4 {
+            return if self.rank_type(a) > self.rank_type(b) {
+                a
+            } else {
+                b
+            };
+        }
+
+        if !a.is_int() || !b.is_int() {
+            return if self.rank_type(a) > self.rank_type(b) {
+                a
+            } else {
+                b
+            };
+        }
+
+        let a_bits = a.cranelift_type.bits();
+        let b_bits = b.cranelift_type.bits();
+
+        let a_signed = a.is_signed();
+        let b_signed = b.is_signed();
+
+        if a_signed == b_signed {
+            return if a_bits >= b_bits { a } else { b };
+        }
+
+        let (signed, unsigned) = if a_signed {
+            (a, b)
         } else {
-            b
+            (b, a)
+        };
+
+        let signed_bits = signed.cranelift_type.bits();
+        let unsigned_bits = unsigned.cranelift_type.bits();
+
+        if signed_bits > unsigned_bits {
+            // e.g. i64 + u32 -> i64
+            signed
+        } else {
+            // e.g. i32 + u32 -> u32
+            //      i64 + u64 -> u64
+            //      i32 + u64 -> u64
+            unsigned
         }
     }
 
@@ -287,6 +326,8 @@ impl <'a> Compiler <'a> {
                                 expected: "pointer".to_string()
                             }.into()); }
                         };
+
+                        println!("inner type: {}", inner_type);
 
                         Ok(inner_type)
                     },
@@ -733,7 +774,14 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
-        let (left_side, right_side) = self.ensure_share_types(&left, &right, builder)?;
+        let left_type = self.resolve_type(left)?;
+        let right_type = self.resolve_type(right)?;
+        let unified_type = self.unify_types(&left_type, &right_type);
+
+        let is_signed = unified_type.is_signed();
+
+        let left_side = self.visit_value(left, builder)?;
+        let right_side = self.visit_value(right, builder)?;
 
         let out: ir::Value;
         match op.token_type() {
@@ -754,16 +802,32 @@ impl <'a> Compiler <'a> {
                 out = builder.ins().icmp(IntCC::NotEqual, left_side, right_side);
             },
             TokenType::Lt => {
-                out = builder.ins().icmp(IntCC::SignedLessThan, left_side, right_side);
+                out = builder.ins().icmp(
+                    if is_signed {IntCC::SignedLessThan} else {IntCC::UnsignedLessThan},
+                    left_side,
+                    right_side
+                );
             },
             TokenType::Gt => {
-                out = builder.ins().icmp(IntCC::SignedGreaterThan, left_side, right_side);
+                out = builder.ins().icmp(
+                    if is_signed {IntCC::SignedGreaterThan} else {IntCC::UnsignedGreaterThan},
+                    left_side,
+                    right_side
+                );
             },
             TokenType::LtEq => {
-                out = builder.ins().icmp(IntCC::SignedLessThanOrEqual, left_side, right_side);
+                out = builder.ins().icmp(
+                    if is_signed {IntCC::SignedLessThanOrEqual} else {IntCC::UnsignedLessThanOrEqual},
+                    left_side,
+                    right_side
+                );
             },
             TokenType::GtEq => {
-                out = builder.ins().icmp(IntCC::SignedGreaterThanOrEqual, left_side, right_side);
+                out = builder.ins().icmp(
+                    if is_signed {IntCC::SignedGreaterThanOrEqual} else {IntCC::UnsignedGreaterThanOrEqual},
+                    left_side,
+                    right_side
+                );
             },
 
             _ => {
@@ -1058,13 +1122,17 @@ impl <'a> Compiler <'a> {
             let target_type = self.resolve_type(ident_node)?;
             let value_type = self.resolve_type(value_node)?;
 
-
-            if target_type != value_type {
-                CometType::try_implicit_cast(value_node, self.visit_value(value_node, builder)?, &value_type, &target_type, builder, self.named_source())?;
-            }
-
+            println!("visiting actual values...");
             let value = self.visit_value(value_node, builder)?;
             let address = self.visit_l_value(ident_node, builder)?;
+
+            println!("{}, {}", target_type, value_type);
+            if target_type != value_type {
+                println!("doing implicit cast...");
+                CometType::try_implicit_cast(value_node, value, &value_type, &target_type, builder, self.named_source())?;
+            }
+
+            
             builder.ins().store(MemFlagsData::new(), value, address, 0);
             return Ok(());
         }
