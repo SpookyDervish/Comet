@@ -1026,8 +1026,6 @@ impl <'a> Compiler <'a> {
             )?;
         }
 
-        println!("{}", builder.func);
-
         let out: ir::Value;
         match op.token_type() {
             TokenType::Plus => {
