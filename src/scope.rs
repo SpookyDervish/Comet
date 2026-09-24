@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_frontend::Variable;
 use cranelift_module::FuncId;
 
-use crate::comet_type::CometType;
+use crate::{ast::ASTNode, comet_struct::CometStruct, comet_type::CometType};
 
 #[derive(Debug)]
 pub enum CometVarType {
@@ -20,13 +20,18 @@ pub struct CometVariable {
     pub function_id: Option<FuncId>
 }
 
-pub struct ScopeFrame {
+pub struct ScopeFrame<'a> {
     pub variables: HashMap<String, CometVariable>,
-    pub types: HashMap<String, CometType>
+    pub types: HashMap<String, CometType>,
+    pub generics: HashMap<String, ASTNode<'a>>
 }
 
-impl ScopeFrame {
+impl <'a> ScopeFrame <'a> {
     pub fn new() -> Self {
-        ScopeFrame { variables: HashMap::new(), types: HashMap::new() }
+        ScopeFrame {
+            variables: HashMap::new(),
+            types: HashMap::new(),
+            generics: HashMap::new()
+        }
     }
 }

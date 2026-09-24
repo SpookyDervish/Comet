@@ -4,6 +4,7 @@ use cranelift::prelude::InstBuilder;
 use cranelift_module::FuncId;
 use miette::NamedSource;
 
+use itertools::Itertools;
 use std::fmt;
 
 use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
@@ -222,6 +223,17 @@ impl CometType {
         }
 
         Ok(out)
+    }
+
+    pub fn generic_type_name(&self) -> String {
+        match &self.kind {
+            CometTypeKind::Function(f) => format!("f_{}_ret_{}", f.arg_types.iter().format("_").to_string(), f.return_type),
+            CometTypeKind::Generic(n) => format!("g_{}", n),
+            CometTypeKind::Pointer(t) => format!("p_{}", t),
+            CometTypeKind::Scalar(s) => format!("{}{}", self.cranelift_type, if *s {"_s"} else {""}),
+            CometTypeKind::Struct(s) => format!("st_{}", s.name()),
+            CometTypeKind::Void => format!("v")
+        }
     }
 }
 

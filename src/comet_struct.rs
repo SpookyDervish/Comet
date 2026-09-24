@@ -1,5 +1,6 @@
 use std::cmp;
 use std::collections::HashMap;
+use itertools::Itertools;
 
 use crate::comet_type::CometType;
 
@@ -51,6 +52,14 @@ impl CometStruct {
 
     pub fn get_field_index(&self, name: &str) -> Option<&usize> {
         self.cached_fields.get(name)
+    }
+
+    pub fn get_mangled_name(struct_name: &str, types: &Vec<CometType>) -> String {
+        format!("{}__{}", struct_name, types.iter().map(|t| t.generic_type_name()).join("__"))
+    }
+
+    pub fn mangle_name(&mut self, types: &Vec<CometType>) {
+        self.name = CometStruct::get_mangled_name(self.name(), types);
     }
 
     /* returns field offsets and size of struct */

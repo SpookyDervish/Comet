@@ -253,8 +253,6 @@ impl <'a> Parser <'a> {
         let mut generic_types = Vec::new();
 
         while !self.peek_token_is(&TokenType::Gt) {
-            println!("{:?}", self.peek_token().unwrap());
-
             let type_ = self.parse_type()?;
             generic_types.push(type_);
 
@@ -631,8 +629,6 @@ impl <'a> Parser <'a> {
             }
 
             functions.push(function);
-
-            
         }
 
         self.advance_token();

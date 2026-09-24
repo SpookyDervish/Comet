@@ -39,8 +39,6 @@ fn main() -> miette::Result<()> {
     let mut parser = parser::Parser::new(tokens);
     let ast = parser.parse()?;
 
-    //println!("{:#?}", ast);
-
     let mut compiler = compiler::Compiler::new(&file_name, source.clone()).unwrap();
     compiler.compile(&ast, None)?;
 

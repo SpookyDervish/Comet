@@ -2,7 +2,7 @@ use miette::{SourceOffset, SourceSpan};
 
 use crate::token::Token;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTType<'a> {
     Identifier(Box<ASTNode<'a>>),
     Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } ,
@@ -11,7 +11,7 @@ pub enum ASTType<'a> {
 }
 
 // TODO: use an arena allocator instead of heap allocating all the nodes
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTNodeType<'a> {
     Program(Vec<ASTNode<'a>>),
     Block(Vec<ASTNode<'a>>),
@@ -47,7 +47,7 @@ pub enum ASTNodeType<'a> {
     TypeLiteral { base_type: ASTType<'a>, generic_types: Option<Vec<ASTNode<'a>>> }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTNode<'a> {
     node_type: ASTNodeType<'a>,
     source_span: SourceSpan
