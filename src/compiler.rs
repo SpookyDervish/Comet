@@ -23,6 +23,8 @@ pub struct Compiler <'a> {
     scopes: Vec<ScopeFrame>,
     methods: HashMap<(String, String), CometMethod>,
 
+    current_function: Option<CometFunction>,
+
     file_name: &'a str,
     source: String,
 
@@ -67,6 +69,7 @@ impl <'a> Compiler <'a> {
             scopes: vec!{base_frame},
             file_name: file_name,
             source: source,
+            current_function: None,
 
             methods: HashMap::new(),
 
@@ -326,8 +329,6 @@ impl <'a> Compiler <'a> {
                                 expected: "pointer".to_string()
                             }.into()); }
                         };
-
-                        println!("inner type: {}", inner_type);
 
                         Ok(inner_type)
                     },
@@ -697,8 +698,6 @@ impl <'a> Compiler <'a> {
                         }
 
                         let right_value = self.visit_value(right, builder)?;
-                        println!("{:#?}", right);
-
                         Ok(right_value)
                     }
                     _ => Err(InvalidOperator {
@@ -1007,10 +1006,14 @@ impl <'a> Compiler <'a> {
             sig.returns.push(AbiParam::new(return_type.cranelift_type));
         }
 
-        let function_type = CometType::new_function(CometFunction {
+        let new_comet_func = CometFunction {
             arg_types,
             return_type: Box::new(return_type)
-        });
+        };
+
+        self.current_function = Some(new_comet_func.clone());
+
+        let function_type = CometType::new_function(new_comet_func);
 
         let func_id = self.module.declare_function(&symbol_name, Linkage::Export, &sig).unwrap();
 
@@ -1088,15 +1091,22 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_ret_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
-        let ret_value_node = match node.node_type() {
+        let ret_value_optional = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
         };
 
-        if ret_value_node.is_none() {
+        if ret_value_optional.is_none() {
             builder.ins().return_(&[]);
         } else {
-            let ret_value = self.visit_value(ret_value_node.as_ref().unwrap(), builder)?;
+            let ret_value_node = ret_value_optional.as_ref().unwrap();
+            let mut ret_value = self.visit_value(ret_value_node, builder)?;
+
+            let ret_type = self.resolve_type(ret_value_node)?;
+            if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
+                ret_value = CometType::try_implicit_cast(ret_value_node, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), builder, self.named_source())?;
+            }
+
             builder.ins().return_(&[ret_value]);
         }
 
@@ -1122,14 +1132,11 @@ impl <'a> Compiler <'a> {
             let target_type = self.resolve_type(ident_node)?;
             let value_type = self.resolve_type(value_node)?;
 
-            println!("visiting actual values...");
-            let value = self.visit_value(value_node, builder)?;
+            let mut value = self.visit_value(value_node, builder)?;
             let address = self.visit_l_value(ident_node, builder)?;
 
-            println!("{}, {}", target_type, value_type);
             if target_type != value_type {
-                println!("doing implicit cast...");
-                CometType::try_implicit_cast(value_node, value, &value_type, &target_type, builder, self.named_source())?;
+                value = CometType::try_implicit_cast(value_node, value, &value_type, &target_type, builder, self.named_source())?;
             }
 
             
