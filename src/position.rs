@@ -1,5 +1,3 @@
-use std::ops::Add;
-
 #[derive(Debug, Clone)]
 pub struct Position <'file> {
     index: usize,

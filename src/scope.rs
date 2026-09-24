@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use cranelift_frontend::Variable;
-use cranelift_module::{DataId, FuncId};
+use cranelift_module::FuncId;
 
 use crate::comet_type::CometType;
 

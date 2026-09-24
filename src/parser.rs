@@ -3,7 +3,6 @@ use miette::NamedSource;
 use crate::comet_error::{NotAFunction, SyntaxError};
 use crate::precedence::PrecedenceType;
 use crate::range::Range;
-use crate::token::TokenType::Ret;
 use crate::token::{Token, TokenType};
 use crate::ast::{ASTNode, ASTNodeType, ASTType};
 

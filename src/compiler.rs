@@ -1,9 +1,8 @@
 use cranelift_codegen::ir::condcodes::IntCC;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, Type, types};
-use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{DataDescription, FuncId, Linkage, Module, ModuleRelocTarget, default_libcall_names};
-use cranelift_native::builder;
+use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::collections::HashMap;
@@ -12,9 +11,8 @@ use crate::ast::ASTType;
 use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
-use crate::scope::CometVarType::{External, Local};
+use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
-use crate::token::Token;
 use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
 
 pub struct Compiler <'a> {

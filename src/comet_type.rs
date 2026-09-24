@@ -6,7 +6,7 @@ use miette::NamedSource;
 
 use std::fmt;
 
-use crate::{ast::{ASTNode, ASTType}, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
+use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
 
 #[derive(Debug)]
 pub struct CometMethod {
