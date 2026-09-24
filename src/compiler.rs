@@ -1,8 +1,9 @@
-use cranelift_codegen::ir::condcodes::IntCC;
+use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
+use cranelift_native::builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::collections::HashMap;
@@ -21,6 +22,8 @@ pub struct Compiler <'a> {
     scopes: Vec<ScopeFrame<'a>>,
     methods: HashMap<(String, String), CometMethod>,
     resolved_generics: HashMap<String, CometStruct>,
+
+    generic_impls: Vec<ASTNode<'a>>,
 
     current_function: Option<CometFunction>,
 
@@ -72,6 +75,7 @@ impl <'a> Compiler <'a> {
 
             methods: HashMap::new(),
             resolved_generics: HashMap::new(),
+            generic_impls: Vec::new(),
 
             var_index: 0
         })
@@ -109,6 +113,132 @@ impl <'a> Compiler <'a> {
             .iter()
             .rev()
             .find_map(|scope| scope.generics.get(name))
+    }
+
+    fn instantiate_generic_impls(
+        &mut self,
+        base_name: &str,
+        concrete_types: &[CometType],
+        concrete_struct: &CometStruct
+    ) -> miette::Result<()> {
+
+        let impls = self.generic_impls.clone();
+
+        for impl_node in impls {
+            let (struct_type_node, functions) = match impl_node.node_type() {
+                ASTNodeType::ImplDefStatement { struct_type, functions } => (struct_type, functions),
+                _ => unreachable!()
+            };
+
+            let target = match struct_type_node.node_type() {
+                ASTNodeType::TypeLiteral { base_type, generic_types, .. } => (base_type, generic_types),
+                _ => continue,
+            };
+
+            let type_name = match target.0 {
+                ASTType::Identifier(name_node) => match name_node.as_ref().node_type() {
+                    ASTNodeType::IdentifierLiteral(name) => name,
+                    _ => continue,
+                },
+                _ => continue,
+            };
+
+            if type_name != base_name {
+                continue;
+            }
+
+            
+            let generic_names = match target.1.as_ref() {
+                Some(generic_nodes) => generic_nodes
+                    .iter()
+                    .map(|n| match n.node_type() {
+                        ASTNodeType::TypeLiteral {
+                            base_type: ASTType::Identifier(name_node),
+                            generic_types: None,
+                        } => match name_node.node_type() {
+                            ASTNodeType::IdentifierLiteral(name) => Ok(name.clone()),
+                            _ => Err(()),
+                        },
+                        _ => Err(()),
+                    })
+                    .collect::<Result<Vec<_>, _>>(),
+                None => continue,
+            };
+
+            let generic_names = match generic_names {
+                Ok(names) => names,
+                Err(()) => continue,
+            };
+
+            if generic_names.len() != concrete_types.len() {
+                continue;
+            }
+
+            self.scopes.push(ScopeFrame::new());
+
+            for (generic_name, concrete_type) in generic_names.iter().zip(concrete_types.iter()) {
+                self.scopes.last_mut().unwrap().types.insert(
+                    generic_name.clone(),
+                    concrete_type.clone(),
+                );
+            }
+
+            self.scopes.last_mut().unwrap().types.insert(
+                "Self".to_string(),
+                CometType::new_struct(concrete_struct.clone()),
+            );
+
+            for function in functions {
+                let (name_node, args, return_type, body) = match function.node_type() {
+                    ASTNodeType::FuncDefinitionStatement { name, args, return_type, body } => {
+                        (name, args, return_type, body)
+                    }
+                    _ => unreachable!()
+                };
+
+                let method_name = match name_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v,
+                    _ => unreachable!()
+                };
+
+                let func_id = self.compile_function(
+                    method_name,
+                    args,
+                    return_type.as_ref().map(|r| r.as_ref()),
+                    body,
+                    FunctionOwner::Impl(concrete_struct.name().to_string()),
+                )?;
+
+                let mut arg_types = Vec::new();
+                for func_arg in args {
+                    let arg_type = match func_arg.node_type() {
+                        ASTNodeType::FuncArgDefinition { type_, .. } => self.get_type_literal_type(type_)?,
+                        _ => unreachable!()
+                    };
+                    arg_types.push(arg_type);
+                }
+
+                let mut compiled_return = CometType::new_void();
+
+                if let Some(t) = return_type.as_ref() {
+                    compiled_return = self.get_type_literal_type(t)?;
+                }
+
+                let function = CometFunction {
+                    arg_types,
+                    return_type: Box::new(compiled_return),
+                };
+
+                self.methods.insert(
+                    (concrete_struct.name().to_string(), method_name.clone()),
+                    CometMethod { function, func_id },
+                );
+            }
+
+            self.scopes.pop();
+        }
+
+        Ok(())
     }
 
     fn get_generic_type_literal_type<'b>(
@@ -166,11 +296,8 @@ impl <'a> Compiler <'a> {
         let existing_struct_name = CometStruct::get_mangled_name(struct_name, &resolved_generic_types);
         let existing_struct = self.resolved_generics.get(&existing_struct_name);
         if existing_struct.is_some() {
-            println!("using existing struct...");
             return Ok(CometType::new_struct(existing_struct.unwrap().clone()));
         }
-            println!("building new struct...");
-
 
         for (i, generic_name) in generic_names.iter().enumerate() {
             self.scopes.last_mut().unwrap().types.insert(
@@ -184,6 +311,10 @@ impl <'a> Compiler <'a> {
         struct_result.mangle_name(&resolved_generic_types);
 
         self.resolved_generics.insert(struct_result.name().to_string(), struct_result.clone());
+
+        self.instantiate_generic_impls(struct_name, &resolved_generic_types, &struct_result)?;
+
+        self.scopes.pop();
 
         Ok(CometType::new_struct(struct_result))
     }
@@ -860,61 +991,141 @@ impl <'a> Compiler <'a> {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
             _ => unreachable!()
         };
+        
+
+        
+
+        let mut left_side = self.visit_value(left, builder)?;
+        let mut right_side = self.visit_value(right, builder)?;
 
         let left_type = self.resolve_type(left)?;
         let right_type = self.resolve_type(right)?;
         let unified_type = self.unify_types(&left_type, &right_type);
 
         let is_signed = unified_type.is_signed();
+        let is_int = unified_type.is_int();
 
-        let left_side = self.visit_value(left, builder)?;
-        let right_side = self.visit_value(right, builder)?;
+        if &left_type != unified_type {
+            left_side = CometType::try_implicit_cast(
+                left,
+                left_side,
+                &left_type,
+                unified_type,
+                builder,
+                self.named_source()
+            )?;
+        }
+        if &right_type != unified_type {
+            right_side = CometType::try_implicit_cast(
+                right,
+                right_side,
+                &right_type,
+                unified_type,
+                builder,
+                self.named_source()
+            )?;
+        }
+
+        println!("{}", builder.func);
 
         let out: ir::Value;
         match op.token_type() {
             TokenType::Plus => {
-                out = builder.ins().iadd(left_side, right_side);
+
+                out = if is_int {
+                    builder.ins().iadd(left_side, right_side)
+                } else {
+                    builder.ins().fadd(left_side, right_side)
+                }
             },
             TokenType::Minus => {
-                out = builder.ins().isub(left_side, right_side);
+                out = if is_int {
+                    builder.ins().isub(left_side, right_side)
+                } else {
+                    builder.ins().fsub(left_side, right_side)
+                }
             },
             TokenType::Times => {
-                out = builder.ins().imul(left_side, right_side);
+                out = if is_int {
+                    builder.ins().imul(left_side, right_side)
+                } else {
+                    builder.ins().fmul(left_side, right_side)
+                }
             },
 
             TokenType::EqEq => {
-                out = builder.ins().icmp(IntCC::Equal, left_side, right_side);
+                out = if is_int {
+                    builder.ins().icmp(IntCC::Equal, left_side, right_side)
+                } else {
+                    builder.ins().fcmp(FloatCC::Equal, left_side, right_side)
+                }
             },
             TokenType::NotEq => {
-                out = builder.ins().icmp(IntCC::NotEqual, left_side, right_side);
+                out = if is_int {
+                    builder.ins().icmp(IntCC::NotEqual, left_side, right_side)
+                } else {
+                    builder.ins().fcmp(FloatCC::NotEqual, left_side, right_side)
+                }
             },
             TokenType::Lt => {
-                out = builder.ins().icmp(
-                    if is_signed {IntCC::SignedLessThan} else {IntCC::UnsignedLessThan},
-                    left_side,
-                    right_side
-                );
+                out = if is_int {
+                    builder.ins().icmp(
+                        if is_signed {IntCC::SignedLessThan} else {IntCC::UnsignedLessThan},
+                        left_side,
+                        right_side
+                    )
+                } else {
+                    builder.ins().fcmp(
+                        FloatCC::LessThan,
+                        left_side,
+                        right_side
+                    )
+                }
             },
             TokenType::Gt => {
-                out = builder.ins().icmp(
-                    if is_signed {IntCC::SignedGreaterThan} else {IntCC::UnsignedGreaterThan},
-                    left_side,
-                    right_side
-                );
+                out = if is_int {
+                    builder.ins().icmp(
+                        if is_signed {IntCC::SignedGreaterThan} else {IntCC::UnsignedGreaterThan},
+                        left_side,
+                        right_side
+                    )
+                } else {
+                    builder.ins().fcmp(
+                        FloatCC::GreaterThan,
+                        left_side,
+                        right_side
+                    )
+                }
             },
             TokenType::LtEq => {
-                out = builder.ins().icmp(
-                    if is_signed {IntCC::SignedLessThanOrEqual} else {IntCC::UnsignedLessThanOrEqual},
-                    left_side,
-                    right_side
-                );
+                out = if is_int {
+                    builder.ins().icmp(
+                        if is_signed {IntCC::SignedLessThanOrEqual} else {IntCC::UnsignedLessThanOrEqual},
+                        left_side,
+                        right_side
+                    )
+                } else {
+                    builder.ins().fcmp(
+                        FloatCC::LessThanOrEqual,
+                        left_side,
+                        right_side
+                    )
+                }
             },
             TokenType::GtEq => {
-                out = builder.ins().icmp(
-                    if is_signed {IntCC::SignedGreaterThanOrEqual} else {IntCC::UnsignedGreaterThanOrEqual},
-                    left_side,
-                    right_side
-                );
+                out = if is_int {
+                    builder.ins().icmp(
+                        if is_signed {IntCC::SignedGreaterThanOrEqual} else {IntCC::UnsignedGreaterThanOrEqual},
+                        left_side,
+                        right_side
+                    )
+                } else {
+                    builder.ins().fcmp(
+                        FloatCC::GreaterThanOrEqual,
+                        left_side,
+                        right_side
+                    )
+                }
             },
 
             _ => {
@@ -1060,6 +1271,7 @@ impl <'a> Compiler <'a> {
 
         let mut builder_context = FunctionBuilderContext::new();
         let mut arg_types = Vec::new();
+        let previous_function = self.current_function.clone();
 
         for (i, arg) in args.iter().enumerate() {
             let (arg_name_node, arg_type_node)= match arg.node_type() {
@@ -1143,6 +1355,7 @@ impl <'a> Compiler <'a> {
         })();
 
         self.scopes.pop();
+        self.current_function = previous_function;
         result?;
 
         builder.seal_all_blocks();
@@ -1188,6 +1401,15 @@ impl <'a> Compiler <'a> {
             builder.ins().return_(&[]);
         } else {
             let ret_value_node = ret_value_optional.as_ref().unwrap();
+            if matches!(self.current_function.as_ref().unwrap().return_type.kind, CometTypeKind::Void) {
+                return Err(TypeMismatch {
+                    expected: "void".to_string(),
+                    invalid: "return value".to_string(),
+                    span: ret_value_node.source_span(),
+                    src: self.named_source()
+                }.into());
+            }
+
             let mut ret_value = self.visit_value(ret_value_node, builder)?;
 
             let ret_type = self.resolve_type(ret_value_node)?;
@@ -1603,6 +1825,15 @@ impl <'a> Compiler <'a> {
             ASTNodeType::ImplDefStatement { struct_type, functions } => (struct_type, functions),
             _ => unreachable!()
         };
+
+        let is_generic_impl = match struct_node.node_type() {
+            ASTNodeType::TypeLiteral { generic_types, .. } => generic_types.is_some(),
+            _ => false
+        };
+        if is_generic_impl {
+            self.generic_impls.push(node.clone());
+            return Ok(());
+        }
 
         let struct_type = self.get_type_literal_type(struct_node)?;
 
