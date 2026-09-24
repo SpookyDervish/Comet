@@ -627,6 +627,35 @@ impl <'a> Compiler <'a> {
         match node.node_type() {
             ASTNodeType::IdentifierLiteral(_) => self.visit_value(node, builder),
 
+            ASTNodeType::PrefixExpression { op, right } => {
+                let right_type = self.resolve_type(right)?;
+                
+                match op.token_type() {
+                    TokenType::Times => {
+                        match right_type.kind {
+                            CometTypeKind::Pointer(_) => {},
+                            _ => { return Err(TypeMismatch {
+                                src: self.named_source(),
+                                span: right.source_span(),
+                                invalid: right_type.to_string(),
+                                expected: "pointer".to_string()
+                            }.into()); }
+                        }
+
+                        let right_value = self.visit_value(right, builder)?;
+                        println!("{:#?}", right);
+
+                        Ok(right_value)
+                    }
+                    _ => Err(InvalidOperator {
+                        src: self.named_source(),
+                        span: op.source_span(),
+                        op: op.token_type().clone(),
+                        value: "as a prefix operator in an l-value".to_string()
+                    }.into())
+                }
+            },
+
             ASTNodeType::InfixExpression { left, op, right } => {
                 let left_type = self.resolve_type(left)?;
                 let left = self.visit_l_value(left, builder)?;
