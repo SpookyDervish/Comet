@@ -277,6 +277,19 @@ impl <'a> Compiler <'a> {
                     TokenType::Ampersand => {
                         Ok(CometType::new_ptr(right_type, self.module.isa().pointer_type()))
                     },
+                    TokenType::Times => {
+                        let inner_type = match right_type.kind {
+                            CometTypeKind::Pointer(t) => *t,
+                            _ => { return Err(TypeMismatch {
+                                src: self.named_source(),
+                                span: right.source_span(),
+                                invalid: right_type.to_string(),
+                                expected: "pointer".to_string()
+                            }.into()); }
+                        };
+
+                        Ok(inner_type)
+                    },
                     _ => Err(InvalidOperator {
                         op: op.token_type().clone(),
                         span: op.source_span(),
