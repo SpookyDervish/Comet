@@ -29,7 +29,7 @@ pub enum ASTNodeType<'a> {
     MatchStatement { expr: Box<ASTNode<'a>>, nodes: Vec<ASTNode<'a>>, default: Option<Box<ASTNode<'a>>> },
     IfStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>>, else_body: Option<Box<ASTNode<'a>>> },
     WhileStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>> },
-    StructDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>> },
+    StructDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
     CompilerDirectiveStatement { directive: Box<ASTNode<'a>>, value_name: Box<ASTNode<'a>>, value_type: Box<ASTNode<'a>> },
     ImplDefStatement { struct_type: Box<ASTNode<'a>>, functions: Vec<ASTNode<'a>> },
 
@@ -44,7 +44,7 @@ pub enum ASTNodeType<'a> {
     FloatLiteral(f64),
     IdentifierLiteral(String),
     StringLiteral(String),
-    TypeLiteral(ASTType<'a>)
+    TypeLiteral { base_type: ASTType<'a>, generic_types: Option<Vec<ASTNode<'a>>> }
 }
 
 #[derive(Debug)]

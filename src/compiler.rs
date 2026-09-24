@@ -105,8 +105,8 @@ impl <'a> Compiler <'a> {
     fn get_type_literal_type (&self, node: &ASTNode) -> miette::Result<CometType> {
         /* Takes in a type literal node and returns the type it represents. */
 
-        let ast_type = match node.node_type() {
-            ASTNodeType::TypeLiteral(value) => value,
+        let (ast_type, generic_types) = match node.node_type() {
+            ASTNodeType::TypeLiteral{ base_type, generic_types } => (base_type, generic_types),
             _ => unreachable!()
         };
 
@@ -1385,8 +1385,8 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_struct_def_statement(&mut self, node: &'a ASTNode) -> miette::Result<()> {
-        let (ident_node, field_nodes) = match node.node_type() {
-            ASTNodeType::StructDefinitionStatement { ident, fields } => (ident, fields),
+        let (ident_node, field_nodes, generics) = match node.node_type() {
+            ASTNodeType::StructDefinitionStatement { ident, fields, generics } => (ident, fields, generics),
             _ => unreachable!()
         };
 
@@ -1394,6 +1394,17 @@ impl <'a> Compiler <'a> {
             ASTNodeType::IdentifierLiteral(value) => value,
             _ => unreachable!()
         };
+
+        if generics.is_some() {
+            for generic_node in generics.as_ref().unwrap() {
+                let generic_name = match generic_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v,
+                    _ => unreachable!()
+                };
+
+                self.scopes.last_mut().unwrap().types.insert(generic_name.clone(), CometType::new_generic(generic_name.clone()));
+            }
+        }
 
         let mut fields: Vec<CometStructField> = Vec::new();
 
@@ -1414,7 +1425,10 @@ impl <'a> Compiler <'a> {
         }
 
         let new_struct = CometStruct::new(ident.clone(), fields);
-        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(new_struct));
+
+        if generics.is_none() {
+            self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(new_struct));
+        }
 
         Ok(())
     }
@@ -1575,7 +1589,7 @@ impl <'a> Compiler <'a> {
             ASTNodeType::MatchStatement { expr: _, nodes: _, default: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
             ASTNodeType::IfStatement { expr: _, body: _, else_body: _ } => { return self.visit_if_statement(ast, builder.unwrap()) },
             ASTNodeType::WhileStatement { expr: _, body: _ } => { return self.visit_while_statement(ast, builder.unwrap()); },
-            ASTNodeType::StructDefinitionStatement { ident: _, fields: _ } => { return self.visit_struct_def_statement(ast); },
+            ASTNodeType::StructDefinitionStatement { ident: _, fields: _, generics: _ } => { return self.visit_struct_def_statement(ast); },
             ASTNodeType::ImplDefStatement { struct_type: _, functions: _ } => { return self.visit_impl_def_statement(ast); },
 
             ASTNodeType::CompilerDirectiveStatement { directive: _, value_name: _, value_type: _ } => { return self.visit_compiler_directive(ast); },

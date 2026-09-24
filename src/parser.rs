@@ -213,7 +213,7 @@ impl <'a> Parser <'a> {
     }
 
     // TYPE PARSING //
-    fn parse_function_type(&mut self) -> miette::Result<ASTNode<'a>> {
+    fn parse_function_type(&mut self) -> miette::Result<ASTType<'a>> {
         let mut range = Range::start(self.current_token().unwrap().pos());
 
         self.expect_peek(TokenType::Fun)?;
@@ -244,40 +244,67 @@ impl <'a> Parser <'a> {
 
         range.end(self.current_token().unwrap().end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::TypeLiteral(ASTType::Function { arg_types: arg_types, return_type: return_type }), range.source_span() ))
+        Ok(ASTType::Function { arg_types: arg_types, return_type: return_type })
+    }
+
+    fn parse_generic_instance_types(&mut self) -> miette::Result<Vec<ASTNode<'a>>> {
+        self.advance_token(); // skip '<'
+
+        let mut generic_types = Vec::new();
+
+        while !self.peek_token_is(&TokenType::Gt) {
+            println!("{:?}", self.peek_token().unwrap());
+
+            let type_ = self.parse_type()?;
+            generic_types.push(type_);
+
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            self.expect_peek(TokenType::Gt)?;
+            break;
+        }
+
+        return Ok(generic_types);
     }
 
     fn parse_type(&mut self) -> miette::Result<ASTNode<'a>> {
         let mut range = Range::start(self.current_token().unwrap().pos());
 
+        let base_type;
         if self.peek_token_is(&TokenType::Ampersand) {
             self.advance_token();
 
             let inner_type = self.parse_type()?;
-            let ast_type = ASTType::Pointer(Box::new(inner_type));
+            base_type = ASTType::Pointer(Box::new(inner_type));
 
-            range.end(self.current_token().unwrap().end_pos());
+        } else if self.peek_token_is(&TokenType::Fun) {
+            base_type = self.parse_function_type()?;
+        } else {
+            self.expect_peek(TokenType::Identifier(String::new()))?;
 
-            return Ok(ASTNode::new(ASTNodeType::TypeLiteral(ast_type), range.source_span()));
+            let curr = &self.current_token().unwrap();
+
+            let ident_node = ASTNode::new(
+                ASTNodeType::IdentifierLiteral(curr.token_type().as_identifier().cloned().unwrap()),
+                curr.source_span()
+            );
+
+            base_type = ASTType::Identifier(Box::new(ident_node));
         }
 
-        if self.peek_token_is(&TokenType::Fun) {
-            return self.parse_function_type();
-        }
+        
+        let generic_types = if self.peek_token_is(&TokenType::Lt) {
+            Some(self.parse_generic_instance_types()?)
+        } else {
+            None
+        };
+        range.end(self.current_token().unwrap().end_pos());
 
-        self.expect_peek(TokenType::Identifier(String::new()))?;
-
-        let curr = &self.current_token().unwrap();
-
-        // best rust code EVER
-        let ident_node = ASTNode::new(
-            ASTNodeType::IdentifierLiteral(curr.token_type().as_identifier().cloned().unwrap()),
-            curr.source_span()
-        );
-
-        range.end(curr.end_pos());
-
-        Ok(ASTNode::new(ASTNodeType::TypeLiteral(ASTType::Identifier(Box::new(ident_node))), range.source_span()))
+        Ok(ASTNode::new(ASTNodeType::TypeLiteral { base_type: base_type, generic_types: generic_types }, range.source_span()))
     }
     // END OF TYPE PARSING //
 
@@ -506,12 +533,42 @@ impl <'a> Parser <'a> {
         Ok(ASTNode::new(ASTNodeType::WhileStatement { expr: Box::new(expr), body: Box::new(body) }, while_range.source_span()))
     }
 
+    fn parse_generic_def(&mut self) -> miette::Result<Vec<ASTNode<'a>>> {
+        self.advance_token(); // skip '<'
+
+        let mut generic_type_names = Vec::new();
+
+        while !self.peek_token_is(&TokenType::Gt) {
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+
+            let generic_name = self.parse_identifier_literal()?;
+            generic_type_names.push(generic_name);
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            self.expect_peek(TokenType::Gt)?;
+            break;
+        }
+
+        Ok(generic_type_names)
+    }
+
     fn parse_struct_def_statement(&mut self) -> miette::Result<ASTNode<'a>> {
         let mut struct_range = Range::start(self.current_token().unwrap().pos());
 
         self.expect_peek(TokenType::Identifier(String::new()))?;
 
         let ident = self.parse_identifier_literal()?;
+
+        let generic_args = if self.peek_token_is(&TokenType::Lt) {
+            Some(self.parse_generic_def()?)
+        } else {
+            None
+        };
+        
 
         self.expect_peek(TokenType::OpenCurly)?;
 
@@ -544,7 +601,7 @@ impl <'a> Parser <'a> {
 
         struct_range.end(self.current_token().unwrap().end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields }, struct_range.source_span()))
+        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields, generics: generic_args }, struct_range.source_span()))
     }
 
     fn parse_impl_block(&mut self) -> miette::Result<ASTNode<'a>> {

@@ -33,6 +33,7 @@ pub enum CometTypeKind {
     Function(CometFunction),
     Scalar(bool),
     Pointer(Box<CometType>),
+    Generic(String),
     Void
 }
 
@@ -71,6 +72,12 @@ impl CometType {
         CometType {
             cranelift_type: types::I64,
             kind: CometTypeKind::Function(comet_function)
+        }
+    }
+    pub fn new_generic(name: String) -> Self {
+        CometType {
+            cranelift_type: types::INVALID,
+            kind: CometTypeKind::Generic(name)
         }
     }
     pub fn new_void() -> Self {
@@ -114,6 +121,7 @@ impl CometType {
             CometTypeKind::Scalar(_) |
             CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
             CometTypeKind::Struct(s) => s.get_layout().1,
+            CometTypeKind::Generic(_) => 0,
             CometTypeKind::Void => 0
         }
     }
@@ -123,6 +131,7 @@ impl CometType {
             CometTypeKind::Scalar(_) |
             CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
             CometTypeKind::Struct(s) => s.get_layout().2,
+            CometTypeKind::Generic(_) => 0,
             CometTypeKind::Void => 0
         }
     }
@@ -238,8 +247,8 @@ impl fmt::Display for CometType {
             },
             CometTypeKind::Pointer(t) => write!(f, "&{}", (*t).to_string()),
             CometTypeKind::Struct(s) => write!(f, "{}{{}}", s.name()),
+            CometTypeKind::Generic(name) => write!(f, "{}", name),
             CometTypeKind::Void => write!(f, "(none)"),
-            _ => write!(f, "<unkown-type>")
         }
     }
 }
