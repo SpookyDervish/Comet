@@ -95,6 +95,12 @@ impl CometType {
             _ => false
         }
     }
+    pub fn is_ptr(&self) -> bool {
+        match self.kind {
+            CometTypeKind::Pointer(_) => true,
+            _ => false
+        }
+    }
 
     pub fn size(&self) -> u32 {
         match &self.kind {

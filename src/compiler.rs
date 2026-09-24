@@ -207,7 +207,11 @@ impl <'a> Compiler <'a> {
             },
 
             ASTNodeType::IdentifierLiteral(name) => {
-                let var = self.get_variable(&name.as_str()).ok_or(format!("Use of undefined variable '{}'", name)).unwrap();
+                let var = self.get_variable(&name.as_str()).ok_or(UndefinedVariable {
+                    span: node.source_span(),
+                    src: self.named_source(),
+                    var: name.clone()
+                })?;
 
                 Ok(var.type_.clone())
             },
@@ -264,6 +268,22 @@ impl <'a> Compiler <'a> {
 
                 let right_value = self.resolve_type(right)?;
                 return Ok(self.unify_types(&left_value, &right_value).clone());
+            },
+
+            ASTNodeType::PrefixExpression { op, right } => {
+                let right_type = self.resolve_type(right)?;
+
+                match op.token_type() {
+                    TokenType::Ampersand => {
+                        Ok(CometType::new_ptr(right_type, self.module.isa().pointer_type()))
+                    },
+                    _ => Err(InvalidOperator {
+                        op: op.token_type().clone(),
+                        span: op.source_span(),
+                        src: self.named_source(),
+                        value: "as a prefix operator".to_string()
+                    }.into())
+                }
             },
 
             ASTNodeType::FuncCall { left: left, args: _ } => {
@@ -771,6 +791,7 @@ impl <'a> Compiler <'a> {
         };
 
         let right_type = self.resolve_type(right_node)?;
+        let right_value = self.visit_value(right_node, builder)?;
 
         match op.token_type() {
             TokenType::Ampersand => {
@@ -780,8 +801,34 @@ impl <'a> Compiler <'a> {
                     right_type.align() as u8
                 ));
 
-                Ok(builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0))
+                let stack_addr = builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0);
+                builder.ins().store(MemFlagsData::new(), right_value, stack_addr, 0);
+
+                Ok(stack_addr)
             },
+
+            TokenType::Times => {
+                if !right_type.is_ptr() {
+                    return Err(TypeMismatch {
+                        expected: "pointer".to_string(),
+                        invalid: right_type.to_string(),
+                        src: self.named_source(),
+                        span: right_node.source_span()
+                    }.into());
+                }
+
+                let internal_type = match right_type.kind {
+                    CometTypeKind::Pointer(v) => v,
+                    _ => unreachable!()
+                };
+
+                Ok(builder.ins().load(
+                    internal_type.cranelift_type,
+                    MemFlagsData::new(),
+                    right_value,
+                    0
+                ))
+            }
 
             _ => Err(InvalidOperator {
                 src: self.named_source(),
