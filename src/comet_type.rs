@@ -34,8 +34,10 @@ pub enum CometTypeKind {
     Function(CometFunction),
     Scalar(bool),
     Pointer(Box<CometType>),
+    Array { base_type: Box<CometType>, size: u32 },
     Generic(String),
-    Void
+    Void,
+    Unkown
 }
 
 #[derive(Clone, Eq, Debug)]
@@ -55,6 +57,12 @@ impl CometType {
         CometType {
             cranelift_type: pointer_type,
             kind: CometTypeKind::Pointer(Box::new(base_type))
+        }
+    }
+    pub fn new_array(base_type: CometType, size: u32, pointer_type: types::Type) -> Self {
+        CometType {
+            cranelift_type: pointer_type,
+            kind: CometTypeKind::Array { base_type: Box::new(base_type), size: size }
         }
     }
     pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
@@ -83,6 +91,9 @@ impl CometType {
     }
     pub fn new_void() -> Self {
         CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Void }
+    }
+    pub fn new_unkown() -> Self {
+        CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Unkown }
     }
 
     pub fn is_signed(&self) -> bool {
@@ -122,8 +133,10 @@ impl CometType {
             CometTypeKind::Scalar(_) |
             CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
             CometTypeKind::Struct(s) => s.get_layout().1,
+            CometTypeKind::Array{ base_type, size } => base_type.size() * size,
             CometTypeKind::Generic(_) => 0,
-            CometTypeKind::Void => 0
+            CometTypeKind::Void => 0,
+            CometTypeKind::Unkown => 0
         }
     }
     pub fn align(&self) -> u32 {
@@ -132,8 +145,10 @@ impl CometType {
             CometTypeKind::Scalar(_) |
             CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
             CometTypeKind::Struct(s) => s.get_layout().2,
+            CometTypeKind::Array { base_type, .. } => base_type.align(),
             CometTypeKind::Generic(_) => 0,
-            CometTypeKind::Void => 0
+            CometTypeKind::Void => 0,
+            CometTypeKind::Unkown => 0
         }
     }
 
@@ -149,7 +164,7 @@ impl CometType {
         let out: Value;
 
         // cast one int type to another
-        if value_type.is_int() && their_type.is_int() {
+        if value_comet_type.is_int() && target_type.is_int() {
             let target_signed = match target_type.kind {
                 CometTypeKind::Scalar(signed) => signed,
                 _ => unreachable!()
@@ -207,16 +222,16 @@ impl CometType {
                 out = builder.ins().fpromote(their_type, value);
             } else { // dont implicitly cast from bigger type to smaller type
                 return Err(InvalidCast { 
-                    new_type: target_type.cranelift_type.to_string(),
-                    old_type: value_type.to_string(),
+                    new_type: target_type.to_string(),
+                    old_type: value_comet_type.to_string(),
                     span: value_node.source_span(),
                     src: named_source
                 }.into());
             }
         } else {
             return Err(TypeMismatch {
-                expected: their_type.to_string(),
-                invalid: value_type.to_string(),
+                expected: target_type.to_string(),
+                invalid: value_comet_type.to_string(),
                 src: named_source,
                 span: value_node.source_span()
             }.into());
@@ -232,7 +247,9 @@ impl CometType {
             CometTypeKind::Pointer(t) => format!("p_{}", t),
             CometTypeKind::Scalar(s) => format!("{}{}", self.cranelift_type, if *s {"_s"} else {""}),
             CometTypeKind::Struct(s) => format!("st_{}", s.name()),
-            CometTypeKind::Void => format!("v")
+            CometTypeKind::Array { base_type, .. } => format!("a_{}", base_type.generic_type_name()),
+            CometTypeKind::Void => format!("v"),
+            CometTypeKind::Unkown => unreachable!()
         }
     }
 }
@@ -260,7 +277,9 @@ impl fmt::Display for CometType {
             CometTypeKind::Pointer(t) => write!(f, "&{}", (*t).to_string()),
             CometTypeKind::Struct(s) => write!(f, "{}{{}}", s.name()),
             CometTypeKind::Generic(name) => write!(f, "{}", name),
+            CometTypeKind::Array { base_type, .. } => write!(f, "{}[]", base_type),
             CometTypeKind::Void => write!(f, "(none)"),
+            CometTypeKind::Unkown => write!(f, "(unkown)"),
         }
     }
 }

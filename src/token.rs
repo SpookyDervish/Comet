@@ -18,6 +18,7 @@ pub enum TokenType {
     Plus, Minus, Times, Divide, Eq,
     OpenParen, CloseParen,
     OpenCurly, CloseCurly,
+    OpenSquare, CloseSquare,
     EqEq, NotEq, Gt, Lt, LtEq, GtEq,
     Not,
     Colon, Comma, ColonColon,
@@ -47,6 +48,8 @@ impl TokenType {
             TokenType::GtEq => PrecedenceType::LessGreater,
             TokenType::LtEq => PrecedenceType::LessGreater,
 
+            TokenType::OpenSquare => PrecedenceType::Index,
+
             TokenType::Dot => PrecedenceType::Dot,
             TokenType::ColonColon => PrecedenceType::Dot,
             _ => PrecedenceType::Lowest
@@ -62,7 +65,7 @@ impl TokenType {
             "if" => Some(TokenType::If),
             "else" => Some(TokenType::Else),
             "while" => Some(TokenType::While),
-            "str" => Some(TokenType::Struct),
+            "struct" => Some(TokenType::Struct),
             "new" => Some(TokenType::New),
             "imp" => Some(TokenType::Imp),
 

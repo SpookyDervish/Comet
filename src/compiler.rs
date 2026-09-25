@@ -9,7 +9,7 @@ use miette::NamedSource;
 use std::collections::HashMap;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, NotAFunction, SyntaxError, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::scope::CometVarType::Local;
@@ -374,13 +374,14 @@ impl <'a> Compiler <'a> {
 
     fn rank_type(&self, type_: &CometType) -> u8 {
         match type_.cranelift_type {
-            types::I8 => 0,
-            types::I16 => 1,
-            types::I32 => 2,
-            types::I64 => 3,
-            types::F16 => 4,
-            types::F32 => 5,
-            types::F64 => 6,
+            types::INVALID => 0,
+            types::I8 => 1,
+            types::I16 => 2,
+            types::I32 => 3,
+            types::I64 => 4,
+            types::F16 => 5,
+            types::F32 => 6,
+            types::F64 => 7,
             _ => 0
         }
     }
@@ -475,6 +476,31 @@ impl <'a> Compiler <'a> {
                 })?;
 
                 Ok(var.type_.clone())
+            },
+
+            ASTNodeType::ArrayLiteral(elems) => {
+                if elems.len() == 0 {
+                    return Ok(CometType::new_unkown());
+                }
+
+                let base_elem_type = self.resolve_type(&elems[0])?;
+                Ok(CometType::new_array(base_elem_type, elems.len() as u32, self.module.isa().pointer_type()))
+            }
+
+            ASTNodeType::IndexExpression { left, .. } => {
+                let left_type = self.resolve_type(left)?;
+
+                let elem_type = match left_type.kind {
+                    CometTypeKind::Array { base_type, .. } => base_type,
+                    _ => { return Err(TypeMismatch {
+                        expected: "array".to_string(),
+                        invalid: left_type.to_string(),
+                        span: left.source_span(),
+                        src: self.named_source()
+                    }.into()); }
+                };
+
+                Ok(*elem_type)
             },
 
             ASTNodeType::InfixExpression { left, op, right } => {
@@ -753,24 +779,76 @@ impl <'a> Compiler <'a> {
                         Ok(params[index])
                     },
                     CometVarType::External(func_id) => {
-                        /*let global_value = self.module.declare_data_in_func(data, &mut builder.func);
-                        let ptr_type = self.module.target_config().pointer_type();
-
-                        let data_ptr = builder.ins().symbol_value(ptr_type, global_value);
-
-                        Ok(builder.ins().load(
-                            ptr_type,
-                            MemFlagsData::new(),
-                            data_ptr,
-                            0
-                        ))*/
-
                         let func_ref = self.module.declare_func_in_func(func_id, builder.func);
                         let pointer_type = self.module.isa().frontend_config().pointer_type();
 
                         Ok(builder.ins().func_addr(pointer_type, func_ref))
                     }
                 }  
+            },
+
+            ASTNodeType::ArrayLiteral(elems) => {
+                if elems.len() == 0 {
+                    return Err(EmptyArrayLiteral {
+                        src: self.named_source(),
+                        span: node.source_span()
+                    }.into());
+                }
+
+                let base_type = match self.resolve_type(node)?.kind {
+                    CometTypeKind::Array { base_type, .. } => base_type,
+                    _ => unreachable!()
+                };
+
+                let stack_slot = builder.create_sized_stack_slot(StackSlotData::new(
+                    StackSlotKind::ExplicitSlot,
+                    base_type.size() * elems.len() as u32,
+                    base_type.align() as u8
+                ));
+
+                let stack_addr = builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0);
+
+                let elem_size = base_type.size() as i32;
+
+                for (i, elem) in elems.iter().enumerate() {
+                    let elem_value = self.visit_value(elem, builder)?;
+
+                    builder.ins().store(
+                        MemFlagsData::new(),
+                        elem_value,
+                        stack_addr,
+                        (i as i32) * elem_size
+                    );
+                }
+
+                Ok(stack_addr)
+            },
+
+            ASTNodeType::IndexExpression { left, index } => {
+                let left_type = self.resolve_type(left)?;
+
+                let elem_type = match left_type.kind {
+                    CometTypeKind::Array { base_type, .. } => base_type,
+                    _ => { return Err(TypeMismatch {
+                        expected: "array".to_string(),
+                        invalid: left_type.to_string(),
+                        span: left.source_span(),
+                        src: self.named_source()
+                    }.into()); }
+                };
+
+                let array_value = self.visit_value(left, builder)?;
+                let index = self.visit_value(index, builder)?;
+
+                let ptr_offset = builder.ins().imul_imm_s(index, elem_type.size() as i64);
+                let ptr = builder.ins().iadd(array_value, ptr_offset);
+
+                Ok(builder.ins().load(
+                    elem_type.cranelift_type,
+                    MemFlagsData::new(),
+                    ptr,
+                    0
+                ))
             },
 
             ASTNodeType::FuncCall { left, args } => {
@@ -853,7 +931,7 @@ impl <'a> Compiler <'a> {
                     struct_layout.1,
                     8
                 ));
-                let addr = builder.ins().stack_addr(types::I64, stack_slot, 0);
+                let addr = builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0);
 
                 let fields_layout = struct_layout.0;
 
@@ -1500,6 +1578,23 @@ impl <'a> Compiler <'a> {
         }
 
         self.var_index += 1;
+
+        match value_type.kind {
+            CometTypeKind::Void => { return Err(InvalidVariableType {
+                span: value_node.source_span(),
+                src: self.named_source(),
+                type_name: value_type.to_string()
+            }.into()); },
+
+            CometTypeKind::Unkown => {
+                if type_node.is_none() { return Err(TypeAnnotationNeeded {
+                    span: node.source_span(),
+                    src: self.named_source(),
+                    var_name: ident.clone()
+                }.into()); }
+            },
+            _ => {}
+        }
         
         let mut final_type = value_type.clone();
         if type_node.is_some() {

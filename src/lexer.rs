@@ -211,6 +211,14 @@ impl<'file> Lexer<'file> {
                     tokens.push(Token::new(TokenType::CloseCurly, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
+                '[' => {
+                    tokens.push(Token::new(TokenType::OpenSquare, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    self.consume();
+                }
+                ']' => {
+                    tokens.push(Token::new(TokenType::CloseSquare, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    self.consume();
+                }
                 ':' => {
                     let mut range = Range::from(&self.pos);
                     self.consume();

@@ -97,6 +97,7 @@ impl <'a> Parser <'a> {
             TokenType::FloatLiteral(_) => Some(Parser::parse_float_literal),
             TokenType::StringLiteral(_) => Some(Parser::parse_string_literal),
             TokenType::Identifier(_) => Some(Parser::parse_identifier_literal),
+            TokenType::OpenSquare => Some(Parser::parse_array_literal),
             TokenType::New => Some(Parser::parse_struct_create_expr),
 
             // prefix exprs
@@ -124,6 +125,9 @@ impl <'a> Parser <'a> {
             TokenType::GtEq => Some(Parser::parse_infix_expression),
             TokenType::Dot => Some(Parser::parse_infix_expression),
             TokenType::ColonColon => Some(Parser::parse_infix_expression),
+
+            TokenType::OpenSquare => Some(Parser::parse_index_expression),
+
             TokenType::OpenParen => Some(Parser::parse_func_call),
             _ => None
         }
@@ -740,6 +744,20 @@ impl <'a> Parser <'a> {
         Ok(ASTNode::new(ASTNodeType::FuncCall { left: Box::new(left_node), args: func_call_args }, func_call_range.source_span() ))
     }
 
+    fn parse_index_expression(&mut self, left_node: ASTNode<'a>) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        self.advance_token();
+
+        let index = self.parse_expression(PrecedenceType::Lowest)?;
+
+        self.expect_peek(TokenType::CloseSquare)?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::IndexExpression { left: Box::new(left_node), index: Box::new(index) }, range.source_span()))
+    }
+
     fn parse_grouped_expression(&mut self) -> miette::Result<ASTNode<'a>> {
         self.advance_token();
 
@@ -874,6 +892,36 @@ impl <'a> Parser <'a> {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn parse_array_literal(&mut self) -> miette::Result<ASTNode<'a>> {
+        
+
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        let mut elements = Vec::new();
+
+        self.advance_token();
+
+        while !self.current_token_is(&TokenType::CloseSquare) {
+
+            let elem = self.parse_expression(PrecedenceType::Lowest)?;
+            elements.push(elem);
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                self.advance_token(); // skip ','
+                continue;
+            }
+
+            self.expect_peek(TokenType::CloseSquare)?;
+            break;
+        }
+
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::ArrayLiteral(elements), range.source_span()))
     }
     // END OF PREFIX METHODS //
     

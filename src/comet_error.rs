@@ -163,3 +163,37 @@ pub struct UnkownMethod {
     pub method: String,
     pub struct_name: String
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("InvalidVariableType")]
+pub struct InvalidVariableType {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Variable cannot be of type '{type_name}'")]
+    pub span: SourceSpan,
+
+    pub type_name: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("TypeAnnotationNeeded")]
+pub struct TypeAnnotationNeeded {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Type annotation needed for variable '{var_name}'")]
+    pub span: SourceSpan,
+
+    pub var_name: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("EmptyArrayLiteral")]
+pub struct EmptyArrayLiteral {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Cannot have an empty array literal")]
+    pub span: SourceSpan,
+}

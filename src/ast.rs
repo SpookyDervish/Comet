@@ -38,13 +38,15 @@ pub enum ASTNodeType<'a> {
     PrefixExpression { op: Token<'a>, right: Box<ASTNode<'a>> },
     FuncCall { left: Box<ASTNode<'a>>, args: Vec<ASTNode<'a>> },
     StructCreateExpression { type_: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>> },
+    IndexExpression { left: Box<ASTNode<'a>>, index: Box<ASTNode<'a>> },
 
     // literals
     IntLiteral(u64),
     FloatLiteral(f64),
     IdentifierLiteral(String),
     StringLiteral(String),
-    TypeLiteral { base_type: ASTType<'a>, generic_types: Option<Vec<ASTNode<'a>>> }
+    TypeLiteral { base_type: ASTType<'a>, generic_types: Option<Vec<ASTNode<'a>>> },
+    ArrayLiteral(Vec<ASTNode<'a>>)
 }
 
 #[derive(Debug, Clone)]
