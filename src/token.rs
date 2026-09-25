@@ -15,7 +15,8 @@ pub enum TokenType {
     Struct, New, Imp,
 
     // symbols
-    Plus, Minus, Times, Divide, Eq,
+    Plus, Minus, Times, Divide, Modulo,
+    Eq,
     OpenParen, CloseParen,
     OpenCurly, CloseCurly,
     OpenSquare, CloseSquare,
@@ -39,6 +40,7 @@ impl TokenType {
             TokenType::Minus => PrecedenceType::Sum,
             TokenType::Times => PrecedenceType::Product,
             TokenType::Divide => PrecedenceType::Product,
+            TokenType::Modulo => PrecedenceType::Product,
             TokenType::OpenParen => PrecedenceType::Call,
 
             TokenType::EqEq => PrecedenceType::Equals,

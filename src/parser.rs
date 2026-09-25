@@ -117,6 +117,7 @@ impl <'a> Parser <'a> {
             TokenType::Minus => Some(Parser::parse_infix_expression),
             TokenType::Times => Some(Parser::parse_infix_expression),
             TokenType::Divide => Some(Parser::parse_infix_expression),
+            TokenType::Modulo => Some(Parser::parse_infix_expression),
             TokenType::EqEq => Some(Parser::parse_infix_expression),
             TokenType::NotEq => Some(Parser::parse_infix_expression),
             TokenType::Lt => Some(Parser::parse_infix_expression),

@@ -139,6 +139,10 @@ impl<'file> Lexer<'file> {
                     tokens.push(Token::new(TokenType::Divide, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
                     self.consume();
                 }
+                '%' => {
+                    tokens.push(Token::new(TokenType::Modulo, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    self.consume();
+                }
                 '=' => {
                     let mut range = Range::from(&self.pos);
                     self.consume();

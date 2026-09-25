@@ -444,23 +444,6 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn ensure_share_types(&mut self, left: &ASTNode<'a>, right: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<(ir::Value, ir::Value)> {
-        let mut left_value = self.visit_value(left, builder)?;
-        let mut right_value = self.visit_value(right, builder)?;
-
-        let left_type = self.resolve_type(left)?;
-        let right_type = self.resolve_type(right)?;
-
-        let unified_type = self.unify_types(&left_type, &right_type);
-
-        if left_type != right_type {
-            left_value = CometType::try_implicit_cast(left, left_value, &left_type, unified_type, builder, self.named_source())?;
-            right_value = CometType::try_implicit_cast(right, right_value, &right_type, unified_type, builder, self.named_source())?;
-        }
-
-        Ok((left_value, right_value))
-    }
-
     fn resolve_type(&mut self, node: &ASTNode) -> miette::Result<CometType> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
@@ -1137,6 +1120,33 @@ impl <'a> Compiler <'a> {
                     builder.ins().imul(left_side, right_side)
                 } else {
                     builder.ins().fmul(left_side, right_side)
+                }
+            },
+            TokenType::Divide => {
+                out = if is_int {
+                    if is_signed {
+                        builder.ins().sdiv(left_side, right_side)
+                    } else {
+                        builder.ins().udiv(left_side, right_side)
+                    }
+                } else {
+                    builder.ins().fdiv(left_side, right_side)
+                }
+            },
+            TokenType::Modulo => {
+                if !is_int {
+                    return Err(InvalidOperator {
+                        op: op.token_type().clone(),
+                        span: op.source_span(),
+                        src: self.named_source(),
+                        value: "on non-integer".to_string()
+                    }.into());
+                }
+
+                out = if is_signed {
+                    builder.ins().srem(left_side, right_side)
+                } else {
+                    builder.ins().urem(left_side, right_side)
                 }
             },
 
