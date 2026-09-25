@@ -56,10 +56,10 @@ Any systems supported by the Cranelift backend can be compiled for. This include
     - [ ] Base generics (creation, type checking, etc...)
     - [ ] Generic constraints
 - [x] Command line args
-- [ ] Arrays
-  - [ ] Creation
-  - [ ] Access
-  - [ ] Changing values
+- [x] Arrays
+  - [x] Creation
+  - [x] Access
+  - [x] Changing values
 - [ ] Exceptions
   - [ ] Throw exceptions
   - [ ] Catch exceptions
