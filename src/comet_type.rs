@@ -126,6 +126,12 @@ impl CometType {
             _ => false
         }
     }
+    pub fn is_array(&self) -> bool {
+        match self.kind {
+            CometTypeKind::Array { .. } => true,
+            _ => false
+        }
+    }
 
     pub fn size(&self) -> u32 {
         match &self.kind {
@@ -277,7 +283,7 @@ impl fmt::Display for CometType {
             CometTypeKind::Pointer(t) => write!(f, "&{}", (*t).to_string()),
             CometTypeKind::Struct(s) => write!(f, "{}{{}}", s.name()),
             CometTypeKind::Generic(name) => write!(f, "{}", name),
-            CometTypeKind::Array { base_type, .. } => write!(f, "{}[]", base_type),
+            CometTypeKind::Array { base_type, size } => write!(f, "{}[{}]", base_type, size),
             CometTypeKind::Void => write!(f, "(none)"),
             CometTypeKind::Unkown => write!(f, "(unkown)"),
         }
@@ -305,6 +311,19 @@ impl PartialEq for CometType {
 
         if self.is_float() && other.is_float() {
             return true;
+        }
+
+        if self.is_array() && other.is_array() {
+            let (self_elem, self_size) = match &self.kind {
+                CometTypeKind::Array { base_type, size } => (base_type, size),
+                _ => unreachable!()
+            };
+            let (other_elem, other_size) = match &other.kind {
+                CometTypeKind::Array { base_type, size } => (base_type, size),
+                _ => unreachable!()
+            };
+
+            return (self_elem == other_elem) && (self_size == other_size);
         }
 
         match &self.kind {

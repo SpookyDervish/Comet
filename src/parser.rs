@@ -285,6 +285,19 @@ impl <'a> Parser <'a> {
 
         } else if self.peek_token_is(&TokenType::Fun) {
             base_type = self.parse_function_type()?;
+        } else if self.peek_token_is(&TokenType::OpenSquare) {
+            self.advance_token();
+
+            let inner_type = self.parse_type()?;
+
+            self.expect_peek(TokenType::Comma)?;
+            self.advance_token();
+
+            let array_length = self.parse_int_literal()?;
+
+            base_type = ASTType::Array(Box::new(inner_type), Box::new(array_length));
+
+            self.expect_peek(TokenType::CloseSquare)?;
         } else {
             self.expect_peek(TokenType::Identifier(String::new()))?;
 
@@ -641,6 +654,25 @@ impl <'a> Parser <'a> {
 
         Ok(ASTNode::new(ASTNodeType::ImplDefStatement { struct_type: Box::new(struct_type), functions: functions }, range.source_span()))
     }
+
+    fn parse_compiler_directive(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+        let directive = self.parse_identifier_literal()?;
+
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+
+        let value_name = self.parse_identifier_literal()?;
+
+        self.advance_token();
+
+        let value_type = self.parse_type()?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::CompilerDirectiveStatement { directive: Box::new(directive), value_name: Box::new(value_name), value_type: Box::new(value_type) }, range.source_span()))
+    }
     // END OF STATEMENT METHODS //
 
     // EXPRESSION METHODS //
@@ -765,25 +797,6 @@ impl <'a> Parser <'a> {
         self.expect_peek(TokenType::CloseParen)?;
 
         Ok(expr)
-    }
-
-    fn parse_compiler_directive(&mut self) -> miette::Result<ASTNode<'a>> {
-        let mut range = Range::start(self.current_token().unwrap().pos());
-
-        self.expect_peek(TokenType::Identifier(String::new()))?;
-        let directive = self.parse_identifier_literal()?;
-
-        self.expect_peek(TokenType::Identifier(String::new()))?;
-
-        let value_name = self.parse_identifier_literal()?;
-
-        self.advance_token();
-
-        let value_type = self.parse_type()?;
-
-        range.end(self.current_token().unwrap().end_pos());
-
-        Ok(ASTNode::new(ASTNodeType::CompilerDirectiveStatement { directive: Box::new(directive), value_name: Box::new(value_name), value_type: Box::new(value_type) }, range.source_span()))
     }
 
     fn parse_struct_create_expr(&mut self) -> miette::Result<ASTNode<'a>> {

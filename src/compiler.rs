@@ -368,6 +368,17 @@ impl <'a> Compiler <'a> {
                 let inner_type = self.get_type_literal_type(inner_node)?;
                 Ok(CometType::new_ptr(inner_type, self.module.isa().pointer_type()))
             }
+
+            ASTType::Array(inner_node, length_node) => {
+                let inner_type = self.get_type_literal_type(inner_node)?;
+
+                let length = match length_node.node_type() {
+                    ASTNodeType::IntLiteral(n) => *n,
+                    _ => unreachable!()
+                };
+
+                Ok(CometType::new_array(inner_type, length as u32, self.module.isa().pointer_type()))
+            }
         }
         
     }

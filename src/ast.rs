@@ -6,7 +6,8 @@ use crate::token::Token;
 pub enum ASTType<'a> {
     Identifier(Box<ASTNode<'a>>),
     Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } ,
-    Pointer(Box<ASTNode<'a>>)
+    Pointer(Box<ASTNode<'a>>),
+    Array(Box<ASTNode<'a>>, Box<ASTNode<'a>>),
     
 }
 
