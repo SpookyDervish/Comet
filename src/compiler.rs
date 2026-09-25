@@ -543,11 +543,15 @@ impl <'a> Compiler <'a> {
                     TokenType::Gt | TokenType::Lt |
                     TokenType::GtEq | TokenType::LtEq => { return Ok(CometType::new_int(types::I8, false)); },
 
-
                     _ => {}
                 }
 
                 let right_value = self.resolve_type(right)?;
+
+                if op.token_type() == &TokenType::Or || op.token_type() == &TokenType::And {
+                    return Ok(self.unify_types(&left_value, &right_value).clone());
+                }
+
                 return Ok(self.unify_types(&left_value, &right_value).clone());
             },
 
@@ -1087,38 +1091,75 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_logical_op_expr(&mut self, left: &ASTNode<'a>, op: &TokenType, right: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+        let left_type = self.resolve_type(left)?;
+        let right_type = self.resolve_type(right)?;
+        let unified_type = self.unify_types(&left_type, &right_type).clone();
+
         let end_block = builder.create_block();
-        let result = builder.append_block_param(end_block, types::I8);
+        let result = builder.append_block_param(end_block, unified_type.cranelift_type);
         let short_circuit_block = builder.create_block();
         let right_block = builder.create_block();
 
         let left_value = self.visit_value(left, builder)?;
+        let mut left_result = left_value;
+        if left_type != unified_type {
+            left_result = CometType::try_implicit_cast(
+                left,
+                left_result,
+                &left_type,
+                &unified_type,
+                builder,
+                self.named_source()
+            )?;
+        }
 
         if op == &TokenType::And {
             builder.ins().brif(left_value, right_block, &[], short_circuit_block, &[]);
             builder.seal_block(builder.current_block().unwrap());
 
             builder.switch_to_block(short_circuit_block);
-            let false_value = builder.ins().iconst(types::I8, 0);
-            builder.ins().jump(end_block, &[ir::BlockArg::Value(false_value)]);
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(left_result)]);
             builder.seal_block(short_circuit_block);
 
             builder.switch_to_block(right_block);
             let right_value = self.visit_value(right, builder)?;
-            builder.ins().jump(end_block, &[ir::BlockArg::Value(right_value)]);
+            let right_result = if right_type != unified_type {
+                CometType::try_implicit_cast(
+                    right,
+                    right_value,
+                    &right_type,
+                    &unified_type,
+                    builder,
+                    self.named_source()
+                )?
+            } else {
+                right_value
+            };
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(right_result)]);
             builder.seal_block(right_block);
         } else {
             builder.ins().brif(left_value, short_circuit_block, &[], right_block, &[]);
             builder.seal_block(builder.current_block().unwrap());
 
             builder.switch_to_block(short_circuit_block);
-            let true_value = builder.ins().iconst(types::I8, 1);
-            builder.ins().jump(end_block, &[ir::BlockArg::Value(true_value)]);
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(left_result)]);
             builder.seal_block(short_circuit_block);
 
             builder.switch_to_block(right_block);
             let right_value = self.visit_value(right, builder)?;
-            builder.ins().jump(end_block, &[ir::BlockArg::Value(right_value)]);
+            let right_result = if right_type != unified_type {
+                CometType::try_implicit_cast(
+                    right,
+                    right_value,
+                    &right_type,
+                    &unified_type,
+                    builder,
+                    self.named_source()
+                )?
+            } else {
+                right_value
+            };
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(right_result)]);
             builder.seal_block(right_block);
         }
 
