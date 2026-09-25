@@ -811,40 +811,44 @@ impl <'a> Parser <'a> {
         let mut struct_create_range = Range::start(self.current_token().unwrap().pos());
 
         let type_ = self.parse_type()?;
-        self.expect_peek(TokenType::OpenCurly)?;
 
-        
-
-        let mut fields: Vec<ASTNode> = Vec::new();
-
-        while !self.peek_token_is(&TokenType::CloseCurly) {
-            self.expect_peek(TokenType::Identifier(String::new()))?;
-
-            let mut struct_field_range = Range::start(self.current_token().unwrap().pos());
-
-            let field_ident = self.parse_identifier_literal()?;
-
-            self.expect_peek(TokenType::Eq)?;
+        let mut fields_option = None;
+        if self.peek_token_is(&TokenType::OpenCurly) {
             self.advance_token();
 
-            let value = self.parse_expression(PrecedenceType::Lowest)?;
-            struct_field_range.end(self.current_token().unwrap().end_pos());
+            let mut fields = Vec::new();
 
-            fields.push(ASTNode::new(ASTNodeType::StructField { ident: Box::new(field_ident), value: Box::new(value) }, struct_field_range.source_span()));
+            while !self.peek_token_is(&TokenType::CloseCurly) {
+                self.expect_peek(TokenType::Identifier(String::new()))?;
 
-            if self.peek_token_is(&TokenType::Comma) {
+                let mut struct_field_range = Range::start(self.current_token().unwrap().pos());
+
+                let field_ident = self.parse_identifier_literal()?;
+
+                self.expect_peek(TokenType::Eq)?;
                 self.advance_token();
-                continue;
+
+                let value = self.parse_expression(PrecedenceType::Lowest)?;
+                struct_field_range.end(self.current_token().unwrap().end_pos());
+
+                fields.push(ASTNode::new(ASTNodeType::StructField { ident: Box::new(field_ident), value: Box::new(value) }, struct_field_range.source_span()));
+
+                if self.peek_token_is(&TokenType::Comma) {
+                    self.advance_token();
+                    continue;
+                }
+
+                self.expect_peek(TokenType::CloseCurly)?;
+
+                break;
             }
 
-            self.expect_peek(TokenType::CloseCurly)?;
-
-            break;
+            fields_option = Some(fields);
         }
 
         struct_create_range.end(self.current_token().unwrap().end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::StructCreateExpression { type_: Box::new(type_), fields: fields }, struct_create_range.source_span()))
+        Ok(ASTNode::new(ASTNodeType::NewInstanceExpression { type_: Box::new(type_), fields: fields_option }, struct_create_range.source_span()))
     }
     // END OF EXPRESSION METHODS //
 
@@ -867,7 +871,11 @@ impl <'a> Parser <'a> {
 
                 return Ok(ASTNode::new(ASTNodeType::IntLiteral(result.unwrap()), token.source_span()));
             }
-            _ => unreachable!(),
+            _ => Err(SyntaxError {
+                src: NamedSource::new(token.pos().file_name(), String::from(token.pos().source())),
+                span: token.source_span(),
+                text: format!("Expected int literal, got {:?} instead", token.token_type())
+            }.into()),
         }
     }
 
@@ -889,7 +897,11 @@ impl <'a> Parser <'a> {
 
                 return Ok(ASTNode::new(ASTNodeType::FloatLiteral(result.unwrap()), token.source_span()));
             }
-            _ => unreachable!(),
+            _ => Err(SyntaxError {
+                src: NamedSource::new(token.pos().file_name(), String::from(token.pos().source())),
+                span: token.source_span(),
+                text: format!("Expected float literal, got {:?} instead", token.token_type())
+            }.into()),
         }
     }
 
@@ -900,7 +912,11 @@ impl <'a> Parser <'a> {
             TokenType::StringLiteral(value) => {
                 return Ok(ASTNode::new(ASTNodeType::StringLiteral(value.clone()), token.source_span()));
             }
-            _ => unreachable!(),
+            _ => Err(SyntaxError {
+                src: NamedSource::new(token.pos().file_name(), String::from(token.pos().source())),
+                span: token.source_span(),
+                text: format!("Expected string literal, got {:?} instead", token.token_type())
+            }.into()),
         }
     }
 
@@ -911,7 +927,11 @@ impl <'a> Parser <'a> {
             TokenType::Identifier(value) => {
                 return Ok(ASTNode::new(ASTNodeType::IdentifierLiteral(value.clone()), token.source_span()));
             }
-            _ => unreachable!(),
+            _ => Err(SyntaxError {
+                src: NamedSource::new(token.pos().file_name(), String::from(token.pos().source())),
+                span: token.source_span(),
+                text: format!("Expected identifier, got {:?} instead", token.token_type())
+            }.into()),
         }
     }
 

@@ -38,7 +38,7 @@ pub enum ASTNodeType<'a> {
     InfixExpression { left: Box<ASTNode<'a>>, op: Token<'a>, right: Box<ASTNode<'a>> },
     PrefixExpression { op: Token<'a>, right: Box<ASTNode<'a>> },
     FuncCall { left: Box<ASTNode<'a>>, args: Vec<ASTNode<'a>> },
-    StructCreateExpression { type_: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>> },
+    NewInstanceExpression { type_: Box<ASTNode<'a>>, fields: Option<Vec<ASTNode<'a>>> },
     IndexExpression { left: Box<ASTNode<'a>>, index: Box<ASTNode<'a>> },
 
     // literals

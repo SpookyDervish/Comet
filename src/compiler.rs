@@ -628,7 +628,7 @@ impl <'a> Compiler <'a> {
                 }
             },
 
-            ASTNodeType::StructCreateExpression { type_, fields: _ } => {
+            ASTNodeType::NewInstanceExpression { type_, fields: _ } => {
                 let struct_type = self.get_type_literal_type(type_)?;
                 Ok(struct_type.clone())
             }
@@ -936,8 +936,23 @@ impl <'a> Compiler <'a> {
                 
             },
 
-            ASTNodeType::StructCreateExpression { type_: type_node, fields } => {
+            ASTNodeType::NewInstanceExpression { type_: type_node, fields } => {
                 let struct_type = self.get_type_literal_type(type_node)?;
+
+                // we're creating an instance of an array
+                match struct_type.kind {
+                    CometTypeKind::Array { base_type, size } => {
+                        let stack_slot = builder.create_sized_stack_slot(StackSlotData::new(
+                            StackSlotKind::ExplicitSlot,
+                            base_type.size() * size as u32,
+                            base_type.align() as u8
+                        ));
+
+                        let stack_addr = builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0);
+                        return Ok(stack_addr);
+                    }
+                    _ => {}
+                }
 
                 let comet_struct = match struct_type.kind {
                     CometTypeKind::Struct(value) => value,
@@ -961,7 +976,7 @@ impl <'a> Compiler <'a> {
 
                 let fields_layout = struct_layout.0;
 
-                for field in fields {
+                for field in fields.as_ref().unwrap() {
                     let (ident_node, value_node) = match field.node_type() {
                         ASTNodeType::StructField { ident, value } => (ident, value),
                         _ => unreachable!()
