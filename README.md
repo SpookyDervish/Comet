@@ -43,27 +43,23 @@ Any systems supported by the Cranelift backend can be compiled for. This include
   - [ ] Struct definition
     - [x] Fields
       - [ ] Private/protected/readonly
-      - [ ] Default values
       - [x] Accessing / setting fields
     - [x] Methods
-    - [ ] Special methods (as, etc...)
     - [x] Constructor
-    - [ ] Destructor
   - [x] "new" keyword
   - [x] Calling methods
-  - [ ] Inheritance
   - [ ] Generics
-    - [ ] Base generics (creation, type checking, etc...)
+    - [x] Base generics (creation, type checking, etc...)
     - [ ] Generic constraints
 - [x] Command line args
 - [x] Arrays
   - [x] Creation
   - [x] Access
   - [x] Changing values
-- [ ] Exceptions
-  - [ ] Throw exceptions
-  - [ ] Catch exceptions
-- [ ] Enums
+- [ ] Tagged unions
+  - [ ] Creation
+  - [ ] Pattern matching
+  - [ ] Instantiation of instances
 
 ## Syntax and Creating External Libs
 - Syntax and tutorial: [Comet Website](https://chsp.au/Comet/Comet/docs.html)
