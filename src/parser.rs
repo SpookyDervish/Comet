@@ -105,6 +105,7 @@ impl <'a> Parser <'a> {
             TokenType::Ampersand => Some(Parser::parse_prefix_expr),
             TokenType::Caret => Some(Parser::parse_prefix_expr),
             TokenType::Times => Some(Parser::parse_prefix_expr),
+            TokenType::Minus => Some(Parser::parse_prefix_expr),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None

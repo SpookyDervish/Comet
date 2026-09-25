@@ -133,6 +133,15 @@ impl CometType {
         }
     }
 
+    pub fn negate(&mut self) {
+        match &mut self.kind {
+            CometTypeKind::Scalar(s) => {
+                *s = !*s;
+            },
+            _ => {}
+        }
+    }
+
     pub fn size(&self) -> u32 {
         match &self.kind {
             CometTypeKind::Function(_) |

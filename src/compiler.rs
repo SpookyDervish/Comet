@@ -571,6 +571,13 @@ impl <'a> Compiler <'a> {
 
                         Ok(inner_type)
                     },
+
+                    TokenType::Minus => {
+                        let mut new_type = right_type.clone();                        
+                        new_type.negate();
+                        Ok(new_type)
+                    }
+
                     _ => Err(InvalidOperator {
                         op: op.token_type().clone(),
                         span: op.source_span(),
@@ -1329,6 +1336,19 @@ impl <'a> Compiler <'a> {
                     right_value,
                     0
                 ))
+            }
+
+            TokenType::Minus => {
+
+                let is_int = right_type.is_int();
+
+                if is_int {
+                    Ok(builder.ins().imul_imm_s(right_value, -1))
+                } else {
+                    let imm = builder.ins().f32const(-1.0);
+                    Ok(builder.ins().fmul(right_value, imm))
+                }
+
             }
 
             _ => Err(InvalidOperator {
