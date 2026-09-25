@@ -1032,6 +1032,28 @@ impl <'a> Compiler <'a> {
                 }
             },
 
+            ASTNodeType::IndexExpression { left, index } => {
+                let left_type = self.resolve_type(left)?;
+
+                let elem_type = match left_type.kind {
+                    CometTypeKind::Array { base_type, .. } => base_type,
+                    _ => { return Err(TypeMismatch {
+                        expected: "array".to_string(),
+                        invalid: left_type.to_string(),
+                        span: left.source_span(),
+                        src: self.named_source()
+                    }.into()); }
+                };
+
+                let array_value = self.visit_value(left, builder)?;
+                let index = self.visit_value(index, builder)?;
+
+                let ptr_offset = builder.ins().imul_imm_s(index, elem_type.size() as i64);
+                let ptr = builder.ins().iadd(array_value, ptr_offset);
+
+                Ok(ptr)
+            },
+
             ASTNodeType::InfixExpression { left, op, right } => {
                 let left_type = self.resolve_type(left)?;
                 let left = self.visit_l_value(left, builder)?;
