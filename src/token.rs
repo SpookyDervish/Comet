@@ -23,7 +23,7 @@ pub enum TokenType {
     EqEq, NotEq, Gt, Lt, LtEq, GtEq,
     Not,
     Colon, Comma, ColonColon,
-    Pipe, Ampersand, Caret,
+    Pipe, Ampersand, Caret, Tilde,
     Or, And,
     Hash,
     Dot,
@@ -41,6 +41,9 @@ impl TokenType {
             TokenType::Times => PrecedenceType::Product,
             TokenType::Divide => PrecedenceType::Product,
             TokenType::Modulo => PrecedenceType::Product,
+            TokenType::Ampersand => PrecedenceType::Product,
+            TokenType::Pipe => PrecedenceType::Product,
+            TokenType::Caret => PrecedenceType::Product,
             TokenType::OpenParen => PrecedenceType::Call,
 
             TokenType::EqEq => PrecedenceType::Equals,

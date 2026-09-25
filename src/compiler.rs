@@ -578,6 +578,19 @@ impl <'a> Compiler <'a> {
                         Ok(new_type)
                     }
 
+                    TokenType::Tilde => {
+                        if !right_type.is_int() {
+                            return Err(InvalidOperator {
+                                op: op.token_type().clone(),
+                                span: op.source_span(),
+                                src: self.named_source(),
+                                value: "on non-integer".to_string()
+                            }.into());
+                        }
+
+                        Ok(right_type)
+                    }
+
                     _ => Err(InvalidOperator {
                         op: op.token_type().clone(),
                         span: op.source_span(),
@@ -1156,7 +1169,42 @@ impl <'a> Compiler <'a> {
                     builder.ins().urem(left_side, right_side)
                 }
             },
+            TokenType::Ampersand => {
+                if !is_int {
+                    return Err(InvalidOperator {
+                        op: op.token_type().clone(),
+                        span: op.source_span(),
+                        src: self.named_source(),
+                        value: "on non-integer".to_string()
+                    }.into());
+                }
 
+                out = builder.ins().band(left_side, right_side);
+            }
+            TokenType::Pipe => {
+                if !is_int {
+                    return Err(InvalidOperator {
+                        op: op.token_type().clone(),
+                        span: op.source_span(),
+                        src: self.named_source(),
+                        value: "on non-integer".to_string()
+                    }.into());
+                }
+
+                out = builder.ins().bor(left_side, right_side);
+            }
+            TokenType::Caret => {
+                if !is_int {
+                    return Err(InvalidOperator {
+                        op: op.token_type().clone(),
+                        span: op.source_span(),
+                        src: self.named_source(),
+                        value: "on non-integer".to_string()
+                    }.into());
+                }
+
+                out = builder.ins().bxor(left_side, right_side);
+            }
             TokenType::EqEq => {
                 out = if is_int {
                     builder.ins().icmp(IntCC::Equal, left_side, right_side)
@@ -1349,6 +1397,20 @@ impl <'a> Compiler <'a> {
                     Ok(builder.ins().fmul(right_value, imm))
                 }
 
+            }
+
+            TokenType::Tilde => {
+                let is_int = right_type.is_int();
+                if !is_int {
+                    return Err(InvalidOperator {
+                        op: op.token_type().clone(),
+                        span: op.source_span(),
+                        src: self.named_source(),
+                        value: "on non-integer".to_string()
+                    }.into());
+                }
+
+                Ok(builder.ins().bnot(right_value))
             }
 
             _ => Err(InvalidOperator {

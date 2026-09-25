@@ -106,6 +106,7 @@ impl <'a> Parser <'a> {
             TokenType::Caret => Some(Parser::parse_prefix_expr),
             TokenType::Times => Some(Parser::parse_prefix_expr),
             TokenType::Minus => Some(Parser::parse_prefix_expr),
+            TokenType::Tilde => Some(Parser::parse_prefix_expr),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
@@ -119,6 +120,9 @@ impl <'a> Parser <'a> {
             TokenType::Times => Some(Parser::parse_infix_expression),
             TokenType::Divide => Some(Parser::parse_infix_expression),
             TokenType::Modulo => Some(Parser::parse_infix_expression),
+            TokenType::Ampersand => Some(Parser::parse_infix_expression),
+            TokenType::Pipe => Some(Parser::parse_infix_expression),
+            TokenType::Caret => Some(Parser::parse_infix_expression),
             TokenType::EqEq => Some(Parser::parse_infix_expression),
             TokenType::NotEq => Some(Parser::parse_infix_expression),
             TokenType::Lt => Some(Parser::parse_infix_expression),
