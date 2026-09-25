@@ -131,6 +131,8 @@ impl <'a> Parser <'a> {
             TokenType::GtEq => Some(Parser::parse_infix_expression),
             TokenType::Dot => Some(Parser::parse_infix_expression),
             TokenType::ColonColon => Some(Parser::parse_infix_expression),
+            TokenType::Or => Some(Parser::parse_infix_expression),
+            TokenType::And => Some(Parser::parse_infix_expression),
 
             TokenType::OpenSquare => Some(Parser::parse_index_expression),
 

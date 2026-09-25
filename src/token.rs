@@ -52,6 +52,10 @@ impl TokenType {
             TokenType::Lt => PrecedenceType::LessGreater,
             TokenType::GtEq => PrecedenceType::LessGreater,
             TokenType::LtEq => PrecedenceType::LessGreater,
+            TokenType::Not => PrecedenceType::LessGreater,
+
+            TokenType::Or => PrecedenceType::Or,
+            TokenType::And => PrecedenceType::And,
 
             TokenType::OpenSquare => PrecedenceType::Index,
 
@@ -76,6 +80,7 @@ impl TokenType {
 
             "or" => Some(TokenType::Or),
             "and" => Some(TokenType::And),
+            "not" => Some(TokenType::Not),
             _ => None
         }
     }

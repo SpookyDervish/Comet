@@ -162,7 +162,12 @@ impl<'file> Lexer<'file> {
                     self.consume();
 
                     if self.current_char != '=' {
-                        tokens.push(Token::new(TokenType::Not, range, self.pos.clone(), self.pos.clone()));
+                        range.end(&self.pos);
+                        return Err(SyntaxError {
+                            span: range.source_span(),
+                            src: NamedSource::new(self.pos.file_name(), String::from(self.pos.source())),
+                            text: "Expected '=' after '!'".to_string()
+                        }.into());
                     } else {
                         range.end(&self.pos);
                         tokens.push(Token::new(TokenType::NotEq, range, self.pos.clone(), self.pos.clone()));

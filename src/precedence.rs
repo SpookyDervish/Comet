@@ -1,14 +1,14 @@
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum PrecedenceType {
     Lowest,
+    Or,
+    And,
     Equals,
     LessGreater,
     Sum,
     Product,
-    Exponent,
     Prefix,
     Call,
     Index,
-    Dot,
-    Max
+    Dot
 }

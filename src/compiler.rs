@@ -591,6 +591,14 @@ impl <'a> Compiler <'a> {
                         Ok(right_type)
                     }
 
+                    TokenType::Not => {
+                        self.get_type("bool").cloned().ok_or_else(|| CompilerBug {
+                            span: node.source_span(),
+                            src: self.named_source(),
+                            text: String::from("failed to get internal \"bool\" type, this is a bug!")
+                        }.into())
+                    }
+
                     _ => Err(InvalidOperator {
                         op: op.token_type().clone(),
                         span: op.source_span(),
@@ -600,7 +608,7 @@ impl <'a> Compiler <'a> {
                 }
             },
 
-            ASTNodeType::FuncCall { left: left, args: _ } => {
+            ASTNodeType::FuncCall { left, args: _ } => {
                 let function_type = self.resolve_type(left)?;
 
                 match function_type.kind {
@@ -1078,6 +1086,48 @@ impl <'a> Compiler <'a> {
         }
     }
 
+    fn visit_logical_op_expr(&mut self, left: &ASTNode<'a>, op: &TokenType, right: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+        let end_block = builder.create_block();
+        let result = builder.append_block_param(end_block, types::I8);
+        let short_circuit_block = builder.create_block();
+        let right_block = builder.create_block();
+
+        let left_value = self.visit_value(left, builder)?;
+
+        if op == &TokenType::And {
+            builder.ins().brif(left_value, right_block, &[], short_circuit_block, &[]);
+            builder.seal_block(builder.current_block().unwrap());
+
+            builder.switch_to_block(short_circuit_block);
+            let false_value = builder.ins().iconst(types::I8, 0);
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(false_value)]);
+            builder.seal_block(short_circuit_block);
+
+            builder.switch_to_block(right_block);
+            let right_value = self.visit_value(right, builder)?;
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(right_value)]);
+            builder.seal_block(right_block);
+        } else {
+            builder.ins().brif(left_value, short_circuit_block, &[], right_block, &[]);
+            builder.seal_block(builder.current_block().unwrap());
+
+            builder.switch_to_block(short_circuit_block);
+            let true_value = builder.ins().iconst(types::I8, 1);
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(true_value)]);
+            builder.seal_block(short_circuit_block);
+
+            builder.switch_to_block(right_block);
+            let right_value = self.visit_value(right, builder)?;
+            builder.ins().jump(end_block, &[ir::BlockArg::Value(right_value)]);
+            builder.seal_block(right_block);
+        }
+
+        builder.switch_to_block(end_block);
+        builder.ensure_inserted_block();
+
+        Ok(result)
+    }
+
     fn visit_infix_expression(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (left, op, right) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
@@ -1085,7 +1135,9 @@ impl <'a> Compiler <'a> {
         };
         
 
-        
+        if op.token_type() == &TokenType::Or || op.token_type() == &TokenType::And {
+            return self.visit_logical_op_expr(left, op.token_type(), right, builder);
+        }
 
         let mut left_side = self.visit_value(left, builder)?;
         let mut right_side = self.visit_value(right, builder)?;
@@ -1411,6 +1463,10 @@ impl <'a> Compiler <'a> {
                 }
 
                 Ok(builder.ins().bnot(right_value))
+            }
+
+            TokenType::Not => {
+                Ok(builder.ins().icmp_imm_s(IntCC::Equal, right_value, 0))
             }
 
             _ => Err(InvalidOperator {
