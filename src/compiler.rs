@@ -1869,33 +1869,34 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_ret_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
-        println!("{}", builder.func);
         let ret_value_optional = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
         };
 
-        if ret_value_optional.is_none() {
-            builder.ins().return_(&[]);
-        } else {
-            let ret_value_node = ret_value_optional.as_ref().unwrap();
-            if matches!(self.current_function.as_ref().unwrap().return_type.kind, CometTypeKind::Void) {
-                return Err(TypeMismatch {
-                    expected: "void".to_string(),
-                    invalid: "return value".to_string(),
-                    span: ret_value_node.source_span(),
-                    src: self.named_source()
-                }.into());
+        if !self.block_is_terminated(builder.current_block().unwrap(), builder) {
+            if ret_value_optional.is_none() {
+                builder.ins().return_(&[]);
+            } else {
+                let ret_value_node = ret_value_optional.as_ref().unwrap();
+                if matches!(self.current_function.as_ref().unwrap().return_type.kind, CometTypeKind::Void) {
+                    return Err(TypeMismatch {
+                        expected: "void".to_string(),
+                        invalid: "return value".to_string(),
+                        span: ret_value_node.source_span(),
+                        src: self.named_source()
+                    }.into());
+                }
+
+                let mut ret_value = self.visit_value(ret_value_node, builder)?;
+
+                let ret_type = self.resolve_type(ret_value_node)?;
+                if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
+                    ret_value = CometType::try_implicit_cast(ret_value_node, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), builder, self.named_source())?;
+                }
+
+                builder.ins().return_(&[ret_value]);
             }
-
-            let mut ret_value = self.visit_value(ret_value_node, builder)?;
-
-            let ret_type = self.resolve_type(ret_value_node)?;
-            if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
-                ret_value = CometType::try_implicit_cast(ret_value_node, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), builder, self.named_source())?;
-            }
-
-            builder.ins().return_(&[ret_value]);
         }
 
         Ok(())
@@ -2521,6 +2522,7 @@ impl <'a> Compiler <'a> {
             }
         }
 
+        // if the default branch exists...
         if let Some(default_branch) = default_branch {
             let default_block = default_block.unwrap();
             builder.switch_to_block(default_block);
