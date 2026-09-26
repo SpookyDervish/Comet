@@ -10,6 +10,7 @@ mod scope;
 mod comet_type;
 mod comet_struct;
 mod comet_error;
+mod comet_union;
 
 use std::fs;
 use std::io::Write;

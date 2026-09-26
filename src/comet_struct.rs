@@ -72,7 +72,7 @@ impl CometStruct {
         for (i, field) in self.fields.iter().enumerate() {
             
 
-            let align = field.field_type.cranelift_type.bytes();
+            let align = field.field_type.align();
             max_alignment = cmp::max(max_alignment, align);
 
             if current_offset % align != 0 {

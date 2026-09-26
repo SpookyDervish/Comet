@@ -1,0 +1,42 @@
+union Inner {
+    First(value: u64),
+    Next(next: Inner),
+    Second()
+}
+
+union Outer {
+    Empty,
+    Wrapped(inner: Inner, count: u64)
+}
+
+fun main() :: i64 {
+    value = new Outer::Wrapped {
+        inner = new Inner::Next {
+            next = new Inner::First { value = 17 }
+        },
+        count = 4
+    }
+
+    match value {
+        Outer::Empty() {
+            ret 0
+        },
+        Outer::Wrapped(Inner::Next(Inner::First(number)), count) {
+            if number == 17 {
+                if count == 4 {
+                    ret 0
+                } else {
+                    ret 1
+                }
+            } else {
+                ret 1
+            }
+        },
+        Outer::Wrapped(Inner::Second(), _) {
+            ret 1
+        },
+        default {
+            ret 2
+        }
+    }
+}

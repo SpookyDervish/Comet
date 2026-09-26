@@ -1,20 +1,21 @@
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
 use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
-use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
-use cranelift_native::builder;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::iter::zip;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
+use crate::comet_union::{CometUnion, CometUnionItem};
 use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
-use crate::{ast::{ASTNode, ASTNodeType}, comet_type::CometType, token::TokenType};
+use crate::{ast::{ASTNode, ASTNodeType, MatchPattern}, comet_type::CometType, token::TokenType};
 
 pub struct Compiler <'a> {
     module: ObjectModule,
@@ -379,6 +380,24 @@ impl <'a> Compiler <'a> {
 
                 Ok(CometType::new_array(inner_type, length as u32, self.module.isa().pointer_type()))
             }
+
+            ASTType::Qualified(names) => {
+                let path = names
+                    .iter()
+                    .map(|node| match node.node_type() {
+                        ASTNodeType::IdentifierLiteral(name) => name.clone(),
+                        _ => unreachable!(),
+                    })
+                    .collect::<Vec<_>>();
+
+                self.get_type(&path.join("::"))
+                    .cloned()
+                    .ok_or(UnkownType {
+                        span: node.source_span(),
+                        src: self.named_source(),
+                        type_: path.join("::"),
+                    }.into())
+            }
         }
         
     }
@@ -444,7 +463,30 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn resolve_type(&mut self, node: &ASTNode) -> miette::Result<CometType> {
+    fn visit_get_union_item(&mut self, left: &ASTNode<'a>, right: &ASTNode<'a>, union: &CometUnion) -> miette::Result<CometType> {
+        let right_ident = match right.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => { return Err(SyntaxError {
+                span: right.source_span(),
+                src: self.named_source(),
+                text: format!("Expected right token to be an identifier")
+            }.into()); }
+        };
+
+        let item = union.get_item(right_ident);
+        if item.is_none() {
+            return Err(UnkownUnionItem {
+                item: right_ident.clone(),
+                span: right.source_span(),
+                src: self.named_source(),
+                union: union.name().clone()
+            }.into());
+        }
+
+        Ok(CometType::new_variant(item.unwrap().clone()))
+    }
+
+    fn resolve_type(&mut self, node: &ASTNode<'a>) -> miette::Result<CometType> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
                 Ok(CometType::new_int(types::I64, false))
@@ -499,6 +541,15 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::InfixExpression { left, op, right } => {
                 let left_value = self.resolve_type(left)?;
+
+                match &left_value.kind {
+                    CometTypeKind::Union(u) => {
+                        if op.token_type() == &TokenType::ColonColon {
+                            return self.visit_get_union_item(left, right, &u);
+                        }
+                    },
+                    _ => {}
+                }
 
                 match op.token_type() {
                     TokenType::Dot | TokenType::ColonColon => {
@@ -630,7 +681,14 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::NewInstanceExpression { type_, fields: _ } => {
                 let struct_type = self.get_type_literal_type(type_)?;
-                Ok(struct_type.clone())
+                match &struct_type.kind {
+                    CometTypeKind::Variant(item) => self.get_type(item.union_name()).cloned().ok_or_else(|| CompilerBug {
+                        span: type_.source_span(),
+                        src: self.named_source(),
+                        text: format!("union '{}' is missing from the type environment", item.union_name())
+                    }.into()),
+                    _ => Ok(struct_type),
+                }
             }
 
             _ => Err(CompilerBug {
@@ -744,6 +802,109 @@ impl <'a> Compiler <'a> {
         } else {
             Ok(results[0])
         }
+    }
+
+    fn visit_variant_instance(&mut self, item: &CometUnionItem, fields: &Option<Vec<ASTNode<'a>>>, span: miette::SourceSpan, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+        let discriminant_type = types::I32;
+        let payload_offset = item.payload_offset(discriminant_type.bytes());
+        let union_type = self.get_type(item.union_name()).cloned().ok_or_else(|| CompilerBug {
+            span: span.clone(),
+            src: self.named_source(),
+            text: format!("union '{}' is missing from the type environment", item.union_name())
+        })?;
+        let union = match union_type.kind {
+            CometTypeKind::Union(union) => union,
+            _ => unreachable!()
+        };
+        let supplied_fields = fields.as_deref().unwrap_or(&[]);
+
+        if supplied_fields.len() != item.field_names().len() {
+            return Err(SyntaxError {
+                span,
+                src: self.named_source(),
+                text: format!("variant '{}' expects {} payload fields, got {}", item.name(), item.field_names().len(), supplied_fields.len())
+            }.into());
+        }
+
+        let stack_slot = builder.create_sized_stack_slot(StackSlotData::new(
+            StackSlotKind::ExplicitSlot,
+            union.storage_size(discriminant_type.bytes()),
+            union.storage_align(discriminant_type.bytes()).max(1).trailing_zeros() as u8
+        ));
+
+        let stack_addr = builder.ins().stack_addr(
+            self.module.isa().pointer_type(),
+            stack_slot,
+            0
+        );
+
+        let discriminant_value = builder.ins().iconst(discriminant_type, item.discriminant() as i64);
+        builder.ins().store(
+            MemFlagsData::new(),
+            discriminant_value,
+            stack_addr,
+            0
+        );
+
+        let mut written_fields = HashMap::new();
+        for field in supplied_fields {
+            let (field_name_node, value_node) = match field.node_type() {
+                ASTNodeType::StructField { ident, value } => (ident, value),
+                _ => unreachable!()
+            };
+
+            let field_name = match field_name_node.node_type() {
+                ASTNodeType::IdentifierLiteral(name) => name,
+                _ => unreachable!()
+            };
+
+            if written_fields.insert(field_name.as_str(), ()).is_some() {
+                return Err(SyntaxError {
+                    span: field_name_node.source_span(),
+                    src: self.named_source(),
+                    text: format!("payload field '{}' is specified more than once", field_name)
+                }.into());
+            }
+
+            let field_type = item.get_field(field_name).ok_or_else(|| UnkownField {
+                field: field_name.clone(),
+                struct_name: item.name().clone(),
+                span: field_name_node.source_span(),
+                src: self.named_source()
+            })?;
+
+            let value_type = self.resolve_type(value_node)?;
+            let mut value = self.visit_value(value_node, builder)?;
+            if value_type != *field_type || value_type.cranelift_type != field_type.cranelift_type {
+                value = CometType::try_implicit_cast(
+                    value_node,
+                    value,
+                    &value_type,
+                    field_type,
+                    builder,
+                    self.named_source()
+                )?;
+            }
+            let field_offset = item.field_offset(field_name).unwrap();
+            builder.ins().store(
+                MemFlagsData::new(),
+                value,
+                stack_addr,
+                (payload_offset + field_offset) as i32
+            );
+        }
+
+        for field_name in item.field_names() {
+            if !written_fields.contains_key(field_name.as_str()) {
+                return Err(SyntaxError {
+                    span: span.clone(),
+                    src: self.named_source(),
+                    text: format!("missing payload field '{}' for variant '{}'", field_name, item.name())
+                }.into());
+            }
+        }
+
+        Ok(stack_addr)
     }
 
     fn visit_value(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
@@ -940,17 +1101,20 @@ impl <'a> Compiler <'a> {
                 let struct_type = self.get_type_literal_type(type_node)?;
 
                 // we're creating an instance of an array
-                match struct_type.kind {
+                match &struct_type.kind {
                     CometTypeKind::Array { base_type, size } => {
                         let stack_slot = builder.create_sized_stack_slot(StackSlotData::new(
                             StackSlotKind::ExplicitSlot,
-                            base_type.size() * size as u32,
+                            base_type.size() * *size as u32,
                             base_type.align() as u8
                         ));
 
                         let stack_addr = builder.ins().stack_addr(self.module.isa().pointer_type(), stack_slot, 0);
                         return Ok(stack_addr);
                     }
+
+                    CometTypeKind::Variant(i) => { return self.visit_variant_instance(i, fields, type_node.source_span(), builder); }
+
                     _ => {}
                 }
 
@@ -1868,78 +2032,467 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
+    fn pattern_variant_item(
+        &self,
+        path: &[ASTNode<'a>],
+        expected_type: &CometType,
+        span: miette::SourceSpan
+    ) -> miette::Result<CometUnionItem> {
+        let names = path.iter().map(|node| match node.node_type() {
+            ASTNodeType::IdentifierLiteral(name) => Ok(name.clone()),
+            _ => Err(SyntaxError {
+                span: node.source_span(),
+                src: self.named_source(),
+                text: "expected identifier in variant path".to_string()
+            }),
+        }).collect::<Result<Vec<_>, _>>()?;
+
+        if names.len() < 2 {
+            return Err(SyntaxError {
+                span,
+                src: self.named_source(),
+                text: "variant pattern path must include a union and variant name".to_string()
+            }.into());
+        }
+
+        let variant_name = names.join("::");
+        let variant_type = self.get_type(&variant_name).ok_or_else(|| UnkownType {
+            span: path.last().unwrap().source_span(),
+            src: self.named_source(),
+            type_: variant_name.clone()
+        })?;
+        let item = match &variant_type.kind {
+            CometTypeKind::Variant(item) => item.clone(),
+            _ => {
+                return Err(TypeMismatch {
+                    expected: "union variant".to_string(),
+                    invalid: variant_type.to_string(),
+                    span,
+                    src: self.named_source()
+                }.into());
+            }
+        };
+
+        let expected_union = match &expected_type.kind {
+            CometTypeKind::Union(union) => union.name().as_str(),
+            CometTypeKind::Variant(variant) => variant.union_name(),
+            _ => {
+                return Err(TypeMismatch {
+                    expected: "union".to_string(),
+                    invalid: expected_type.to_string(),
+                    span,
+                    src: self.named_source()
+                }.into());
+            }
+        };
+
+        if item.union_name() != expected_union {
+            return Err(TypeMismatch {
+                expected: expected_union.to_string(),
+                invalid: item.union_name().to_string(),
+                span,
+                src: self.named_source()
+            }.into());
+        }
+
+        Ok(item)
+    }
+
+    fn collect_pattern_bindings(
+        &self,
+        pattern: &MatchPattern<'a>,
+        expected_type: &CometType
+    ) -> miette::Result<Vec<(String, CometType)>> {
+        match pattern {
+            MatchPattern::Variant { path, fields } => {
+                let item = self.pattern_variant_item(path, expected_type, path[0].source_span())?;
+                if fields.len() != item.field_names().len() {
+                    return Err(SyntaxError {
+                        span: path.last().unwrap().source_span(),
+                        src: self.named_source(),
+                        text: format!("variant '{}' expects {} pattern fields, got {}", item.name(), item.field_names().len(), fields.len())
+                    }.into());
+                }
+
+                let mut bindings = Vec::new();
+                for (index, field_pattern) in fields.iter().enumerate() {
+                    let field_type = item.field_type_at(index).unwrap();
+                    match field_pattern {
+                        MatchPattern::Binding(binding) => {
+                            let name = match binding.node_type() {
+                                ASTNodeType::IdentifierLiteral(name) => name,
+                                _ => unreachable!()
+                            };
+                            if name != "_" {
+                                bindings.push((name.clone(), field_type.clone()));
+                            }
+                        }
+                        MatchPattern::Variant { .. } => {
+                            bindings.extend(self.collect_pattern_bindings(field_pattern, field_type)?);
+                        }
+                        MatchPattern::Expression(expression) => {
+                            return Err(SyntaxError {
+                                span: expression.source_span(),
+                                src: self.named_source(),
+                                text: "variant payload patterns must be bindings or nested variant patterns".to_string()
+                            }.into());
+                        }
+                    }
+                }
+                Ok(bindings)
+            }
+            MatchPattern::Expression(_) => Ok(Vec::new()),
+            MatchPattern::Binding(binding) => Err(SyntaxError {
+                span: binding.source_span(),
+                src: self.named_source(),
+                text: "a binding must appear inside a variant pattern".to_string()
+            }.into())
+        }
+    }
+
+    fn emit_variant_match_branch(
+        &mut self,
+        pattern: &MatchPattern<'a>,
+        value: ir::Value,
+        value_type: &CometType,
+        matched_block: Block,
+        failed_block: Block,
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<()> {
+        let (path, fields) = match pattern {
+            MatchPattern::Variant { path, fields } => (path, fields),
+            _ => unreachable!()
+        };
+        let item = self.pattern_variant_item(path, value_type, path[0].source_span())?;
+        let nested_fields = fields.iter().enumerate().filter_map(|(index, field_pattern)| {
+            match field_pattern {
+                MatchPattern::Variant { .. } => Some((index, field_pattern)),
+                _ => None
+            }
+        }).collect::<Vec<_>>();
+
+        let discriminant = builder.ins().load(types::I32, MemFlagsData::new(), value, 0);
+        let is_variant = builder.ins().icmp_imm_s(IntCC::Equal, discriminant, item.discriminant() as i64);
+        let current_block = builder.current_block().unwrap();
+
+        if nested_fields.is_empty() {
+            builder.ins().brif(is_variant, matched_block, &[], failed_block, &[]);
+            builder.seal_block(current_block);
+            return Ok(());
+        }
+
+        let nested_check_block = builder.create_block();
+        builder.ins().brif(is_variant, nested_check_block, &[], failed_block, &[]);
+        builder.seal_block(current_block);
+        builder.switch_to_block(nested_check_block);
+
+        for (nested_index, (field_index, field_pattern)) in nested_fields.iter().enumerate() {
+            let field_name = item.field_name_at(*field_index).unwrap();
+            let field_type = item.field_type_at(*field_index).unwrap().clone();
+            let field_offset = item.payload_offset(types::I32.bytes()) + item.field_offset(field_name).unwrap();
+            let field_address = builder.ins().iadd_imm_s(value, field_offset as i64);
+            let field_value = builder.ins().load(field_type.cranelift_type, MemFlagsData::new(), field_address, 0);
+            let next_block = if nested_index + 1 == nested_fields.len() {
+                matched_block
+            } else {
+                builder.create_block()
+            };
+
+            self.emit_variant_match_branch(field_pattern, field_value, &field_type, next_block, failed_block, builder)?;
+
+            if next_block != matched_block {
+                builder.switch_to_block(next_block);
+            }
+        }
+
+        Ok(())
+    }
+
+    fn bind_variant_pattern(
+        &mut self,
+        pattern: &MatchPattern<'a>,
+        value: ir::Value,
+        value_type: &CometType,
+        variables: &HashMap<String, (Variable, CometType)>,
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<()> {
+        let (path, fields) = match pattern {
+            MatchPattern::Variant { path, fields } => (path, fields),
+            _ => unreachable!()
+        };
+        let item = self.pattern_variant_item(path, value_type, path[0].source_span())?;
+
+        for (index, field_pattern) in fields.iter().enumerate() {
+            let field_name = item.field_name_at(index).unwrap();
+            let field_type = item.field_type_at(index).unwrap().clone();
+            let field_offset = item.payload_offset(types::I32.bytes()) + item.field_offset(field_name).unwrap();
+            let field_address = builder.ins().iadd_imm_s(value, field_offset as i64);
+            let field_value = builder.ins().load(field_type.cranelift_type, MemFlagsData::new(), field_address, 0);
+
+            match field_pattern {
+                MatchPattern::Binding(binding) => {
+                    let name = match binding.node_type() {
+                        ASTNodeType::IdentifierLiteral(name) => name,
+                        _ => unreachable!()
+                    };
+                    if name != "_" {
+                        let (variable, _) = variables.get(name).ok_or_else(|| CompilerBug {
+                            span: binding.source_span(),
+                            src: self.named_source(),
+                            text: format!("missing match binding '{}'", name)
+                        })?;
+                        builder.def_var(*variable, field_value);
+                    }
+                }
+                MatchPattern::Variant { .. } => {
+                    self.bind_variant_pattern(field_pattern, field_value, &field_type, variables, builder)?;
+                }
+                MatchPattern::Expression(expression) => {
+                    return Err(SyntaxError {
+                        span: expression.source_span(),
+                        src: self.named_source(),
+                        text: "variant payload patterns must be bindings or nested variant patterns".to_string()
+                    }.into());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn pattern_is_unconditional_variant(pattern: &MatchPattern<'a>) -> bool {
+        match pattern {
+            MatchPattern::Variant { fields, .. } => fields.iter().all(|field| matches!(field, MatchPattern::Binding(_))),
+            _ => false
+        }
+    }
+
+    fn pattern_key(pattern: &MatchPattern<'a>) -> Option<String> {
+        match pattern {
+            MatchPattern::Variant { path, fields } => {
+                let names = path.iter().map(|node| match node.node_type() {
+                    ASTNodeType::IdentifierLiteral(name) => Some(name.as_str()),
+                    _ => None
+                }).collect::<Option<Vec<_>>>()?;
+                let fields = fields.iter().map(|field| match field {
+                    MatchPattern::Binding(_) => Some("_".to_string()),
+                    MatchPattern::Variant { .. } => Self::pattern_key(field),
+                    MatchPattern::Expression(_) => None
+                }).collect::<Option<Vec<_>>>()?;
+                Some(format!("{}({})", names.join("::"), fields.join(",")))
+            }
+            _ => None
+        }
+    }
+
     fn visit_match_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, match_nodes, default_branch) = match node.node_type() {
             ASTNodeType::MatchStatement { expr, nodes, default } => (expr, nodes, default),
             _ => unreachable!()
         };
 
+        let scrutinee_type = self.resolve_type(expr_node)?;
         let expr = self.visit_value(expr_node, builder)?;
-        let end_block = builder.create_block();
-        let default_block = default_branch.as_ref().map(|_| builder.create_block()); // only create a block if the default_branch exists
+        let union = match &scrutinee_type.kind {
+            CometTypeKind::Union(union) => Some(union.clone()),
+            _ => None
+        };
 
+        let mut binding_signatures = Vec::new();
+        let mut completely_covered = HashSet::new();
+        let mut seen_patterns = HashSet::new();
+
+        for match_node in match_nodes {
+            let patterns = match match_node.node_type() {
+                ASTNodeType::MatchNode { expressions, .. } => expressions,
+                _ => unreachable!()
+            };
+            let mut arm_signature: Option<Vec<(String, CometType)>> = None;
+
+            for pattern in patterns {
+                if let Some(key) = Self::pattern_key(pattern) {
+                    if !seen_patterns.insert(key) {
+                        return Err(SyntaxError {
+                            span: match_node.source_span(),
+                            src: self.named_source(),
+                            text: "this variant pattern is already matched".to_string()
+                        }.into());
+                    }
+                }
+
+                if union.is_some() && !matches!(pattern, MatchPattern::Variant { .. }) {
+                    return Err(SyntaxError {
+                        span: match_node.source_span(),
+                        src: self.named_source(),
+                        text: "union values must be matched with variant patterns or a default arm".to_string()
+                    }.into());
+                }
+
+                let signature = self.collect_pattern_bindings(pattern, &scrutinee_type)?;
+                let mut names = HashSet::new();
+                for (name, _) in &signature {
+                    if !names.insert(name.clone()) {
+                        return Err(SyntaxError {
+                            span: match_node.source_span(),
+                            src: self.named_source(),
+                            text: format!("binding '{}' appears more than once in this pattern", name)
+                        }.into());
+                    }
+                }
+
+                if let Some(existing) = &arm_signature {
+                    if existing.len() != signature.len() || existing.iter().zip(signature.iter()).any(|(left, right)| left.0 != right.0 || left.1 != right.1) {
+                        return Err(SyntaxError {
+                            span: match_node.source_span(),
+                            src: self.named_source(),
+                            text: "all alternatives in one match arm must bind the same names and types".to_string()
+                        }.into());
+                    }
+                } else {
+                    arm_signature = Some(signature);
+                }
+
+                if Self::pattern_is_unconditional_variant(pattern) {
+                    if let MatchPattern::Variant { path, .. } = pattern {
+                        let item = self.pattern_variant_item(path, &scrutinee_type, path[0].source_span())?;
+                        if !completely_covered.insert(item.discriminant()) {
+                            return Err(SyntaxError {
+                                span: path.last().unwrap().source_span(),
+                                src: self.named_source(),
+                                text: format!("variant '{}::{}' is matched more than once", item.union_name(), item.name())
+                            }.into());
+                        }
+                    }
+                }
+            }
+
+            binding_signatures.push(arm_signature.unwrap_or_default());
+        }
+
+        if let Some(union) = &union {
+            if default_branch.is_none() && completely_covered.len() != union.items().len() {
+                let missing = union.items().iter()
+                    .filter(|item| !completely_covered.contains(&item.discriminant()))
+                    .map(|item| item.name().as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                return Err(SyntaxError {
+                    span: node.source_span(),
+                    src: self.named_source(),
+                    text: format!("non-exhaustive union match; add patterns for: {} or provide a default arm", missing)
+                }.into());
+            }
+        }
+
+        let end_block = builder.create_block();
+        let default_block = default_branch.as_ref().map(|_| builder.create_block());
         let mut compare_block = builder.current_block().unwrap();
+        let mut end_reachable = default_branch.is_none();
 
         for (arm_index, match_node) in match_nodes.iter().enumerate() {
-
-            let (match_expr_nodes, match_block) = match match_node.node_type() {
+            let (patterns, match_block) = match match_node.node_type() {
                 ASTNodeType::MatchNode { expressions, block } => (expressions, block),
                 _ => unreachable!()
             };
-
             let arm_block = builder.create_block();
+            let mut variables = HashMap::new();
 
-            for (expr_index, match_expr_node) in match_expr_nodes.iter().enumerate() {
+            for (name, type_) in &binding_signatures[arm_index] {
+                let variable = builder.declare_var(type_.cranelift_type);
+                variables.insert(name.clone(), (variable, type_.clone()));
+            }
+
+            for (pattern_index, pattern) in patterns.iter().enumerate() {
                 if builder.current_block() != Some(compare_block) {
                     builder.switch_to_block(compare_block);
                 }
 
-                let match_expr = self.visit_value(match_expr_node, builder)?;
-                let is_equal = builder.ins().icmp(IntCC::Equal, expr, match_expr);
-
-                let false_block = if expr_index + 1 < match_expr_nodes.len() {
+                let failed_block = if pattern_index + 1 < patterns.len() {
                     builder.create_block()
                 } else if arm_index + 1 < match_nodes.len() {
                     builder.create_block()
                 } else {
                     default_block.unwrap_or(end_block)
                 };
+                let pattern_block = builder.create_block();
 
-                builder.ins().brif(is_equal, arm_block, &[], false_block, &[]);
-                builder.seal_block(compare_block);
-                compare_block = false_block;
+                match pattern {
+                    MatchPattern::Variant { .. } => {
+                        self.emit_variant_match_branch(pattern, expr, &scrutinee_type, pattern_block, failed_block, builder)?;
+                    }
+                    MatchPattern::Expression(value_node) => {
+                        let pattern_value = self.visit_value(value_node, builder)?;
+                        let pattern_type = self.resolve_type(value_node)?;
+                        let is_equal = if scrutinee_type.is_float() && pattern_type.is_float() {
+                            builder.ins().fcmp(FloatCC::Equal, expr, pattern_value)
+                        } else {
+                            builder.ins().icmp(IntCC::Equal, expr, pattern_value)
+                        };
+                        builder.ins().brif(is_equal, pattern_block, &[], failed_block, &[]);
+                        builder.seal_block(compare_block);
+                    }
+                    MatchPattern::Binding(binding) => {
+                        return Err(SyntaxError {
+                            span: binding.source_span(),
+                            src: self.named_source(),
+                            text: "a binding must appear inside a variant pattern".to_string()
+                        }.into());
+                    }
+                }
+
+                builder.switch_to_block(pattern_block);
+                if matches!(pattern, MatchPattern::Variant { .. }) {
+                    self.bind_variant_pattern(pattern, expr, &scrutinee_type, &variables, builder)?;
+                }
+                builder.ins().jump(arm_block, &[]);
+                builder.seal_block(pattern_block);
+
+                if pattern_index + 1 < patterns.len() || arm_index + 1 < match_nodes.len() {
+                    compare_block = failed_block;
+                }
             }
 
             builder.switch_to_block(arm_block);
-
-
-            self.compile(match_block, Some(builder))?;
+            self.scopes.push(ScopeFrame::new());
+            for (name, (variable, type_)) in variables {
+                self.scopes.last_mut().unwrap().variables.insert(name, CometVariable {
+                    type_,
+                    var_type: CometVarType::Local(variable),
+                    mutable: false,
+                    function_id: None
+                });
+            }
+            let compile_result = self.compile(match_block, Some(builder));
+            self.scopes.pop();
+            compile_result?;
 
             let arm_is_terminated = self.block_is_terminated(arm_block, builder);
             if !arm_is_terminated {
                 builder.ins().jump(end_block, &[]);
+                end_reachable = true;
             }
-
-            builder.seal_block(arm_block);
         }
 
         if let Some(default_branch) = default_branch {
             let default_block = default_block.unwrap();
             builder.switch_to_block(default_block);
-
             self.compile(default_branch, Some(builder))?;
 
             let default_is_terminated = self.block_is_terminated(default_block, builder);
             if !default_is_terminated {
                 builder.ins().jump(end_block, &[]);
+                end_reachable = true;
             }
-
             builder.seal_block(default_block);
         }
 
         builder.switch_to_block(end_block);
-        builder.ensure_inserted_block();
-
+        if end_reachable {
+            builder.ensure_inserted_block();
+        } else {
+            builder.ins().trap(ir::TrapCode::unwrap_user(1));
+            builder.seal_block(end_block);
+        }
         Ok(())
     }
 
@@ -1978,8 +2531,6 @@ impl <'a> Compiler <'a> {
             builder.ins().jump(end_block, &[]);
         }
 
-        builder.seal_block(then_block);
-
         builder.switch_to_block(else_block);
         if else_body.is_some() {
             self.compile(else_body.as_ref().unwrap(), Some(builder))?;
@@ -1989,8 +2540,14 @@ impl <'a> Compiler <'a> {
                 builder.ins().jump(end_block, &[]);
             }
 
-            builder.seal_block(else_block);
             builder.switch_to_block(end_block);
+            if then_block_terminated && else_block_terminated {
+                builder.ins().trap(ir::TrapCode::unwrap_user(1));
+                builder.seal_block(end_block);
+            } else {
+                builder.ensure_inserted_block();
+            }
+        } else {
             builder.ensure_inserted_block();
         }
 
@@ -2025,6 +2582,7 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
 
     fn visit_struct_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<Option<CometStruct>> {
         let (ident_node, field_nodes, generics) = match node.node_type() {
@@ -2063,91 +2621,93 @@ impl <'a> Compiler <'a> {
 
         let new_struct = CometStruct::new(ident.clone(), fields);
 
-        if generics.is_none() {
-            self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(new_struct.clone()));
-        }
+        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(new_struct.clone()));
 
         Ok(Some(new_struct))
     }
 
-    fn visit_extern_directive(&mut self, name_node: &ASTNode<'a>, type_node: &ASTNode<'a>) -> miette::Result<()> {
-        let name = match name_node.node_type() {
-            ASTNodeType::IdentifierLiteral(value) => value,
-            _ => unreachable!()
-        };
-        
-        // make signature
-        let mut sig = self.module.make_signature();
-        let comet_type = self.get_type_literal_type(type_node)?;
-
-        let func_type = match &comet_type.kind {
-            CometTypeKind::Function(v) => v,
-            _ => { return Err(CompilerBug {
-                src: self.named_source(),
-                span: type_node.source_span(),
-                text: String::from("only functions are supported with #extern")
-            }.into()); }
-        };
-
-        if func_type.return_type.cranelift_type != types::INVALID {
-            sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
-        }
-        for arg in &func_type.arg_types {
-            sig.params.push(AbiParam::new(arg.cranelift_type))
-        }
-
-        // make external func with new sig
-        let ext_func_id = self.module
-            .declare_function(name, Linkage::Import, &sig)
-            .unwrap();
-
-        /*let data_id = self.module
-            .declare_data(&format!("{}_var", name), Linkage::Local, true, false)
-            .unwrap();
-
-        let mut data_desc = DataDescription::new();
-        let target_config = self.module.isa().frontend_config();
-        let pointer_size = target_config.pointer_type().bytes() as usize;
-
-        data_desc.define_zeroinit(pointer_size);
-
-        let data_func_ref = self.module.declare_func_in_data(ext_func_id, &mut data_desc);
-        data_desc.write_function_addr(0, data_func_ref);
-
-        self.module.define_data(data_id, &data_desc).unwrap();*/
-
-        self.scopes.last_mut().unwrap().variables.insert(name.clone(), CometVariable {
-            type_: comet_type,
-            var_type: CometVarType::External(ext_func_id),
-            mutable: false,
-            function_id: Some(ext_func_id)
-        });
-
-        Ok(())
-    }
-
-    fn visit_compiler_directive(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
-        let (directive_node, name_node, type_node) = match node.node_type() {
-            ASTNodeType::CompilerDirectiveStatement { directive, value_name, value_type } => (directive, value_name, value_type),
+    fn visit_union_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+        let (ident_node, item_nodes, generics) = match node.node_type() {
+            ASTNodeType::UnionDefinitionStatement { ident, fields, generics } => (ident, fields, generics),
             _ => unreachable!()
         };
 
-        let directive = match directive_node.node_type() {
+        let ident = match ident_node.node_type() {
             ASTNodeType::IdentifierLiteral(v) => v,
             _ => unreachable!()
         };
 
-        match directive.as_str() {
-            "extern" => {
-                self.visit_extern_directive(name_node, type_node)
-            },
-            _ => Err(InvalidCompilerDirective {
-                directive: directive.clone(),
-                span: directive_node.source_span(),
-                src: self.named_source()
-            }.into())
+        if generics.is_some() {
+            return Err(SyntaxError {
+                span: node.source_span(),
+                src: self.named_source(),
+                text: "generic unions are not supported yet".to_string()
+            }.into());
         }
-        
+
+        self.scopes.last_mut().unwrap().types.insert(
+            ident.clone(),
+            CometType::new_union(CometUnion::new(ident.clone(), Vec::new()))
+        );
+
+        let mut items = Vec::new();
+        let mut variant_names = HashSet::new();
+        for (i, item_node) in item_nodes.iter().enumerate() {
+            let (item_ident_node, item_names, item_types) = match item_node.node_type() {
+                ASTNodeType::UnionItemDefinition { ident, names, types } => (ident, names, types),
+                _ => unreachable!()
+            };
+
+            let item_ident = match item_ident_node.node_type() {
+                ASTNodeType::IdentifierLiteral(v) => v,
+                _ => unreachable!()
+            };
+
+            if !variant_names.insert(item_ident.clone()) {
+                return Err(SyntaxError {
+                    span: item_ident_node.source_span(),
+                    src: self.named_source(),
+                    text: format!("variant '{}' is declared more than once", item_ident)
+                }.into());
+            }
+
+            let mut fields = Vec::new();
+            let mut field_names = HashSet::new();
+            for (name_node, type_node) in zip(item_names, item_types) {
+                let field_name = match name_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v,
+                    _ => unreachable!()
+                };
+
+                if !field_names.insert(field_name.clone()) {
+                    return Err(SyntaxError {
+                        span: name_node.source_span(),
+                        src: self.named_source(),
+                        text: format!("payload field '{}' is declared more than once", field_name)
+                    }.into());
+                }
+
+                let comet_field_type = self.get_type_literal_type(type_node)?;
+
+                fields.push((field_name.clone(), comet_field_type));
+            }
+
+            let union_item = CometUnionItem::new(
+                ident.clone(),
+                item_ident.clone(),
+                fields,
+                i as u32
+            );
+
+            items.push(union_item.clone());
+            self.scopes.last_mut().unwrap().types.insert(format!("{}::{}", ident, item_ident), CometType::new_variant(union_item));
+
+        }
+
+        let new_union = CometUnion::new(ident.clone(), items);
+        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_union(new_union));
+
+        Ok(())
     }
 
     fn visit_impl_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
@@ -2221,6 +2781,86 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
+    fn visit_extern_directive(&mut self, name_node: &ASTNode<'a>, type_node: &ASTNode<'a>) -> miette::Result<()> {
+        let name = match name_node.node_type() {
+            ASTNodeType::IdentifierLiteral(value) => value,
+            _ => unreachable!()
+        };
+
+        // make signature
+        let mut sig = self.module.make_signature();
+        let comet_type = self.get_type_literal_type(type_node)?;
+
+        let func_type = match &comet_type.kind {
+            CometTypeKind::Function(v) => v,
+            _ => { return Err(CompilerBug {
+                src: self.named_source(),
+                span: type_node.source_span(),
+                text: String::from("only functions are supported with #extern")
+            }.into()); }
+        };
+
+        if func_type.return_type.cranelift_type != types::INVALID {
+            sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
+        }
+        for arg in &func_type.arg_types {
+            sig.params.push(AbiParam::new(arg.cranelift_type))
+        }
+
+        // make external func with new sig
+        let ext_func_id = self.module
+            .declare_function(name, Linkage::Import, &sig)
+            .unwrap();
+
+        /*let data_id = self.module
+            .declare_data(&format!("{}_var", name), Linkage::Local, true, false)
+            .unwrap();
+
+        let mut data_desc = DataDescription::new();
+        let target_config = self.module.isa().frontend_config();
+        let pointer_size = target_config.pointer_type().bytes() as usize;
+
+        data_desc.define_zeroinit(pointer_size);
+
+        let data_func_ref = self.module.declare_func_in_data(ext_func_id, &mut data_desc);
+        data_desc.write_function_addr(0, data_func_ref);
+
+        self.module.define_data(data_id, &data_desc).unwrap();*/
+
+        self.scopes.last_mut().unwrap().variables.insert(name.clone(), CometVariable {
+            type_: comet_type,
+            var_type: CometVarType::External(ext_func_id),
+            mutable: false,
+            function_id: Some(ext_func_id)
+        });
+
+        Ok(())
+    }
+
+    fn visit_compiler_directive(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+        let (directive_node, name_node, type_node) = match node.node_type() {
+            ASTNodeType::CompilerDirectiveStatement { directive, value_name, value_type } => (directive, value_name, value_type),
+            _ => unreachable!()
+        };
+
+        let directive = match directive_node.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => unreachable!()
+        };
+
+        match directive.as_str() {
+            "extern" => {
+                self.visit_extern_directive(name_node, type_node)
+            },
+            _ => Err(InvalidCompilerDirective {
+                directive: directive.clone(),
+                span: directive_node.source_span(),
+                src: self.named_source()
+            }.into())
+        }
+
+    }
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &ASTNode<'a>, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
@@ -2228,20 +2868,21 @@ impl <'a> Compiler <'a> {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },
             ASTNodeType::Block(_) => { return self.visit_block(ast, builder.unwrap()); },
 
-            ASTNodeType::FuncDefinitionStatement {name: _, args: _, return_type: _, body: _ } => { return self.visit_func_def(ast); },
+            ASTNodeType::FuncDefinitionStatement { .. } => { return self.visit_func_def(ast); },
             ASTNodeType::ExpressionStatement(_) => { return self.visit_expression_statement(ast, builder.unwrap()); },
             ASTNodeType::ReturnStatement(_) => { return self.visit_ret_statement(ast, builder.unwrap()); }
-            ASTNodeType::AssignStatement { ident: _, type_: _, value: _ } => { return self.visit_assign_statement(ast, builder.unwrap()); }
-            ASTNodeType::MatchStatement { expr: _, nodes: _, default: _ } => { return self.visit_match_statement(ast, builder.unwrap()); },
-            ASTNodeType::IfStatement { expr: _, body: _, else_body: _ } => { return self.visit_if_statement(ast, builder.unwrap()) },
-            ASTNodeType::WhileStatement { expr: _, body: _ } => { return self.visit_while_statement(ast, builder.unwrap()); },
-            ASTNodeType::StructDefinitionStatement { ident: _, fields: _, generics: _ } => {
+            ASTNodeType::AssignStatement { .. } => { return self.visit_assign_statement(ast, builder.unwrap()); }
+            ASTNodeType::MatchStatement { .. } => { return self.visit_match_statement(ast, builder.unwrap()); },
+            ASTNodeType::IfStatement { .. } => { return self.visit_if_statement(ast, builder.unwrap()) },
+            ASTNodeType::WhileStatement { .. } => { return self.visit_while_statement(ast, builder.unwrap()); },
+            ASTNodeType::StructDefinitionStatement { .. } => {
                 self.visit_struct_def_statement(ast)?;
                 return Ok(());
             },
-            ASTNodeType::ImplDefStatement { struct_type: _, functions: _ } => { return self.visit_impl_def_statement(ast); },
+            ASTNodeType::UnionDefinitionStatement { .. } => { return self.visit_union_def_statement(ast); }
+            ASTNodeType::ImplDefStatement { .. } => { return self.visit_impl_def_statement(ast); },
 
-            ASTNodeType::CompilerDirectiveStatement { directive: _, value_name: _, value_type: _ } => { return self.visit_compiler_directive(ast); },
+            ASTNodeType::CompilerDirectiveStatement { .. } => { return self.visit_compiler_directive(ast); },
 
             _ => {
                 Err(CompilerBug {

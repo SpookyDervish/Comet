@@ -4,7 +4,7 @@ use crate::comet_error::{NotAFunction, SyntaxError};
 use crate::precedence::PrecedenceType;
 use crate::range::Range;
 use crate::token::{Token, TokenType};
-use crate::ast::{ASTNode, ASTNodeType, ASTType};
+use crate::ast::{ASTNode, ASTNodeType, ASTType, MatchPattern};
 
 pub struct Parser <'a> {
     tokens: Vec<Token<'a>>,
@@ -152,6 +152,7 @@ impl <'a> Parser <'a> {
             TokenType::While => self.parse_while_statement(),
             TokenType::Struct => self.parse_struct_def_statement(),
             TokenType::Imp => self.parse_impl_block(),
+            TokenType::Union => self.parse_union_def_statement(),
 
             TokenType::Hash => self.parse_compiler_directive(),
 
@@ -281,6 +282,107 @@ impl <'a> Parser <'a> {
         return Ok(generic_types);
     }
 
+    fn parse_qualified(&mut self) -> miette::Result<Vec<ASTNode<'a>>> {
+        // Starts at the first identifier and consumes a qualified name.
+        let mut names = vec![ASTNode::new(
+            ASTNodeType::IdentifierLiteral(
+                self.current_token()
+                    .unwrap()
+                    .token_type()
+                    .as_identifier()
+                    .cloned()
+                    .unwrap()
+            ),
+            self.current_token().unwrap().source_span()
+        )];
+
+        while self.peek_token_is(&TokenType::ColonColon) {
+            self.advance_token(); // skip ::
+
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+
+            names.push(ASTNode::new(
+                ASTNodeType::IdentifierLiteral(
+                    self.current_token()
+                        .unwrap()
+                        .token_type()
+                        .as_identifier()
+                        .cloned()
+                        .unwrap()
+                ),
+                self.current_token().unwrap().source_span()
+            ));
+        }
+
+        Ok(names)
+    }
+
+    fn is_variant_pattern_ahead(&self) -> bool {
+        let mut lookahead = self.token_index;
+
+        if !matches!(
+            self.tokens.get(lookahead).map(|token| token.token_type()),
+            Some(TokenType::Identifier(_))
+        ) {
+            return false;
+        }
+
+        lookahead += 1;
+        let mut is_qualified = false;
+
+        while matches!(
+            self.tokens.get(lookahead).map(|token| token.token_type()),
+            Some(TokenType::ColonColon)
+        ) {
+            is_qualified = true;
+            lookahead += 1;
+
+            if !matches!(
+                self.tokens.get(lookahead).map(|token| token.token_type()),
+                Some(TokenType::Identifier(_))
+            ) {
+                return false;
+            }
+
+            lookahead += 1;
+        }
+
+        is_qualified && matches!(
+            self.tokens.get(lookahead).map(|token| token.token_type()),
+            Some(TokenType::OpenParen)
+        )
+    }
+
+    fn parse_match_pattern(&mut self, nested: bool) -> miette::Result<MatchPattern<'a>> {
+        if !self.is_variant_pattern_ahead() {
+            if nested && self.current_token_is(&TokenType::Identifier(String::new())) {
+                return self.parse_identifier_literal().map(MatchPattern::Binding);
+            }
+            return self.parse_expression(PrecedenceType::Lowest).map(MatchPattern::Expression);
+        }
+
+        let path = self.parse_qualified()?;
+        self.expect_peek(TokenType::OpenParen)?;
+
+        let mut fields = Vec::new();
+        if !self.peek_token_is(&TokenType::CloseParen) {
+            self.advance_token();
+            loop {
+                fields.push(self.parse_match_pattern(true)?);
+
+                if self.peek_token_is(&TokenType::CloseParen) {
+                    break;
+                }
+
+                self.expect_peek(TokenType::Comma)?;
+                self.advance_token();
+            }
+        }
+
+        self.expect_peek(TokenType::CloseParen)?;
+        Ok(MatchPattern::Variant { path, fields })
+    }
+
     fn parse_type(&mut self) -> miette::Result<ASTNode<'a>> {
         let mut range = Range::start(self.current_token().unwrap().pos());
 
@@ -307,19 +409,16 @@ impl <'a> Parser <'a> {
 
             self.expect_peek(TokenType::CloseSquare)?;
         } else {
-            self.expect_peek(TokenType::Identifier(String::new()))?;
+            self.advance_token();
+            let mut names = self.parse_qualified()?;
 
-            let curr = &self.current_token().unwrap();
-
-            let ident_node = ASTNode::new(
-                ASTNodeType::IdentifierLiteral(curr.token_type().as_identifier().cloned().unwrap()),
-                curr.source_span()
-            );
-
-            base_type = ASTType::Identifier(Box::new(ident_node));
+            base_type = if names.len() == 1 {
+                ASTType::Identifier(Box::new(names.pop().unwrap()))
+            } else {
+                ASTType::Qualified(names)
+            };
         }
 
-        
         let generic_types = if self.peek_token_is(&TokenType::Lt) {
             Some(self.parse_generic_instance_types()?)
         } else {
@@ -456,29 +555,24 @@ impl <'a> Parser <'a> {
         let mut default_branch: Option<Box<ASTNode>> = None;
 
         loop {
-            let mut expressions: Vec<ASTNode> = vec![];
+            let mut patterns: Vec<MatchPattern> = vec![];
 
-            // default branch
             if self.current_token_is(&TokenType::Default) {
                 let block = self.parse_block_statement()?;
 
                 default_branch = Some(Box::new(block));
-            } else { // expressions
+            } else {
         
                 let mut expressions_range = Range::start(self.current_token().unwrap().pos());
 
                 loop {
-                    let node_expr = self.parse_expression(PrecedenceType::Lowest)?;
-                    expressions.push(node_expr);
-
-                    
+                    patterns.push(self.parse_match_pattern(false)?);
 
                     if self.peek_token_is(&TokenType::OpenCurly) {
                         break;
                     }
 
                     self.expect_peek(TokenType::Or)?;
-
                     self.advance_token(); // skip 'or'
                 }
 
@@ -486,20 +580,15 @@ impl <'a> Parser <'a> {
 
                 expressions_range.end(self.current_token().unwrap().end_pos());
 
-                nodes.push(ASTNode::new(ASTNodeType::MatchNode { expressions: expressions, block: Box::new(block) }, expressions_range.source_span()));
+                nodes.push(ASTNode::new(ASTNodeType::MatchNode { expressions: patterns, block: Box::new(block) }, expressions_range.source_span()));
 
             }
-
-            
-
-
             
             if self.peek_token_is(&TokenType::CloseCurly) {
                 break;
             }
 
             self.expect_peek(TokenType::Comma)?;
-
             self.advance_token();
         }
 
@@ -661,6 +750,81 @@ impl <'a> Parser <'a> {
         range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::ImplDefStatement { struct_type: Box::new(struct_type), functions: functions }, range.source_span()))
+    }
+
+    fn parse_union_def_statement(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+
+        let ident = self.parse_identifier_literal()?;
+
+        let generic_args = if self.peek_token_is(&TokenType::Lt) {
+            Some(self.parse_generic_def()?)
+        } else {
+            None
+        };
+
+        let mut items = Vec::new();
+
+        self.expect_peek(TokenType::OpenCurly)?;
+
+        while !self.peek_token_is(&TokenType::CloseCurly) {
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+
+            let mut item_range = Range::start(self.current_token().unwrap().pos());
+
+            let ident = self.parse_identifier_literal()?;
+
+
+            let mut item_names = Vec::new();
+            let mut item_types = Vec::new();
+
+            // parse value list
+            if self.peek_token_is(&TokenType::OpenParen) {
+                self.advance_token(); // skip identifier
+                if self.peek_token_is(&TokenType::CloseParen) {
+                    self.advance_token();
+                } else {
+                    self.advance_token(); // skip '(' to the first field
+
+                    loop {
+                        let item_field_name = self.parse_identifier_literal()?;
+                        self.expect_peek(TokenType::Colon)?;
+
+                        let item_field_type = self.parse_type()?;
+
+                        item_names.push(item_field_name);
+                        item_types.push(item_field_type);
+
+                        if self.peek_token_is(&TokenType::Comma) {
+                            self.advance_token();
+                            self.advance_token();
+                            continue;
+                        }
+
+                        self.expect_peek(TokenType::CloseParen)?;
+                        break;
+                    }
+                }
+            }
+
+            item_range.end(self.current_token().unwrap().end_pos());
+            items.push(ASTNode::new(ASTNodeType::UnionItemDefinition { ident: Box::new(ident), names: item_names, types: item_types }, item_range.source_span()));
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            break;
+        }
+
+        self.expect_peek(TokenType::CloseCurly)?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::UnionDefinitionStatement { ident: Box::new(ident), fields: items, generics: generic_args }, range.source_span()))
     }
 
     fn parse_compiler_directive(&mut self) -> miette::Result<ASTNode<'a>> {

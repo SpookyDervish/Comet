@@ -7,7 +7,7 @@ use miette::NamedSource;
 use itertools::Itertools;
 use std::fmt;
 
-use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct};
+use crate::{ast::ASTNode, comet_error::{InvalidCast, TypeMismatch}, comet_struct::CometStruct, comet_union::{CometUnion, CometUnionItem}};
 
 #[derive(Debug)]
 pub struct CometMethod {
@@ -31,6 +31,8 @@ pub struct CometFunction {
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum CometTypeKind {
     Struct(CometStruct),
+    Union(CometUnion),
+    Variant(CometUnionItem),
     Function(CometFunction),
     Scalar(bool),
     Pointer(Box<CometType>),
@@ -75,6 +77,18 @@ impl CometType {
         CometType {
             cranelift_type: types::I64,
             kind: CometTypeKind::Struct(comet_struct)
+        }
+    }
+    pub fn new_union(comet_union: CometUnion) -> Self {
+        CometType {
+            cranelift_type: types::I64,
+            kind: CometTypeKind::Union(comet_union)
+        }
+    }
+    pub fn new_variant(comet_union_item: CometUnionItem) -> Self {
+        CometType {
+            cranelift_type: types::I64,
+            kind: CometTypeKind::Variant(comet_union_item)
         }
     }
     pub fn new_function(comet_function: CometFunction) -> Self {
@@ -146,7 +160,9 @@ impl CometType {
         match &self.kind {
             CometTypeKind::Function(_) |
             CometTypeKind::Scalar(_) |
-            CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
+            CometTypeKind::Pointer(_) |
+            CometTypeKind::Union(_) |
+            CometTypeKind::Variant(_) => self.cranelift_type.bytes(),
             CometTypeKind::Struct(s) => s.get_layout().1,
             CometTypeKind::Array{ base_type, size } => base_type.size() * size,
             CometTypeKind::Generic(_) => 0,
@@ -158,7 +174,9 @@ impl CometType {
         match &self.kind {
             CometTypeKind::Function(_) |
             CometTypeKind::Scalar(_) |
-            CometTypeKind::Pointer(_) => self.cranelift_type.bytes(),
+            CometTypeKind::Pointer(_) |
+            CometTypeKind::Union(_) |
+            CometTypeKind::Variant(_) => self.cranelift_type.bytes(),
             CometTypeKind::Struct(s) => s.get_layout().2,
             CometTypeKind::Array { base_type, .. } => base_type.align(),
             CometTypeKind::Generic(_) => 0,
@@ -262,6 +280,8 @@ impl CometType {
             CometTypeKind::Pointer(t) => format!("p_{}", t),
             CometTypeKind::Scalar(s) => format!("{}{}", self.cranelift_type, if *s {"_s"} else {""}),
             CometTypeKind::Struct(s) => format!("st_{}", s.name()),
+            CometTypeKind::Union(u) => format!("u_{}", u.name()),
+            CometTypeKind::Variant(u) => format!("ui_{}", u.name()),
             CometTypeKind::Array { base_type, .. } => format!("a_{}", base_type.generic_type_name()),
             CometTypeKind::Void => format!("v"),
             CometTypeKind::Unkown => unreachable!()
@@ -291,6 +311,8 @@ impl fmt::Display for CometType {
             },
             CometTypeKind::Pointer(t) => write!(f, "&{}", (*t).to_string()),
             CometTypeKind::Struct(s) => write!(f, "{}{{}}", s.name()),
+            CometTypeKind::Union(u) => write!(f, "{}()", u.name()),
+            CometTypeKind::Variant(v) => write!(f, "{}()", v.name()),
             CometTypeKind::Generic(name) => write!(f, "{}", name),
             CometTypeKind::Array { base_type, size } => write!(f, "{}[{}]", base_type, size),
             CometTypeKind::Void => write!(f, "(none)"),
@@ -335,11 +357,19 @@ impl PartialEq for CometType {
             return (self_elem == other_elem) && (self_size == other_size);
         }
 
-        match &self.kind {
-            CometTypeKind::Pointer(_) => { return self.kind == other.kind; },
-            _ => {}
+        match (&self.kind, &other.kind) {
+            (CometTypeKind::Struct(left), CometTypeKind::Struct(right)) => left.name() == right.name(),
+            (CometTypeKind::Union(left), CometTypeKind::Union(right)) => left.name() == right.name(),
+            (CometTypeKind::Variant(left), CometTypeKind::Variant(right)) => {
+                left.union_name() == right.union_name() && left.name() == right.name()
+            }
+            (CometTypeKind::Pointer(left), CometTypeKind::Pointer(right)) => left == right,
+            (CometTypeKind::Function(left), CometTypeKind::Function(right)) => left == right,
+            (CometTypeKind::Array { base_type: left, size: left_size }, CometTypeKind::Array { base_type: right, size: right_size }) => {
+                left == right && left_size == right_size
+            }
+            (CometTypeKind::Void, CometTypeKind::Void) => true,
+            _ => false
         }
-
-        false
     }
 }

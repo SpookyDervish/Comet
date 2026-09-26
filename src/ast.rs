@@ -8,7 +8,15 @@ pub enum ASTType<'a> {
     Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } ,
     Pointer(Box<ASTNode<'a>>),
     Array(Box<ASTNode<'a>>, Box<ASTNode<'a>>),
+    Qualified(Vec<ASTNode<'a>>)
     
+}
+
+#[derive(Debug, Clone)]
+pub enum MatchPattern <'a> {
+    Expression(ASTNode<'a>),
+    Binding(ASTNode<'a>),
+    Variant { path: Vec<ASTNode<'a>>, fields: Vec<MatchPattern<'a>> }
 }
 
 // TODO: use an arena allocator instead of heap allocating all the nodes
@@ -18,9 +26,11 @@ pub enum ASTNodeType<'a> {
     Block(Vec<ASTNode<'a>>),
 
     FuncArgDefinition { name: Box<ASTNode<'a>>, type_: Box<ASTNode<'a>> },
-    MatchNode { expressions: Vec<ASTNode<'a>>, block: Box<ASTNode<'a>> },
+    MatchNode { expressions: Vec<MatchPattern<'a>>, block: Box<ASTNode<'a>> },
     StructFieldDefinition { ident: Box<ASTNode<'a>>, type_: Box<ASTNode<'a>> },
     StructField { ident: Box<ASTNode<'a>>, value: Box<ASTNode<'a>> },
+    UnionItemDefinition { ident: Box<ASTNode<'a>>, names: Vec<ASTNode<'a>>, types: Vec<ASTNode<'a>> },
+    VariantBinding { field_ident: Box<ASTNode<'a>>, bind_ident: Box<ASTNode<'a>> },
 
     // statements
     ExpressionStatement(Box<ASTNode<'a>>),
@@ -31,6 +41,7 @@ pub enum ASTNodeType<'a> {
     IfStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>>, else_body: Option<Box<ASTNode<'a>>> },
     WhileStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>> },
     StructDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
+    UnionDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
     CompilerDirectiveStatement { directive: Box<ASTNode<'a>>, value_name: Box<ASTNode<'a>>, value_type: Box<ASTNode<'a>> },
     ImplDefStatement { struct_type: Box<ASTNode<'a>>, functions: Vec<ASTNode<'a>> },
 

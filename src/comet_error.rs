@@ -78,6 +78,19 @@ pub struct UnkownField {
 }
 
 #[derive(Diagnostic, Debug, Error)]
+#[error("UnkownUnionItem")]
+pub struct UnkownUnionItem {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("No item with the name '{item}' exists in the union '{union}'")]
+    pub span: SourceSpan,
+
+    pub item: String,
+    pub union: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
 #[error("InvalidOperator")]
 pub struct InvalidOperator {
     #[source_code]
