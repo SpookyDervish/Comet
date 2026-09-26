@@ -281,7 +281,7 @@ impl CometType {
             CometTypeKind::Scalar(s) => format!("{}{}", self.cranelift_type, if *s {"_s"} else {""}),
             CometTypeKind::Struct(s) => format!("st_{}", s.name()),
             CometTypeKind::Union(u) => format!("u_{}", u.name()),
-            CometTypeKind::Variant(u) => format!("ui_{}", u.name()),
+            CometTypeKind::Variant(v) => format!("v_{}", v.name()),
             CometTypeKind::Array { base_type, .. } => format!("a_{}", base_type.generic_type_name()),
             CometTypeKind::Void => format!("v"),
             CometTypeKind::Unkown => unreachable!()

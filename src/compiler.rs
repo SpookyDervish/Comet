@@ -1869,6 +1869,7 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_ret_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+        println!("{}", builder.func);
         let ret_value_optional = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
@@ -2038,6 +2039,8 @@ impl <'a> Compiler <'a> {
         expected_type: &CometType,
         span: miette::SourceSpan
     ) -> miette::Result<CometUnionItem> {
+
+        // get names, make sure everything in path is an identifier
         let names = path.iter().map(|node| match node.node_type() {
             ASTNodeType::IdentifierLiteral(name) => Ok(name.clone()),
             _ => Err(SyntaxError {
@@ -2047,6 +2050,7 @@ impl <'a> Compiler <'a> {
             }),
         }).collect::<Result<Vec<_>, _>>()?;
 
+        // make sure path is even long enough somehow
         if names.len() < 2 {
             return Err(SyntaxError {
                 span,
@@ -2055,12 +2059,17 @@ impl <'a> Compiler <'a> {
             }.into());
         }
 
+        // convert variant name to a string
         let variant_name = names.join("::");
+
+        // get variant type from path string
         let variant_type = self.get_type(&variant_name).ok_or_else(|| UnkownType {
             span: path.last().unwrap().source_span(),
             src: self.named_source(),
             type_: variant_name.clone()
         })?;
+
+        // get item from union variant
         let item = match &variant_type.kind {
             CometTypeKind::Variant(item) => item.clone(),
             _ => {
@@ -2073,6 +2082,7 @@ impl <'a> Compiler <'a> {
             }
         };
 
+        // expect either another union or a variant
         let expected_union = match &expected_type.kind {
             CometTypeKind::Union(union) => union.name().as_str(),
             CometTypeKind::Variant(variant) => variant.union_name(),
@@ -2086,6 +2096,7 @@ impl <'a> Compiler <'a> {
             }
         };
 
+        // make sure the item is the write name
         if item.union_name() != expected_union {
             return Err(TypeMismatch {
                 expected: expected_union.to_string(),
@@ -2098,6 +2109,9 @@ impl <'a> Compiler <'a> {
         Ok(item)
     }
 
+    /*
+    Recursively checks that each pattern belongs to the given union.
+     */
     fn collect_pattern_bindings(
         &self,
         pattern: &MatchPattern<'a>,
@@ -2118,6 +2132,7 @@ impl <'a> Compiler <'a> {
                 for (index, field_pattern) in fields.iter().enumerate() {
                     let field_type = item.field_type_at(index).unwrap();
                     match field_pattern {
+                        // go through names and add to scope
                         MatchPattern::Binding(binding) => {
                             let name = match binding.node_type() {
                                 ASTNodeType::IdentifierLiteral(name) => name,
@@ -2128,6 +2143,7 @@ impl <'a> Compiler <'a> {
                             }
                         }
                         MatchPattern::Variant { .. } => {
+                            // visit inner node
                             bindings.extend(self.collect_pattern_bindings(field_pattern, field_type)?);
                         }
                         MatchPattern::Expression(expression) => {
@@ -2159,10 +2175,16 @@ impl <'a> Compiler <'a> {
         failed_block: Block,
         builder: &mut FunctionBuilder
     ) -> miette::Result<()> {
+
+        /* emit code for the switch branch that handles a variant */
+
+        // get path and fields
         let (path, fields) = match pattern {
             MatchPattern::Variant { path, fields } => (path, fields),
             _ => unreachable!()
         };
+
+        // get item
         let item = self.pattern_variant_item(path, value_type, path[0].source_span())?;
         let nested_fields = fields.iter().enumerate().filter_map(|(index, field_pattern)| {
             match field_pattern {
@@ -2171,16 +2193,19 @@ impl <'a> Compiler <'a> {
             }
         }).collect::<Vec<_>>();
 
+        // get the discriminant
         let discriminant = builder.ins().load(types::I32, MemFlagsData::new(), value, 0);
         let is_variant = builder.ins().icmp_imm_s(IntCC::Equal, discriminant, item.discriminant() as i64);
         let current_block = builder.current_block().unwrap();
 
+        // if the variant has no nested fields just chec the discriminant matches
         if nested_fields.is_empty() {
             builder.ins().brif(is_variant, matched_block, &[], failed_block, &[]);
             builder.seal_block(current_block);
             return Ok(());
         }
 
+        // check the discriminant matches, if it does then go to the nested checks
         let nested_check_block = builder.create_block();
         builder.ins().brif(is_variant, nested_check_block, &[], failed_block, &[]);
         builder.seal_block(current_block);
@@ -2216,12 +2241,16 @@ impl <'a> Compiler <'a> {
         variables: &HashMap<String, (Variable, CometType)>,
         builder: &mut FunctionBuilder
     ) -> miette::Result<()> {
+        /* define variables for a pattern */
+
+        // get the patha nd itme
         let (path, fields) = match pattern {
             MatchPattern::Variant { path, fields } => (path, fields),
             _ => unreachable!()
         };
         let item = self.pattern_variant_item(path, value_type, path[0].source_span())?;
 
+        // go through each field in the pattern
         for (index, field_pattern) in fields.iter().enumerate() {
             let field_name = item.field_name_at(index).unwrap();
             let field_type = item.field_type_at(index).unwrap().clone();
@@ -2229,6 +2258,7 @@ impl <'a> Compiler <'a> {
             let field_address = builder.ins().iadd_imm_s(value, field_offset as i64);
             let field_value = builder.ins().load(field_type.cranelift_type, MemFlagsData::new(), field_address, 0);
 
+            // define a variable for each field
             match field_pattern {
                 MatchPattern::Binding(binding) => {
                     let name = match binding.node_type() {
@@ -2261,6 +2291,7 @@ impl <'a> Compiler <'a> {
     }
 
     fn pattern_is_unconditional_variant(pattern: &MatchPattern<'a>) -> bool {
+        /* returns true if a variant carries no data */
         match pattern {
             MatchPattern::Variant { fields, .. } => fields.iter().all(|field| matches!(field, MatchPattern::Binding(_))),
             _ => false
@@ -2291,6 +2322,8 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
+        // build scrutinee type and value. for a union, `expr` is the address
+        // of its storage
         let scrutinee_type = self.resolve_type(expr_node)?;
         let expr = self.visit_value(expr_node, builder)?;
         let union = match &scrutinee_type.kind {
@@ -2302,6 +2335,7 @@ impl <'a> Compiler <'a> {
         let mut completely_covered = HashSet::new();
         let mut seen_patterns = HashSet::new();
 
+        // do a check of each arm first
         for match_node in match_nodes {
             let patterns = match match_node.node_type() {
                 ASTNodeType::MatchNode { expressions, .. } => expressions,
@@ -2320,6 +2354,8 @@ impl <'a> Compiler <'a> {
                     }
                 }
 
+                // if we're checking a union then each union arm must be
+                // checking a pattern, not an expression
                 if union.is_some() && !matches!(pattern, MatchPattern::Variant { .. }) {
                     return Err(SyntaxError {
                         span: match_node.source_span(),
@@ -2328,8 +2364,11 @@ impl <'a> Compiler <'a> {
                     }.into());
                 }
 
+                // get bindings, adding each name
                 let signature = self.collect_pattern_bindings(pattern, &scrutinee_type)?;
                 let mut names = HashSet::new();
+
+                // check for duplicate binding names
                 for (name, _) in &signature {
                     if !names.insert(name.clone()) {
                         return Err(SyntaxError {
@@ -2352,8 +2391,11 @@ impl <'a> Compiler <'a> {
                     arm_signature = Some(signature);
                 }
 
+                // go through patterns with no data
                 if Self::pattern_is_unconditional_variant(pattern) {
                     if let MatchPattern::Variant { path, .. } = pattern {
+
+                        // get item from path
                         let item = self.pattern_variant_item(path, &scrutinee_type, path[0].source_span())?;
                         if !completely_covered.insert(item.discriminant()) {
                             return Err(SyntaxError {
@@ -2369,6 +2411,8 @@ impl <'a> Compiler <'a> {
             binding_signatures.push(arm_signature.unwrap_or_default());
         }
 
+        // if the union exists and there is no default branch, make sure there
+        // is enough branches to cover all variants
         if let Some(union) = &union {
             if default_branch.is_none() && completely_covered.len() != union.items().len() {
                 let missing = union.items().iter()
@@ -2384,6 +2428,7 @@ impl <'a> Compiler <'a> {
             }
         }
 
+        // go through usual match statement logic for non variants
         let end_block = builder.create_block();
         let default_block = default_branch.as_ref().map(|_| builder.create_block());
         let mut compare_block = builder.current_block().unwrap();
@@ -2418,6 +2463,7 @@ impl <'a> Compiler <'a> {
 
                 match pattern {
                     MatchPattern::Variant { .. } => {
+                        // if its a variant do something special for that
                         self.emit_variant_match_branch(pattern, expr, &scrutinee_type, pattern_block, failed_block, builder)?;
                     }
                     MatchPattern::Expression(value_node) => {
@@ -2441,6 +2487,8 @@ impl <'a> Compiler <'a> {
                 }
 
                 builder.switch_to_block(pattern_block);
+
+                // if the pattern is a variant then define all its field variables
                 if matches!(pattern, MatchPattern::Variant { .. }) {
                     self.bind_variant_pattern(pattern, expr, &scrutinee_type, &variables, builder)?;
                 }
@@ -2812,21 +2860,6 @@ impl <'a> Compiler <'a> {
         let ext_func_id = self.module
             .declare_function(name, Linkage::Import, &sig)
             .unwrap();
-
-        /*let data_id = self.module
-            .declare_data(&format!("{}_var", name), Linkage::Local, true, false)
-            .unwrap();
-
-        let mut data_desc = DataDescription::new();
-        let target_config = self.module.isa().frontend_config();
-        let pointer_size = target_config.pointer_type().bytes() as usize;
-
-        data_desc.define_zeroinit(pointer_size);
-
-        let data_func_ref = self.module.declare_func_in_data(ext_func_id, &mut data_desc);
-        data_desc.write_function_addr(0, data_func_ref);
-
-        self.module.define_data(data_id, &data_desc).unwrap();*/
 
         self.scopes.last_mut().unwrap().variables.insert(name.clone(), CometVariable {
             type_: comet_type,
