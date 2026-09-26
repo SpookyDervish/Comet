@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift_frontend::Variable;
 use cranelift_module::FuncId;
 
-use crate::{ast::ASTNode, comet_struct::CometStruct, comet_type::CometType};
+use crate::{ast::ASTNode, comet_type::CometType};
 
 #[derive(Debug)]
 pub enum CometVarType {

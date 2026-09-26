@@ -463,7 +463,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_get_union_item(&mut self, left: &ASTNode<'a>, right: &ASTNode<'a>, union: &CometUnion) -> miette::Result<CometType> {
+    fn visit_get_union_item(&mut self, _left: &ASTNode<'a>, right: &ASTNode<'a>, union: &CometUnion) -> miette::Result<CometType> {
         let right_ident = match right.node_type() {
             ASTNodeType::IdentifierLiteral(v) => v,
             _ => { return Err(SyntaxError {
