@@ -210,3 +210,15 @@ pub struct EmptyArrayLiteral {
     #[label("Cannot have an empty array literal")]
     pub span: SourceSpan,
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("NotImplemented")]
+pub struct NotImplemented {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("{text} is not implemented")]
+    pub span: SourceSpan,
+
+    pub text: String
+}

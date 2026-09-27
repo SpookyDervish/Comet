@@ -1,4 +1,5 @@
 use miette::{SourceOffset, SourceSpan};
+use itertools::Itertools;
 
 use crate::token::Token;
 
@@ -30,7 +31,7 @@ pub enum ASTNodeType<'a> {
     StructFieldDefinition { ident: Box<ASTNode<'a>>, type_: Box<ASTNode<'a>> },
     StructField { ident: Box<ASTNode<'a>>, value: Box<ASTNode<'a>> },
     UnionItemDefinition { ident: Box<ASTNode<'a>>, names: Vec<ASTNode<'a>>, types: Vec<ASTNode<'a>> },
-    VariantBinding { field_ident: Box<ASTNode<'a>>, bind_ident: Box<ASTNode<'a>> },
+    QualifierNode { ident: Box<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
 
     // statements
     ExpressionStatement(Box<ASTNode<'a>>),

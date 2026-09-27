@@ -32,10 +32,6 @@ impl <'a> Parser <'a> {
         self.token_index += 1;
     }
 
-    fn step_back_token(&mut self) {
-        self.token_index -= 1;
-    }
-
     fn peek_token_is(&self, token_type: &TokenType) -> bool {
         return self.peek_token().is_some() && (std::mem::discriminant(self.peek_token().unwrap().token_type()) == std::mem::discriminant(token_type));
     }
@@ -284,24 +280,12 @@ impl <'a> Parser <'a> {
 
     fn parse_qualified(&mut self) -> miette::Result<Vec<ASTNode<'a>>> {
         // Starts at the first identifier and consumes a qualified name.
-        let mut names = vec![ASTNode::new(
-            ASTNodeType::IdentifierLiteral(
-                self.current_token()
-                    .unwrap()
-                    .token_type()
-                    .as_identifier()
-                    .cloned()
-                    .unwrap()
-            ),
-            self.current_token().unwrap().source_span()
-        )];
+        let mut names = vec![];
+        loop {
+            
+            let mut range = Range::start(self.current_token().unwrap().pos());
 
-        while self.peek_token_is(&TokenType::ColonColon) {
-            self.advance_token(); // skip ::
-
-            self.expect_peek(TokenType::Identifier(String::new()))?;
-
-            names.push(ASTNode::new(
+            let name = ASTNode::new(
                 ASTNodeType::IdentifierLiteral(
                     self.current_token()
                         .unwrap()
@@ -311,7 +295,24 @@ impl <'a> Parser <'a> {
                         .unwrap()
                 ),
                 self.current_token().unwrap().source_span()
-            ));
+            );
+
+            let mut generics = None;
+            if self.peek_token_is(&TokenType::Lt) {
+                generics = Some(self.parse_generic_instance_types()?);
+            }
+
+            range.end(self.current_token().unwrap().end_pos());
+
+            names.push(ASTNode::new(ASTNodeType::QualifierNode { ident: Box::new(name), generics: generics }, range.source_span()));
+
+            if self.peek_token_is(&TokenType::ColonColon) {
+                self.advance_token(); // skip ::
+                self.expect_peek(TokenType::Identifier(String::new()))?;
+                continue;
+            }
+
+            break;
         }
 
         Ok(names)

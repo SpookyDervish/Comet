@@ -7,9 +7,10 @@ use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::collections::{HashMap, HashSet};
 use std::iter::zip;
+use itertools::Itertools;
 
-use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem};
+use crate::ast::{self, ASTType};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, NotImplemented, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::comet_union::{CometUnion, CometUnionItem};
@@ -22,7 +23,7 @@ pub struct Compiler <'a> {
 
     scopes: Vec<ScopeFrame<'a>>,
     methods: HashMap<(String, String), CometMethod>,
-    resolved_generics: HashMap<String, CometStruct>,
+    resolved_generics: HashMap<String, CometType>,
 
     generic_impls: Vec<ASTNode<'a>>,
 
@@ -244,31 +245,29 @@ impl <'a> Compiler <'a> {
 
     fn get_generic_type_literal_type<'b>(
         &mut self,
-        ast_type: &ASTType<'b>,
-        ast_type_node: &ASTNode,
+        type_name_node: &ASTNode<'b>,
         generic_types: &[ASTNode<'b>]
     ) -> miette::Result<CometType> {
-        let struct_name_node = match ast_type {
-            ASTType::Identifier(struct_name_node) => struct_name_node,
-            _ => { return Err(SyntaxError {
-                span: ast_type_node.source_span(),
+        let type_name = match type_name_node.node_type() {
+            ASTNodeType::QualifierNode { ident, .. } => {
+                match ident.node_type() {
+                    ASTNodeType::IdentifierLiteral(name) => name,
+                    _ => unreachable!(),
+                }
+            }
+
+            _ => unreachable!(),
+        };
+
+        let mut type_template = self.get_generic(type_name)
+            .ok_or_else(|| UnkownType {
+                span: type_name_node.source_span(),
                 src: self.named_source(),
-                text: "expected identifier".to_string()
-            }.into()) }
-        };
+                type_: type_name.clone(),
+            })?
+            .clone();
 
-        let struct_name = match struct_name_node.node_type() {
-            ASTNodeType::IdentifierLiteral(struct_name) => struct_name,
-            _ => unreachable!()
-        };
-
-        let mut struct_template = self.get_generic(struct_name).ok_or_else(|| UnkownType {
-            span: ast_type_node.source_span(),
-            src: self.named_source(),
-            type_: struct_name.clone()
-        })?.clone();
-
-        let generic_names: Vec<String> = match struct_template.node_type_mut() {
+        let generic_names: Vec<String> = match type_template.node_type_mut() {
             ASTNodeType::StructDefinitionStatement { ident: _, fields: _, generics } => { 
                 let generic_names = generics
                 .as_ref()
@@ -283,7 +282,22 @@ impl <'a> Compiler <'a> {
                 *generics = None;
 
                 generic_names
-            }
+            },
+            ASTNodeType::UnionDefinitionStatement { ident: _, fields: _, generics } => {
+                let generic_names = generics
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|generic_node| match generic_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v.clone(),
+                    _ => unreachable!()
+                })
+                .collect();
+
+                *generics = None;
+
+                generic_names
+            },
             _ => unreachable!()
         };
 
@@ -294,10 +308,19 @@ impl <'a> Compiler <'a> {
             .map(|t| self.get_type_literal_type(t))
             .collect::<miette::Result<Vec<_>>>()?;
 
-        let existing_struct_name = CometStruct::get_mangled_name(struct_name, &resolved_generic_types);
-        let existing_struct = self.resolved_generics.get(&existing_struct_name);
-        if existing_struct.is_some() {
-            return Ok(CometType::new_struct(existing_struct.unwrap().clone()));
+        let existing_type_name = match type_template.node_type() {
+            ASTNodeType::StructDefinitionStatement { .. } => {
+                CometStruct::get_mangled_name(&type_name, &resolved_generic_types)
+            }
+            ASTNodeType::UnionDefinitionStatement { .. } => {
+                CometUnion::get_mangled_name(&type_name, &resolved_generic_types)
+            },
+            _ => unreachable!()
+        };
+
+        let existing_generic = self.resolved_generics.get(&existing_type_name);
+        if existing_generic.is_some() {
+            return Ok(existing_generic.unwrap().clone());
         }
 
         for (i, generic_name) in generic_names.iter().enumerate() {
@@ -307,17 +330,72 @@ impl <'a> Compiler <'a> {
             );
         }
 
+        
+        match type_template.node_type() {
+            ASTNodeType::StructDefinitionStatement { .. } => {
+                let mut struct_result = self.visit_struct_def_statement(&type_template)?.unwrap();
+                struct_result.mangle_name(&resolved_generic_types);
 
-        let mut struct_result = self.visit_struct_def_statement(&struct_template)?.unwrap();
-        struct_result.mangle_name(&resolved_generic_types);
+                self.instantiate_generic_impls(&type_name, &resolved_generic_types, &struct_result)?;
 
-        self.resolved_generics.insert(struct_result.name().to_string(), struct_result.clone());
+                let new_type = CometType::new_struct(struct_result.clone());
+                self.resolved_generics.insert(struct_result.name().to_string(), new_type.clone());
 
-        self.instantiate_generic_impls(struct_name, &resolved_generic_types, &struct_result)?;
+                self.scopes.pop();
 
-        self.scopes.pop();
+                Ok(new_type)
+            },
+            ASTNodeType::UnionDefinitionStatement { .. } => {
+                println!("hi mangled name is {}", existing_type_name);
+                let union_result = self.visit_union_def_statement(&type_template, Some(&resolved_generic_types))?.unwrap();
+                //union_result.mangle_name(&resolved_generic_types);
 
-        Ok(CometType::new_struct(struct_result))
+                let union_name = union_result.name().to_string();
+                let new_type = CometType::new_union(union_result);
+                self.resolved_generics.insert(union_name.clone(), new_type.clone());
+
+                self.scopes.pop();
+
+                self.scopes.last_mut().unwrap().types.insert(union_name, new_type.clone());
+
+                
+
+                Ok(new_type)
+            },
+            _ => unreachable!()
+        }
+        
+
+        
+    }
+
+
+    fn qualified_name <'b> (&mut self, node: &ASTNode<'b>) -> miette::Result<String> {
+        match node.node_type() {
+            ASTNodeType::QualifierNode { ident: ident_node, generics } => {
+                let ident = match ident_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v,
+                    _ => unreachable!()
+                };
+                
+                let generics_string = if (&generics).is_some() {
+                    generics
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|g| self.get_type_literal_type(g))
+                        .collect::<miette::Result<Vec<CometType>>>()?
+                        .iter()
+                        .format("_")
+                        .to_string()
+                } else {
+                    String::new()
+                };
+
+                Ok(format!("{}{}", ident, if generics_string.is_empty() { String::new() } else { format!("_{}", generics_string) }))
+            },
+            _ => unreachable!()
+        }
     }
 
     fn get_type_literal_type<'b> (&mut self, node: &ASTNode<'b>) -> miette::Result<CometType> {
@@ -329,20 +407,17 @@ impl <'a> Compiler <'a> {
         };
 
         if generic_types.is_some() {
-            return self.get_generic_type_literal_type(ast_type, node, generic_types.as_ref().unwrap());
+            return self.get_generic_type_literal_type(node, generic_types.as_ref().unwrap());
         }
 
         match ast_type {
             ASTType::Identifier(struct_name) => {
-                let ident_node = match struct_name.as_ref().node_type() {
-                    ASTNodeType::IdentifierLiteral(value) => value,
-                    _ => unreachable!()
-                };
+                let ident = self.qualified_name(struct_name)?;
 
-                self.get_type(ident_node.as_str()).cloned().ok_or(UnkownType {
+                self.get_type(&ident).cloned().ok_or(UnkownType {
                     span: struct_name.source_span(),
                     src: self.named_source(),
-                    type_: ident_node.clone()
+                    type_: ident
                 }.into())
             },
 
@@ -382,21 +457,109 @@ impl <'a> Compiler <'a> {
             }
 
             ASTType::Qualified(names) => {
-                let path = names
-                    .iter()
-                    .map(|node| match node.node_type() {
-                        ASTNodeType::IdentifierLiteral(name) => name.clone(),
-                        _ => unreachable!(),
-                    })
-                    .collect::<Vec<_>>();
-
-                self.get_type(&path.join("::"))
-                    .cloned()
-                    .ok_or(UnkownType {
+                if names.is_empty() {
+                    return Err(SyntaxError {
                         span: node.source_span(),
                         src: self.named_source(),
-                        type_: path.join("::"),
-                    }.into())
+                        text: "empty qualified type".to_string()
+                    }.into());
+                }
+
+                // The first component is the type itself.
+                //
+                // Test<u64>::Hi
+                // ^^^^^^^^^
+                let first = &names[0];
+
+                let mut current_type = match first.node_type() {
+                    ASTNodeType::QualifierNode { generics, .. } => {
+                        if let Some(generic_types) = generics {
+                            println!("resolving generic");
+                            // Resolve Test<u64>
+                            self.get_generic_type_literal_type(
+                                first,
+                                generic_types
+                            )?
+                        } else {
+                            // Resolve a non-generic Test
+                            let ident = self.qualified_name(first)?;
+
+                            self.get_type(&ident)
+                                .cloned()
+                                .ok_or_else(|| UnkownType {
+                                    span: first.source_span(),
+                                    src: self.named_source(),
+                                    type_: ident
+                                })?
+                        }
+                    }
+
+                    _ => {
+                        return Err(SyntaxError {
+                            span: first.source_span(),
+                            src: self.named_source(),
+                            text: "expected type identifier".to_string()
+                        }.into());
+                    }
+                };
+
+                // Resolve the remaining qualified components.
+                //
+                // Test<u64>::Hi
+                //            ^^
+                for name in names.iter().skip(1) {
+                    let ident = match name.node_type() {
+                        ASTNodeType::QualifierNode { ident, generics } => {
+                            if generics.is_some() {
+                                return Err(SyntaxError {
+                                    span: name.source_span(),
+                                    src: self.named_source(),
+                                    text: "generic arguments are not allowed here".to_string()
+                                }.into());
+                            }
+
+                            match ident.node_type() {
+                                ASTNodeType::IdentifierLiteral(v) => v,
+                                _ => unreachable!()
+                            }
+                        }
+
+                        ASTNodeType::IdentifierLiteral(v) => v,
+
+                        _ => {
+                            return Err(SyntaxError {
+                                span: name.source_span(),
+                                src: self.named_source(),
+                                text: "expected identifier".to_string()
+                            }.into());
+                        }
+                    };
+
+                    current_type = match current_type.kind {
+                        CometTypeKind::Union(union) => {
+                            let item = union.get_item(ident)
+                                .ok_or_else(|| UnkownUnionItem {
+                                    item: ident.clone(),
+                                    span: name.source_span(),
+                                    src: self.named_source(),
+                                    union: union.name().clone()
+                                })?;
+
+                            CometType::new_variant(item.clone())
+                        }
+
+                        _ => {
+                            return Err(InvalidOperator {
+                                op: TokenType::ColonColon,
+                                span: name.source_span(),
+                                src: self.named_source(),
+                                value: String::from("on non-union type")
+                            }.into());
+                        }
+                    };
+                }
+
+                Ok(current_type)
             }
         }
         
@@ -681,12 +844,17 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::NewInstanceExpression { type_, fields: _ } => {
                 let struct_type = self.get_type_literal_type(type_)?;
+
                 match &struct_type.kind {
-                    CometTypeKind::Variant(item) => self.get_type(item.union_name()).cloned().ok_or_else(|| CompilerBug {
-                        span: type_.source_span(),
-                        src: self.named_source(),
-                        text: format!("union '{}' is missing from the type environment", item.union_name())
-                    }.into()),
+                    CometTypeKind::Variant(item) => {
+
+                        println!("{}", item.union_name());
+                        self.get_type(item.union_name()).cloned().ok_or_else(|| CompilerBug {
+                            span: type_.source_span(),
+                            src: self.named_source(),
+                            text: format!("union '{}' is missing from the type environment", item.union_name())
+                        }.into())
+                    },
                     _ => Ok(struct_type),
                 }
             }
@@ -2676,23 +2844,30 @@ impl <'a> Compiler <'a> {
         Ok(Some(new_struct))
     }
 
-    fn visit_union_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_union_def_statement(&mut self, node: &ASTNode<'a>, resolved_generics: Option<&Vec<CometType>>) -> miette::Result<Option<CometUnion>> {
         let (ident_node, item_nodes, generics) = match node.node_type() {
             ASTNodeType::UnionDefinitionStatement { ident, fields, generics } => (ident, fields, generics),
             _ => unreachable!()
         };
 
-        let ident = match ident_node.node_type() {
+        let union_name = match ident_node.node_type() {
             ASTNodeType::IdentifierLiteral(v) => v,
             _ => unreachable!()
         };
 
+        println!("{:#?}", resolved_generics);
+        let ident = if resolved_generics.is_some() {
+            &CometUnion::get_mangled_name(union_name, resolved_generics.unwrap())
+        } else {
+            union_name
+        };
+
+        println!("new ident: {}, generics: {:?}", ident, generics);
+
         if generics.is_some() {
-            return Err(SyntaxError {
-                span: node.source_span(),
-                src: self.named_source(),
-                text: "generic unions are not supported yet".to_string()
-            }.into());
+            let generic_template = node.clone();
+            self.scopes.last_mut().unwrap().generics.insert(ident.clone(), generic_template);
+            return Ok(None);
         }
 
         self.scopes.last_mut().unwrap().types.insert(
@@ -2750,14 +2925,17 @@ impl <'a> Compiler <'a> {
             );
 
             items.push(union_item.clone());
+            println!("declaring union item");
             self.scopes.last_mut().unwrap().types.insert(format!("{}::{}", ident, item_ident), CometType::new_variant(union_item));
+            
 
         }
 
         let new_union = CometUnion::new(ident.clone(), items);
-        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_union(new_union));
+        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_union(new_union.clone()));
+        println!("{:#?}", self.scopes.last().unwrap().types);
 
-        Ok(())
+        Ok(Some(new_union))
     }
 
     fn visit_impl_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
@@ -2914,7 +3092,10 @@ impl <'a> Compiler <'a> {
                 self.visit_struct_def_statement(ast)?;
                 return Ok(());
             },
-            ASTNodeType::UnionDefinitionStatement { .. } => { return self.visit_union_def_statement(ast); }
+            ASTNodeType::UnionDefinitionStatement { .. } => {
+                self.visit_union_def_statement(ast, None)?;
+                return Ok(());
+            }
             ASTNodeType::ImplDefStatement { .. } => { return self.visit_impl_def_statement(ast); },
 
             ASTNodeType::CompilerDirectiveStatement { .. } => { return self.visit_compiler_directive(ast); },
