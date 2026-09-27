@@ -346,9 +346,7 @@ impl <'a> Compiler <'a> {
                 Ok(new_type)
             },
             ASTNodeType::UnionDefinitionStatement { .. } => {
-                println!("hi mangled name is {}", existing_type_name);
                 let union_result = self.visit_union_def_statement(&type_template, Some(&resolved_generic_types))?.unwrap();
-                //union_result.mangle_name(&resolved_generic_types);
 
                 let union_name = union_result.name().to_string();
                 let new_type = CometType::new_union(union_result);
@@ -474,7 +472,6 @@ impl <'a> Compiler <'a> {
                 let mut current_type = match first.node_type() {
                     ASTNodeType::QualifierNode { generics, .. } => {
                         if let Some(generic_types) = generics {
-                            println!("resolving generic");
                             // Resolve Test<u64>
                             self.get_generic_type_literal_type(
                                 first,
@@ -848,7 +845,6 @@ impl <'a> Compiler <'a> {
                 match &struct_type.kind {
                     CometTypeKind::Variant(item) => {
 
-                        println!("{}", item.union_name());
                         self.get_type(item.union_name()).cloned().ok_or_else(|| CompilerBug {
                             span: type_.source_span(),
                             src: self.named_source(),
@@ -2211,11 +2207,16 @@ impl <'a> Compiler <'a> {
 
         // get names, make sure everything in path is an identifier
         let names = path.iter().map(|node| match node.node_type() {
-            ASTNodeType::IdentifierLiteral(name) => Ok(name.clone()),
+            ASTNodeType::QualifierNode { ident: ident_node, .. } => {
+                match ident_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(name) => Ok(name.clone()),
+                    _ => unreachable!()
+                }
+            },
             _ => Err(SyntaxError {
                 span: node.source_span(),
                 src: self.named_source(),
-                text: "expected identifier in variant path".to_string()
+                text: "expected qualifier in variant path".to_string()
             }),
         }).collect::<Result<Vec<_>, _>>()?;
 
@@ -2855,14 +2856,11 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
-        println!("{:#?}", resolved_generics);
         let ident = if resolved_generics.is_some() {
             &CometUnion::get_mangled_name(union_name, resolved_generics.unwrap())
         } else {
             union_name
         };
-
-        println!("new ident: {}, generics: {:?}", ident, generics);
 
         if generics.is_some() {
             let generic_template = node.clone();
@@ -2925,7 +2923,6 @@ impl <'a> Compiler <'a> {
             );
 
             items.push(union_item.clone());
-            println!("declaring union item");
             self.scopes.last_mut().unwrap().types.insert(format!("{}::{}", ident, item_ident), CometType::new_variant(union_item));
             
 
@@ -2933,7 +2930,6 @@ impl <'a> Compiler <'a> {
 
         let new_union = CometUnion::new(ident.clone(), items);
         self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_union(new_union.clone()));
-        println!("{:#?}", self.scopes.last().unwrap().types);
 
         Ok(Some(new_union))
     }
