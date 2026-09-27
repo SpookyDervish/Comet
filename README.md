@@ -38,28 +38,27 @@ Any systems supported by the Cranelift backend can be compiled for. This include
   - [ ] Package manager
 - [x] Functions
   - [x] Returning
-  - [ ] Inline functions
-- [ ] Structs
-  - [ ] Struct definition
-    - [x] Fields
-      - [ ] Private/protected/readonly
-      - [x] Accessing / setting fields
-    - [x] Methods
-    - [x] Constructor
+  - [x] Inline functions
+- [ ] Datatypes
+    - [ ] Structs
+        - [x] Fields
+        - [ ] Private/protected/readonly
+        - [x] Accessing / setting fields
+        - [x] Impl blocks (methods)
+        - [x] Constructor
+        - [x] Generic structs
+    - [ ] Tagged unions
+        - [x] Creation
+        - [x] Pattern matching
+        - [ ] Generic unions
+            - [x] Creation
+            - [ ] Pattern matching
   - [x] "new" keyword
-  - [x] Calling methods
-  - [ ] Generics
-    - [x] Base generics (creation, type checking, etc...)
-    - [ ] Generic constraints
 - [x] Command line args
 - [x] Arrays
   - [x] Creation
   - [x] Access
   - [x] Changing values
-- [ ] Tagged unions
-  - [ ] Creation
-  - [ ] Pattern matching
-  - [ ] Instantiation of instances
 
 ## Syntax and Creating External Libs
 - Syntax and tutorial: [Comet Website](https://chsp.au/Comet/Comet/docs.html)

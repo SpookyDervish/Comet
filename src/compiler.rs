@@ -1991,21 +1991,31 @@ impl <'a> Compiler <'a> {
         self.scopes.push(ScopeFrame::new());
 
         // generate code
-        let result = (|| {
-            self.compile(body, Some(&mut builder))
-        })();
+        let result = match body.node_type() {
+            ASTNodeType::Block(_) => {
+                self.compile(body, Some(&mut builder))
+            },
+            ASTNodeType::InfixExpression { .. } => {
+                let mut ret_value = self.visit_value(body, &mut builder)?;
+
+                let ret_type = self.resolve_type(body)?;
+                if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
+                    ret_value = CometType::try_implicit_cast(body, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), &mut builder, self.named_source())?;
+                }
+
+                builder.ins().return_(&[ret_value]);
+                Ok(())
+            },
+            _ => unreachable!()
+        };
 
         self.scopes.pop();
         self.current_function = previous_function;
         result?;
 
-        builder.seal_all_blocks();
-
-        
         // finalize func
+        builder.seal_block(builder.current_block().unwrap());
         builder.finalize(target_config);
-
-       
 
         println!("=== BUILT FUNCTION ===\n{}", ctx.func);
 

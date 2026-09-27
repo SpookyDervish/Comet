@@ -147,12 +147,16 @@ impl<'file> Lexer<'file> {
                     let mut range = Range::from(&self.pos);
                     self.consume();
 
-                    if self.current_char != '=' {
-                        tokens.push(Token::new(TokenType::Eq, range, self.pos.clone(), self.pos.clone()));
-                    } else {
+                    if self.current_char == '>' {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::Arrow, range, self.pos.clone(), self.pos.clone()));
+                        self.consume();
+                    } else if self.current_char == '=' {
                         range.end(&self.pos);
                         tokens.push(Token::new(TokenType::EqEq, range, self.pos.clone(), self.pos.clone()));
                         self.consume();
+                    } else {
+                        tokens.push(Token::new(TokenType::Eq, range, self.pos.clone(), self.pos.clone()));
                     }
                     
                     

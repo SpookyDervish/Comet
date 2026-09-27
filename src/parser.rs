@@ -503,8 +503,14 @@ impl <'a> Parser <'a> {
             return_type = Some(Box::new(self.parse_type()?));
         }
 
-        // parse function body
-        let body = self.parse_block_statement()?;
+        // inline functions
+        let body = if self.peek_token_is(&TokenType::Arrow) {
+            self.advance_token();
+            self.advance_token();
+            self.parse_expression(PrecedenceType::Lowest)?
+        } else {
+            self.parse_block_statement()?
+        };
 
         func_range.end(self.current_token().unwrap().end_pos());
 

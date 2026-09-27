@@ -23,7 +23,7 @@ pub enum TokenType {
     OpenSquare, CloseSquare,
     EqEq, NotEq, Gt, Lt, LtEq, GtEq,
     Not,
-    Colon, Comma, ColonColon,
+    Colon, Comma, ColonColon, Arrow,
     Pipe, Ampersand, Caret, Tilde,
     Or, And,
     Hash,
