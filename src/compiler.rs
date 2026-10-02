@@ -3,6 +3,7 @@ use cranelift_codegen::{ir::AbiParam, settings};
 use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
+use cranelift_object::object::ReadCacheOps;
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use miette::NamedSource;
 use std::collections::{HashMap, HashSet};
@@ -10,7 +11,7 @@ use std::iter::zip;
 use itertools::Itertools;
 
 use crate::ast::{self, ASTType};
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, NotImplemented, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, NotImplemented, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::comet_union::{CometUnion, CometUnionItem};
@@ -302,6 +303,16 @@ impl <'a> Compiler <'a> {
         };
 
         self.scopes.push(ScopeFrame::new());
+
+        if generic_types.len() != generic_names.len() {
+            return Err(WrongNumberOfGenerics {
+                expect: generic_names.len(),
+                got: generic_types.len(),
+                src: self.named_source(),
+                span: type_name_node.source_span(),
+                type_name: type_name.clone()
+            }.into());
+        }
 
         let resolved_generic_types: Vec<CometType> = generic_types
             .iter()

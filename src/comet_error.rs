@@ -222,3 +222,17 @@ pub struct NotImplemented {
 
     pub text: String
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("WrongNumberOfGenerics")]
+pub struct WrongNumberOfGenerics {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Wrong number of generic types were passed to type '{type_name}'. Expected {expect}, got {got}")]
+    pub span: SourceSpan,
+
+    pub type_name: String,
+    pub expect: usize,
+    pub got: usize
+}
