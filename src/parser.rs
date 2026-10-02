@@ -101,7 +101,7 @@ impl <'a> Parser <'a> {
             TokenType::Ampersand => Some(Parser::parse_prefix_expr),
             TokenType::Caret => Some(Parser::parse_prefix_expr),
             TokenType::Times => Some(Parser::parse_prefix_expr),
-            TokenType::Minus => Some(Parser::parse_prefix_expr),
+            TokenType::StarStar => Some(Parser::parse_prefix_expr),
             TokenType::Tilde => Some(Parser::parse_prefix_expr),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
@@ -179,6 +179,7 @@ impl <'a> Parser <'a> {
             }, span));
         }
 
+        
         let left = self.parse_expression(PrecedenceType::Lowest)?;
         
 

@@ -132,8 +132,18 @@ impl<'file> Lexer<'file> {
                     self.consume();
                 }
                 '*' => {
-                    tokens.push(Token::new(TokenType::Times, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));
+                    let mut range = Range::from(&self.pos);
                     self.consume();
+
+                    if self.current_char != '*' {
+                        tokens.push(Token::new(TokenType::Times, range, self.pos.clone(), self.pos.clone()));
+                    } else {
+                        range.end(&self.pos);
+                        tokens.push(Token::new(TokenType::StarStar, range, self.pos.clone(), self.pos.clone()));
+                        self.consume();
+                    }
+                    
+                    
                 }
                 '/' => {
                     tokens.push(Token::new(TokenType::Divide, Range::from(&self.pos), self.pos.clone(), self.pos.clone()));

@@ -794,7 +794,7 @@ impl <'a> Compiler <'a> {
                     TokenType::Ampersand => {
                         Ok(CometType::new_ptr(right_type, self.module.isa().pointer_type()))
                     },
-                    TokenType::Times => {
+                    TokenType::StarStar => {
                         let inner_type = match right_type.kind {
                             CometTypeKind::Pointer(t) => *t,
                             _ => { return Err(TypeMismatch {
@@ -1373,7 +1373,7 @@ impl <'a> Compiler <'a> {
                 let right_type = self.resolve_type(right)?;
                 
                 match op.token_type() {
-                    TokenType::Times => {
+                    TokenType::StarStar => {
                         match right_type.kind {
                             CometTypeKind::Pointer(_) => {},
                             _ => { return Err(TypeMismatch {
@@ -1842,7 +1842,7 @@ impl <'a> Compiler <'a> {
                 Ok(stack_addr)
             },
 
-            TokenType::Times => {
+            TokenType::StarStar => {
                 if !right_type.is_ptr() {
                     return Err(TypeMismatch {
                         expected: "pointer".to_string(),
