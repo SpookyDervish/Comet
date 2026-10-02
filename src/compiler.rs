@@ -2891,6 +2891,10 @@ impl <'a> Compiler <'a> {
 
         let mut fields: Vec<CometStructField> = Vec::new();
 
+        // predeclare the empty struct so the user can have types in themself
+        let base_struct = CometStruct::new(ident.clone(), vec![]);
+        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(base_struct.clone()));
+
         for field_node in field_nodes {
             let (field_ident_node, field_type_node) = match field_node.node_type() {
                 ASTNodeType::StructFieldDefinition { ident, type_ } => (ident, type_),
