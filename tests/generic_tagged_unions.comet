@@ -1,0 +1,20 @@
+union Maybe<T> {
+    Some(value: T),
+    None()
+}
+
+fun main() :: i64 {
+    test = new Maybe<u64>::None
+
+    match test {
+        Maybe<u64>::Some(value) {
+            ret value
+        },
+
+        Maybe<u64>::None() {
+            ret 50
+        }
+    }
+
+    ret 0
+}

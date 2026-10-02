@@ -320,7 +320,13 @@ impl <'a> Compiler <'a> {
 
         let existing_generic = self.resolved_generics.get(&existing_type_name);
         if existing_generic.is_some() {
-            return Ok(existing_generic.unwrap().clone());
+            let existing_generic = existing_generic.unwrap().clone();
+            self.scopes.pop();
+            self.scopes.last_mut().unwrap().types.insert(
+                existing_type_name,
+                existing_generic.clone()
+            );
+            return Ok(existing_generic);
         }
 
         for (i, generic_name) in generic_names.iter().enumerate() {
@@ -2014,7 +2020,7 @@ impl <'a> Compiler <'a> {
         result?;
 
         // finalize func
-        builder.seal_block(builder.current_block().unwrap());
+        builder.seal_all_blocks();
         builder.finalize(target_config);
 
         println!("=== BUILT FUNCTION ===\n{}", ctx.func);
@@ -2209,60 +2215,87 @@ impl <'a> Compiler <'a> {
     }
 
     fn pattern_variant_item(
-        &self,
+        &mut self,
         path: &[ASTNode<'a>],
         expected_type: &CometType,
         span: miette::SourceSpan
     ) -> miette::Result<CometUnionItem> {
-
-        // get names, make sure everything in path is an identifier
-        let names = path.iter().map(|node| match node.node_type() {
-            ASTNodeType::QualifierNode { ident: ident_node, .. } => {
-                match ident_node.node_type() {
-                    ASTNodeType::IdentifierLiteral(name) => Ok(name.clone()),
-                    _ => unreachable!()
-                }
-            },
-            _ => Err(SyntaxError {
-                span: node.source_span(),
-                src: self.named_source(),
-                text: "expected qualifier in variant path".to_string()
-            }),
-        }).collect::<Result<Vec<_>, _>>()?;
-
-        // make sure path is even long enough somehow
-        if names.len() < 2 {
+        if path.len() != 2 {
             return Err(SyntaxError {
                 span,
                 src: self.named_source(),
-                text: "variant pattern path must include a union and variant name".to_string()
+                text: "variant pattern path must have the form Union<Type>::Variant".to_string()
             }.into());
         }
 
-        // convert variant name to a string
-        let variant_name = names.join("::");
+        let (union_name, generic_types) = match path[0].node_type() {
+            ASTNodeType::QualifierNode { ident, generics } => {
+                let name = match ident.node_type() {
+                    ASTNodeType::IdentifierLiteral(name) => name,
+                    _ => unreachable!()
+                };
+                (name.clone(), generics.as_deref())
+            }
+            _ => {
+                return Err(SyntaxError {
+                    span: path[0].source_span(),
+                    src: self.named_source(),
+                    text: "expected a union type in variant pattern".to_string()
+                }.into());
+            }
+        };
 
-        // get variant type from path string
-        let variant_type = self.get_type(&variant_name).ok_or_else(|| UnkownType {
-            span: path.last().unwrap().source_span(),
-            src: self.named_source(),
-            type_: variant_name.clone()
-        })?;
+        let union_type = if let Some(generic_types) = generic_types {
+            self.get_generic_type_literal_type(&path[0], generic_types)?
+        } else {
+            self.get_type(&union_name).cloned().ok_or_else(|| UnkownType {
+                span: path[0].source_span(),
+                src: self.named_source(),
+                type_: union_name.clone()
+            })?
+        };
 
-        // get item from union variant
-        let item = match &variant_type.kind {
-            CometTypeKind::Variant(item) => item.clone(),
+        let union = match union_type.kind {
+            CometTypeKind::Union(union) => union,
             _ => {
                 return Err(TypeMismatch {
-                    expected: "union variant".to_string(),
-                    invalid: variant_type.to_string(),
-                    span,
+                    expected: "union".to_string(),
+                    invalid: union_type.to_string(),
+                    span: path[0].source_span(),
                     src: self.named_source()
                 }.into());
             }
         };
 
-        // expect either another union or a variant
+        let variant_name = match path[1].node_type() {
+            ASTNodeType::QualifierNode { ident, generics: None } => match ident.node_type() {
+                ASTNodeType::IdentifierLiteral(name) => name,
+                _ => unreachable!()
+            },
+            ASTNodeType::QualifierNode { generics: Some(_), .. } => {
+                return Err(SyntaxError {
+                    span: path[1].source_span(),
+                    src: self.named_source(),
+                    text: "generic arguments are only allowed on the union type".to_string()
+                }.into());
+            }
+            _ => {
+                return Err(SyntaxError {
+                    span: path[1].source_span(),
+                    src: self.named_source(),
+                    text: "expected a variant name".to_string()
+                }.into());
+            }
+        };
+
+        let item = union.get_item(variant_name).cloned().ok_or_else(|| UnkownUnionItem {
+            item: variant_name.clone(),
+            union: union.name().clone(),
+            span: path[1].source_span(),
+            src: self.named_source(),
+        })?;
+
+        // Nested patterns must use the same specialized union as their payload.
         let expected_union = match &expected_type.kind {
             CometTypeKind::Union(union) => union.name().as_str(),
             CometTypeKind::Variant(variant) => variant.union_name(),
@@ -2276,8 +2309,7 @@ impl <'a> Compiler <'a> {
             }
         };
 
-        // make sure the item is the write name
-        if item.union_name() != expected_union {
+        if item.union_name() != union.name() || item.union_name() != expected_union {
             return Err(TypeMismatch {
                 expected: expected_union.to_string(),
                 invalid: item.union_name().to_string(),
@@ -2293,7 +2325,7 @@ impl <'a> Compiler <'a> {
     Recursively checks that each pattern belongs to the given union.
      */
     fn collect_pattern_bindings(
-        &self,
+        &mut self,
         pattern: &MatchPattern<'a>,
         expected_type: &CometType
     ) -> miette::Result<Vec<(String, CometType)>> {
@@ -2612,7 +2644,7 @@ impl <'a> Compiler <'a> {
         let end_block = builder.create_block();
         let default_block = default_branch.as_ref().map(|_| builder.create_block());
         let mut compare_block = builder.current_block().unwrap();
-        let mut end_reachable = default_branch.is_none();
+        let mut end_reachable = default_branch.is_none() && union.is_none();
 
         for (arm_index, match_node) in match_nodes.iter().enumerate() {
             let (patterns, match_block) = match match_node.node_type() {
@@ -2720,7 +2752,6 @@ impl <'a> Compiler <'a> {
             builder.ensure_inserted_block();
         } else {
             builder.ins().trap(ir::TrapCode::unwrap_user(1));
-            builder.seal_block(end_block);
         }
         Ok(())
     }

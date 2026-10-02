@@ -329,6 +329,9 @@ impl <'a> Parser <'a> {
         }
 
         lookahead += 1;
+        if !self.skip_generic_arguments(&mut lookahead) {
+            return false;
+        }
         let mut is_qualified = false;
 
         while matches!(
@@ -346,12 +349,42 @@ impl <'a> Parser <'a> {
             }
 
             lookahead += 1;
+            if !self.skip_generic_arguments(&mut lookahead) {
+                return false;
+            }
         }
 
         is_qualified && matches!(
             self.tokens.get(lookahead).map(|token| token.token_type()),
             Some(TokenType::OpenParen)
         )
+    }
+
+    fn skip_generic_arguments(&self, lookahead: &mut usize) -> bool {
+        if !matches!(
+            self.tokens.get(*lookahead).map(|token| token.token_type()),
+            Some(TokenType::Lt)
+        ) {
+            return true;
+        }
+
+        let mut depth = 0usize;
+        while let Some(token) = self.tokens.get(*lookahead) {
+            match token.token_type() {
+                TokenType::Lt => depth += 1,
+                TokenType::Gt => {
+                    depth -= 1;
+                    if depth == 0 {
+                        *lookahead += 1;
+                        return true;
+                    }
+                }
+                _ => {}
+            }
+            *lookahead += 1;
+        }
+
+        false
     }
 
     fn parse_match_pattern(&mut self, nested: bool) -> miette::Result<MatchPattern<'a>> {
