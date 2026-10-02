@@ -416,6 +416,10 @@ impl <'a> Compiler <'a> {
 
         match ast_type {
             ASTType::Identifier(struct_name) => {
+                if let ASTNodeType::QualifierNode { generics: Some(generic_types), .. } = struct_name.node_type() {
+                    return self.get_generic_type_literal_type(struct_name, generic_types);
+                }
+
                 let ident = self.qualified_name(struct_name)?;
 
                 self.get_type(&ident).cloned().ok_or(UnkownType {
@@ -2001,18 +2005,31 @@ impl <'a> Compiler <'a> {
             ASTNodeType::Block(_) => {
                 self.compile(body, Some(&mut builder))
             },
-            ASTNodeType::InfixExpression { .. } => {
-                let mut ret_value = self.visit_value(body, &mut builder)?;
+            _ => {
+                let ret_value = self.visit_value(body, &mut builder)?;
+                let function_return_type = self.current_function.as_ref().unwrap().return_type.as_ref().clone();
 
-                let ret_type = self.resolve_type(body)?;
-                if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
-                    ret_value = CometType::try_implicit_cast(body, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), &mut builder, self.named_source())?;
+                if function_return_type.cranelift_type == types::INVALID {
+                    builder.ins().return_(&[]);
+                } else {
+                    let ret_type = self.resolve_type(body)?;
+                    let ret_value = if ret_type != function_return_type {
+                        CometType::try_implicit_cast(
+                            body,
+                            ret_value,
+                            &ret_type,
+                            &function_return_type,
+                            &mut builder,
+                            self.named_source()
+                        )?
+                    } else {
+                        ret_value
+                    };
+
+                    builder.ins().return_(&[ret_value]);
                 }
-
-                builder.ins().return_(&[ret_value]);
                 Ok(())
             },
-            _ => unreachable!()
         };
 
         self.scopes.pop();
