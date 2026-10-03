@@ -149,6 +149,7 @@ impl <'a> Parser <'a> {
             TokenType::Struct => self.parse_struct_def_statement(),
             TokenType::Imp => self.parse_impl_block(),
             TokenType::Union => self.parse_union_def_statement(),
+            TokenType::Bring => self.parse_bring_statement(),
 
             TokenType::Hash => self.parse_compiler_directive(),
 
@@ -885,6 +886,24 @@ impl <'a> Parser <'a> {
         range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::CompilerDirectiveStatement { directive: Box::new(directive), value_name: Box::new(value_name), value_type: Box::new(value_type) }, range.source_span()))
+    }
+
+    fn parse_bring_statement(&mut self) -> miette::Result<ASTNode<'a>> {
+        let mut range = Range::start(self.current_token().unwrap().pos());
+
+        self.advance_token();
+        let path = self.parse_qualified()?;
+
+        let mut as_node = None;
+        if self.peek_token_is(&TokenType::As) {
+            self.advance_token();
+            self.advance_token();
+            as_node = Some(Box::new(self.parse_identifier_literal()?));
+        }
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::BringStatement { path, as_: as_node }, range.source_span()))
     }
     // END OF STATEMENT METHODS //
 

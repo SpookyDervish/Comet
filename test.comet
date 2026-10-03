@@ -1,0 +1,5 @@
+bring test2 as addFile
+
+fun main() :: i64 {
+    ret addFile.add(2, 4)
+}

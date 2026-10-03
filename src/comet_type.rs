@@ -37,6 +37,7 @@ pub enum CometTypeKind {
     Scalar(bool),
     Pointer(Box<CometType>),
     Array { base_type: Box<CometType>, size: u32 },
+    Module,
     Generic(String),
     Void,
     Unkown
@@ -166,6 +167,7 @@ impl CometType {
             CometTypeKind::Struct(s) => s.get_layout().1,
             CometTypeKind::Array{ base_type, size } => base_type.size() * size,
             CometTypeKind::Generic(_) => 0,
+            CometTypeKind::Module => 0,
             CometTypeKind::Void => 0,
             CometTypeKind::Unkown => 0
         }
@@ -180,6 +182,7 @@ impl CometType {
             CometTypeKind::Struct(s) => s.get_layout().2,
             CometTypeKind::Array { base_type, .. } => base_type.align(),
             CometTypeKind::Generic(_) => 0,
+            CometTypeKind::Module => 0,
             CometTypeKind::Void => 0,
             CometTypeKind::Unkown => 0
         }
@@ -283,7 +286,8 @@ impl CometType {
             CometTypeKind::Union(u) => format!("u_{}", u.name()),
             CometTypeKind::Variant(v) => format!("v_{}", v.name()),
             CometTypeKind::Array { base_type, .. } => format!("a_{}", base_type.generic_type_name()),
-            CometTypeKind::Void => format!("v"),
+            CometTypeKind::Void => String::from("v"),
+            CometTypeKind::Module => String::from("m"),
             CometTypeKind::Unkown => unreachable!()
         }
     }
@@ -315,6 +319,7 @@ impl fmt::Display for CometType {
             CometTypeKind::Variant(v) => write!(f, "{}()", v.name()),
             CometTypeKind::Generic(name) => write!(f, "{}", name),
             CometTypeKind::Array { base_type, size } => write!(f, "{}[{}]", base_type, size),
+            CometTypeKind::Module => write!(f, "module"),
             CometTypeKind::Void => write!(f, "(none)"),
             CometTypeKind::Unkown => write!(f, "(unkown)"),
         }

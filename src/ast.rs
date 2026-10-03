@@ -45,6 +45,7 @@ pub enum ASTNodeType<'a> {
     UnionDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
     CompilerDirectiveStatement { directive: Box<ASTNode<'a>>, value_name: Box<ASTNode<'a>>, value_type: Box<ASTNode<'a>> },
     ImplDefStatement { struct_type: Box<ASTNode<'a>>, functions: Vec<ASTNode<'a>> },
+    BringStatement { path: Vec<ASTNode<'a>>, as_: Option<Box<ASTNode<'a>>> },
 
     // expressions
     InfixExpression { left: Box<ASTNode<'a>>, op: Token<'a>, right: Box<ASTNode<'a>> },

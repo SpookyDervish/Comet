@@ -1,20 +1,22 @@
 use cranelift_codegen::ir::condcodes::{FloatCC, IntCC};
+use cranelift_codegen::ir::immediates::Imm64;
 use cranelift_codegen::{ir::AbiParam, settings};
-use cranelift_codegen::ir::{self, Block, InstBuilder, MemFlagsData, StackSlotData, StackSlotKind, types};
+use cranelift_codegen::ir::{self, Block, InstBuilder, InstBuilderBase, MemFlagsData, StackSlotData, StackSlotKind, types};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
-use cranelift_object::object::ReadCacheOps;
 use cranelift_object::{ObjectBuilder, ObjectModule};
-use miette::NamedSource;
+use miette::{NamedSource, IntoDiagnostic};
 use std::collections::{HashMap, HashSet};
 use std::iter::zip;
+use std::fs;
 use itertools::Itertools;
 
-use crate::ast::{self, ASTType};
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, NotImplemented, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
+use crate::ast::ASTType;
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::comet_union::{CometUnion, CometUnionItem};
+use crate::{lexer, parser, scope};
 use crate::scope::CometVarType::Local;
 use crate::scope::{CometVarType, CometVariable, ScopeFrame};
 use crate::{ast::{ASTNode, ASTNodeType, MatchPattern}, comet_type::CometType, token::TokenType};
@@ -99,7 +101,7 @@ impl <'a> Compiler <'a> {
         NamedSource::new(self.file_name, self.source.clone())
     }
 
-    fn get_variable(&self, name: &str) -> Option<&CometVariable> {
+    fn get_variable(&self, name: &str) -> Option<&CometVariable<'a>> {
         self.scopes.iter().rev().find_map(|scope| scope.variables.get(name))
     }
 
@@ -667,6 +669,47 @@ impl <'a> Compiler <'a> {
         Ok(CometType::new_variant(item.unwrap().clone()))
     }
 
+    fn resolve_module_access_type(&mut self, node: &ASTNode<'a>) -> miette::Result<CometType> {
+        let (left, op, right) = match node.node_type() {
+            ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
+            _ => unreachable!()
+        };
+        
+        let left_name = match left.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => unreachable!()
+        };
+
+        let var_name = match right.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => unreachable!()
+        };
+
+        let module_var = self.get_variable(&left_name.as_str()).ok_or(UndefinedVariable {
+            span: node.source_span(),
+            src: self.named_source(),
+            var: left_name.clone()
+        })?;
+
+        let module = match &module_var.var_type {
+            CometVarType::Module(s) => s,
+            _ => unreachable!()
+        };
+
+        let var = module.variables.get(var_name);
+        if var.is_none() {
+            return Err(UnkownField {
+                field: var_name.clone(),
+                struct_name: left_name.clone(),
+                span: right.source_span(),
+                src: self.named_source()
+            }.into());
+        }
+        let var = var.unwrap();
+
+        return Ok(var.type_.clone());
+    }
+
     fn resolve_type(&mut self, node: &ASTNode<'a>) -> miette::Result<CometType> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
@@ -736,6 +779,7 @@ impl <'a> Compiler <'a> {
                     TokenType::Dot | TokenType::ColonColon => {
                         let struct_type = match left_value.kind {
                             CometTypeKind::Struct(comet_struct) => comet_struct,
+                            CometTypeKind::Module => { return self.resolve_module_access_type(node); },
                             _ => { return Err(InvalidOperator {
                                     op: op.token_type().clone(),
                                     span: op.source_span(),
@@ -912,6 +956,84 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
+    fn visit_module_func_call(
+        &mut self,
+        receiver_node: &ASTNode<'a>,
+        method_node: &ASTNode<'a>,
+        op: &TokenType,
+        args: &[ASTNode<'a>],
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<ir::Value> {
+        let var_name = match receiver_node.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => unreachable!()
+        };
+
+        let module_var = self.get_variable(var_name).unwrap();
+
+        let module_scope = match &module_var.var_type {
+            CometVarType::Module(s) => s,
+            _ => unreachable!()
+        };
+
+        let func_name = match method_node.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v,
+            _ => unreachable!()
+        };
+
+        let func_var = module_scope.variables.get(func_name);
+        if func_var.is_none() {
+            return Err(UnkownMethod {
+                span: method_node.source_span(),
+                src: self.named_source(),
+                method: func_name.clone(),
+                struct_name: var_name.clone()
+            }.into());
+        }
+        let func_var = func_var.unwrap();
+
+        let func = match &func_var.type_.kind {
+            CometTypeKind::Function(f) => f,
+            _ => unreachable!()
+        };
+
+        // build signature
+        let mut sig = self.module.make_signature();
+
+        for arg_type in &func.arg_types {
+            sig.params.push(AbiParam::new(arg_type.cranelift_type));
+        }
+
+        if func.return_type.cranelift_type != types::INVALID {
+            sig.returns.push(AbiParam::new(
+                func.return_type.cranelift_type,
+            ));
+        }
+
+        let func_id = self.module
+                                    .declare_function(func_name, Linkage::Import, &sig)
+                                    .unwrap();
+
+        let func_ref = self
+            .module
+            .declare_func_in_func(func_id, builder.func);
+
+        let mut compiled_args = vec![];
+
+        for arg in args {
+            compiled_args.push(self.visit_value(arg, builder)?);
+        }
+
+        let call_inst = builder.ins().call(func_ref, &compiled_args);
+        let results = builder.inst_results(call_inst);
+
+        if results.is_empty() {
+            Ok(builder.ins().iconst(types::I64, 0))
+        } else {
+            Ok(results[0])
+        }
+    }
+
     fn visit_method_call(
         &mut self,
         receiver_node: &ASTNode<'a>,
@@ -924,6 +1046,7 @@ impl <'a> Compiler <'a> {
 
         let struct_name = match &receiver_type.kind {
             CometTypeKind::Struct(comet_struct) => comet_struct.name(),
+            CometTypeKind::Module => { return self.visit_module_func_call(receiver_node, method_node, op, args, builder); },
             _ => {
                 return Err(TypeMismatch {
                     expected: "struct".to_string(),
@@ -1144,17 +1267,20 @@ impl <'a> Compiler <'a> {
                     return Ok(builder.ins().func_addr(pointer_type, func_ref));
                 }
 
-                match comet_var.var_type {
-                    CometVarType::Local(var) => Ok(builder.use_var(var)),
+                match &comet_var.var_type {
+                    CometVarType::Local(var) => Ok(builder.use_var(*var)),
                     CometVarType::FuncArg(index) => {
                         let params = builder.block_params(builder.current_block().unwrap());
-                        Ok(params[index])
+                        Ok(params[*index])
                     },
                     CometVarType::External(func_id) => {
-                        let func_ref = self.module.declare_func_in_func(func_id, builder.func);
+                        let func_ref = self.module.declare_func_in_func(*func_id, builder.func);
                         let pointer_type = self.module.isa().frontend_config().pointer_type();
 
                         Ok(builder.ins().func_addr(pointer_type, func_ref))
+                    },
+                    CometVarType::Module(_) => {
+                        Ok(builder.ins().build_imm_const(types::INVALID, Imm64::new(0), false))
                     }
                 }  
             },
@@ -3132,7 +3258,7 @@ impl <'a> Compiler <'a> {
         };
 
         match directive.as_str() {
-            "extern" => {
+            "ext" => {
                 self.visit_extern_directive(name_node, type_node)
             },
             _ => Err(InvalidCompilerDirective {
@@ -3142,6 +3268,100 @@ impl <'a> Compiler <'a> {
             }.into())
         }
 
+    }
+
+    fn visit_include_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+        let (path_nodes, as_node_optional) = match node.node_type() {
+            ASTNodeType::BringStatement { path, as_ } => (path, as_),
+            _ => unreachable!()
+        };
+
+        let as_node = as_node_optional.as_ref();
+
+        let name = as_node.map(|n| match n.node_type() {
+            ASTNodeType::IdentifierLiteral(v) => v.clone(),
+            _ => unreachable!()
+        }).unwrap_or(match path_nodes.iter().last().unwrap().node_type() {
+            ASTNodeType::QualifierNode { ident, .. } => {
+                match ident.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v.clone(),
+                    _ => unreachable!()
+                }
+            },
+            _ => unreachable!()
+        });
+
+        let path: String = path_nodes
+                    .iter()
+                    .map(|n| match n.node_type() {
+                        ASTNodeType::QualifierNode { ident, .. } => {
+                            match ident.node_type() {
+                                ASTNodeType::IdentifierLiteral(v) => v,
+                                _ => unreachable!()
+                            }
+                        },
+                        _ => unreachable!()
+                    })
+                    .join("/") + ".comet";
+
+        
+
+        let include_source = fs::read_to_string(&path).into_diagnostic()?;
+
+        let mut include_lexer = lexer::Lexer::new(&path, &include_source);
+
+        let include_tokens = include_lexer.lex()?;
+
+        let mut include_parser = parser::Parser::new(include_tokens);
+        let include_ast = include_parser.parse()?;
+
+        let mut include_compiler = Compiler::new(&path, include_source.clone()).unwrap();
+        include_compiler.compile(&include_ast, None)?;
+
+        let included_vars = &include_compiler.scopes[0].variables;
+
+        let mut include_scope = scope::ScopeFrame::new();
+
+        for (name, value) in included_vars {
+            let comet_type = &value.type_;
+
+            match &comet_type.kind {
+                CometTypeKind::Function(func_type) => {
+                    // make signature
+                    let mut sig = self.module.make_signature();
+
+                    if func_type.return_type.cranelift_type != types::INVALID {
+                        sig.returns.push(AbiParam::new(func_type.return_type.cranelift_type));
+                    }
+                    for arg in &func_type.arg_types {
+                        sig.params.push(AbiParam::new(arg.cranelift_type))
+                    }
+
+                    // make external func with new sig
+                    let ext_func_id = self.module
+                        .declare_function(name, Linkage::Import, &sig)
+                        .unwrap();
+
+                    include_scope.variables.insert(name.clone(), CometVariable {
+                        type_: comet_type.clone(),
+                        var_type: CometVarType::External(ext_func_id),
+                        mutable: false,
+                        function_id: Some(ext_func_id)
+                    });
+                },
+                _ => {}
+            }
+        }
+
+        self.scopes.iter_mut().last().unwrap().variables.insert(name.clone(), CometVariable { 
+            type_: CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Module },
+            var_type: CometVarType::Module(include_scope),
+            function_id: None,
+            mutable: false
+         });
+
+
+        Ok(())
     }
     // END OF VISIT METHODS //
 
@@ -3166,6 +3386,7 @@ impl <'a> Compiler <'a> {
                 return Ok(());
             }
             ASTNodeType::ImplDefStatement { .. } => { return self.visit_impl_def_statement(ast); },
+            ASTNodeType::BringStatement { .. } => { return self.visit_include_statement(ast); },
 
             ASTNodeType::CompilerDirectiveStatement { .. } => { return self.visit_compiler_directive(ast); },
 
