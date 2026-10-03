@@ -1,0 +1,25 @@
+struct Vector {
+    x: i32,
+    y: i32,
+    z: i32
+}
+
+imp Vector {
+    fun add(self: Self, other: Vector) {
+        self.x = self.x + other.x
+        self.y = self.y + other.y
+        self.z = self.z + other.z
+        ret
+    }
+}
+
+
+fun main() :: i64 {
+
+    vec1 = new Vector { x = 1, y = 2, z = 3 }
+    vec2 = new Vector { x = 2, y = 3, z = 4 }
+
+    vec1.add(vec2)
+
+    ret vec1.x != 3
+}
