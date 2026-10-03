@@ -1,5 +1,7 @@
-bring test2 as addFile
+struct Foo {
+    x: i64
+}
 
 fun main() :: i64 {
-    ret addFile.add(2, 4)
+    ret new Foo { x = 0.123 }
 }

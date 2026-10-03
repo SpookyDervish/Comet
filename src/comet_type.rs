@@ -2,7 +2,7 @@ use cranelift_codegen::ir::{Value, types};
 use cranelift_frontend::FunctionBuilder;
 use cranelift::prelude::InstBuilder;
 use cranelift_module::FuncId;
-use miette::NamedSource;
+use miette::{NamedSource, SourceSpan};
 
 use itertools::Itertools;
 use std::fmt;
@@ -46,69 +46,88 @@ pub enum CometTypeKind {
 #[derive(Clone, Eq, Debug)]
 pub struct CometType {
     pub cranelift_type: types::Type,
-    pub kind: CometTypeKind
+    pub kind: CometTypeKind,
+    pub definition_span: Option<SourceSpan>
 }
 
 impl CometType {
     pub fn new(cranelift_type: types::Type) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            kind: CometTypeKind::Scalar(false)
+            kind: CometTypeKind::Scalar(false),
+            definition_span: None
         }
     }
     pub fn new_ptr(base_type: CometType, pointer_type: types::Type) -> Self {
         CometType {
             cranelift_type: pointer_type,
-            kind: CometTypeKind::Pointer(Box::new(base_type))
+            kind: CometTypeKind::Pointer(Box::new(base_type)),
+            definition_span: None
         }
     }
     pub fn new_array(base_type: CometType, size: u32, pointer_type: types::Type) -> Self {
         CometType {
             cranelift_type: pointer_type,
-            kind: CometTypeKind::Array { base_type: Box::new(base_type), size: size }
+            kind: CometTypeKind::Array { base_type: Box::new(base_type), size: size },
+            definition_span: None
         }
     }
     pub fn new_int(cranelift_type: types::Type, signed: bool) -> Self {
         CometType { 
             cranelift_type: cranelift_type,
-            kind: CometTypeKind::Scalar(signed)
+            kind: CometTypeKind::Scalar(signed),
+            definition_span: None
         }
     }
     pub fn new_struct(comet_struct: CometStruct) -> Self {
         CometType {
             cranelift_type: types::I64,
-            kind: CometTypeKind::Struct(comet_struct)
+            kind: CometTypeKind::Struct(comet_struct),
+            definition_span: None
         }
     }
     pub fn new_union(comet_union: CometUnion) -> Self {
         CometType {
             cranelift_type: types::I64,
-            kind: CometTypeKind::Union(comet_union)
+            kind: CometTypeKind::Union(comet_union),
+            definition_span: None
         }
     }
     pub fn new_variant(comet_union_item: CometUnionItem) -> Self {
         CometType {
             cranelift_type: types::I64,
-            kind: CometTypeKind::Variant(comet_union_item)
+            kind: CometTypeKind::Variant(comet_union_item),
+            definition_span: None
         }
     }
     pub fn new_function(comet_function: CometFunction) -> Self {
         CometType {
             cranelift_type: types::I64,
-            kind: CometTypeKind::Function(comet_function)
+            kind: CometTypeKind::Function(comet_function),
+            definition_span: None
         }
     }
     pub fn new_generic(name: String) -> Self {
         CometType {
             cranelift_type: types::INVALID,
-            kind: CometTypeKind::Generic(name)
+            kind: CometTypeKind::Generic(name),
+            definition_span: None
         }
     }
     pub fn new_void() -> Self {
-        CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Void }
+        CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Void, definition_span: None }
     }
     pub fn new_unkown() -> Self {
-        CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Unkown }
+        CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Unkown, definition_span: None }
+    }
+
+    pub fn with_definition_span(mut self, definition_span: Option<SourceSpan>) -> Self {
+        self.definition_span = definition_span;
+        self
+    }
+
+    pub fn definition_span(&self) -> Option<SourceSpan> {
+        self.definition_span.clone()
     }
 
     pub fn is_signed(&self) -> bool {
@@ -188,7 +207,7 @@ impl CometType {
         }
     }
 
-    pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_comet_type: &CometType, target_type: &CometType, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
+    pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_comet_type: &CometType, target_type: &CometType, target_node: Option<&ASTNode>, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
         let their_type = target_type.cranelift_type;
 
         if value_comet_type == target_type {
@@ -269,7 +288,8 @@ impl CometType {
                 expected: target_type.to_string(),
                 invalid: value_comet_type.to_string(),
                 src: named_source,
-                span: value_node.source_span()
+                span: value_node.source_span(),
+                type_def: target_node.map(|n| n.source_span()).or_else(|| target_type.definition_span())
             }.into());
         }
 

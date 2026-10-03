@@ -357,7 +357,8 @@ impl <'a> Compiler <'a> {
 
                 self.instantiate_generic_impls(&type_name, &resolved_generic_types, &struct_result)?;
 
-                let new_type = CometType::new_struct(struct_result.clone());
+                let new_type = CometType::new_struct(struct_result.clone())
+                    .with_definition_span(Some(type_name_node.source_span()));
                 self.resolved_generics.insert(struct_result.name().to_string(), new_type.clone());
 
                 self.scopes.pop();
@@ -368,7 +369,8 @@ impl <'a> Compiler <'a> {
                 let union_result = self.visit_union_def_statement(&type_template, Some(&resolved_generic_types))?.unwrap();
 
                 let union_name = union_result.name().to_string();
-                let new_type = CometType::new_union(union_result);
+                let new_type = CometType::new_union(union_result)
+                    .with_definition_span(Some(type_name_node.source_span()));
                 self.resolved_generics.insert(union_name.clone(), new_type.clone());
 
                 self.scopes.pop();
@@ -599,6 +601,10 @@ impl <'a> Compiler <'a> {
         }
     }
 
+    fn type_definition_span_for_error(invalid_type: Option<&CometType>, _expected_type: Option<&CometType>) -> Option<miette::SourceSpan> {
+        invalid_type.and_then(|t| t.definition_span())
+    }
+
     fn unify_types(&self, a: &'a CometType, b: &'a CometType) -> &CometType {
         if self.rank_type(a) >= 4 || self.rank_type(b) >= 4 {
             return if self.rank_type(a) > self.rank_type(b) {
@@ -670,8 +676,8 @@ impl <'a> Compiler <'a> {
     }
 
     fn resolve_module_access_type(&mut self, node: &ASTNode<'a>) -> miette::Result<CometType> {
-        let (left, op, right) = match node.node_type() {
-            ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
+        let (left, right) = match node.node_type() {
+            ASTNodeType::InfixExpression { left, op: _, right } => (left, right),
             _ => unreachable!()
         };
         
@@ -756,7 +762,8 @@ impl <'a> Compiler <'a> {
                         expected: "array".to_string(),
                         invalid: left_type.to_string(),
                         span: left.source_span(),
-                        src: self.named_source()
+                        src: self.named_source(),
+                        type_def: None
                     }.into()); }
                 };
 
@@ -845,7 +852,8 @@ impl <'a> Compiler <'a> {
                                 src: self.named_source(),
                                 span: right.source_span(),
                                 invalid: right_type.to_string(),
-                                expected: "pointer".to_string()
+                                expected: "pointer".to_string(),
+                                type_def: None
                             }.into()); }
                         };
 
@@ -960,7 +968,6 @@ impl <'a> Compiler <'a> {
         &mut self,
         receiver_node: &ASTNode<'a>,
         method_node: &ASTNode<'a>,
-        op: &TokenType,
         args: &[ASTNode<'a>],
         builder: &mut FunctionBuilder
     ) -> miette::Result<ir::Value> {
@@ -1046,13 +1053,14 @@ impl <'a> Compiler <'a> {
 
         let struct_name = match &receiver_type.kind {
             CometTypeKind::Struct(comet_struct) => comet_struct.name(),
-            CometTypeKind::Module => { return self.visit_module_func_call(receiver_node, method_node, op, args, builder); },
+            CometTypeKind::Module => { return self.visit_module_func_call(receiver_node, method_node, args, builder); },
             _ => {
                 return Err(TypeMismatch {
                     expected: "struct".to_string(),
                     invalid: receiver_type.to_string(),
                     span: receiver_node.source_span(),
-                    src: self.named_source()
+                    src: self.named_source(),
+                    type_def: None
                 }.into());
             }
         };
@@ -1189,6 +1197,7 @@ impl <'a> Compiler <'a> {
                     value,
                     &value_type,
                     field_type,
+                    Some(field_name_node),
                     builder,
                     self.named_source()
                 )?;
@@ -1331,7 +1340,8 @@ impl <'a> Compiler <'a> {
                         expected: "array".to_string(),
                         invalid: left_type.to_string(),
                         span: left.source_span(),
-                        src: self.named_source()
+                        src: self.named_source(),
+                        type_def: None
                     }.into()); }
                 };
 
@@ -1436,7 +1446,8 @@ impl <'a> Compiler <'a> {
                         src: self.named_source(),
                         expected: String::from("struct"),
                         invalid: struct_type.to_string(),
-                        span: type_node.source_span()
+                        span: type_node.source_span(),
+                        type_def: None
                     }.into()); }
                 };
 
@@ -1506,7 +1517,8 @@ impl <'a> Compiler <'a> {
                                 src: self.named_source(),
                                 span: right.source_span(),
                                 invalid: right_type.to_string(),
-                                expected: "pointer".to_string()
+                                expected: "pointer".to_string(),
+                                type_def: None
                             }.into()); }
                         }
 
@@ -1531,7 +1543,8 @@ impl <'a> Compiler <'a> {
                         expected: "array".to_string(),
                         invalid: left_type.to_string(),
                         span: left.source_span(),
-                        src: self.named_source()
+                        src: self.named_source(),
+                        type_def: None
                     }.into()); }
                 };
 
@@ -1620,6 +1633,7 @@ impl <'a> Compiler <'a> {
                 left_result,
                 &left_type,
                 &unified_type,
+                None,
                 builder,
                 self.named_source()
             )?;
@@ -1641,6 +1655,7 @@ impl <'a> Compiler <'a> {
                     right_value,
                     &right_type,
                     &unified_type,
+                    None,
                     builder,
                     self.named_source()
                 )?
@@ -1665,6 +1680,7 @@ impl <'a> Compiler <'a> {
                     right_value,
                     &right_type,
                     &unified_type,
+                    None,
                     builder,
                     self.named_source()
                 )?
@@ -1708,6 +1724,7 @@ impl <'a> Compiler <'a> {
                 left_side,
                 &left_type,
                 unified_type,
+                None,
                 builder,
                 self.named_source()
             )?;
@@ -1718,6 +1735,7 @@ impl <'a> Compiler <'a> {
                 right_side,
                 &right_type,
                 unified_type,
+                None,
                 builder,
                 self.named_source()
             )?;
@@ -1912,7 +1930,8 @@ impl <'a> Compiler <'a> {
                         src: self.named_source(),
                         expected: String::from("struct"),
                         invalid: struct_type.to_string(),
-                        span: left_node.source_span()
+                        span: left_node.source_span(),
+                        type_def: None
                     }.into()); }
         };
 
@@ -1974,7 +1993,8 @@ impl <'a> Compiler <'a> {
                         expected: "pointer".to_string(),
                         invalid: right_type.to_string(),
                         src: self.named_source(),
-                        span: right_node.source_span()
+                        span: right_node.source_span(),
+                        type_def: None
                     }.into());
                 }
 
@@ -2084,11 +2104,15 @@ impl <'a> Compiler <'a> {
             });
         }
 
-        let return_type = return_type_node
+        let mut return_type = return_type_node
             .as_ref()
             .map(|node| self.get_type_literal_type(node))
             .transpose()?
             .unwrap_or_else(CometType::new_void);
+
+        if let Some(node) = return_type_node {
+            return_type = return_type.with_definition_span(Some(node.source_span()));
+        }
 
         if return_type.cranelift_type != types::INVALID {
             sig.returns.push(AbiParam::new(return_type.cranelift_type));
@@ -2096,7 +2120,7 @@ impl <'a> Compiler <'a> {
 
         let new_comet_func = CometFunction {
             arg_types,
-            return_type: Box::new(return_type)
+            return_type: Box::new(return_type.clone())
         };
 
         self.current_function = Some(new_comet_func.clone());
@@ -2121,8 +2145,6 @@ impl <'a> Compiler <'a> {
         let func_ref = self.module.declare_func_in_func(func_id, builder.func);
         let func_addr = builder.ins().func_addr(target_config.pointer_type(), func_ref);
 
-        //let func_var = Variable::from_u32(self.var_index);
-        //self.var_index += 1;
         let func_var = builder.declare_var(target_config.pointer_type());
         builder.def_var(func_var, func_addr);
 
@@ -2156,6 +2178,7 @@ impl <'a> Compiler <'a> {
                             ret_value,
                             &ret_type,
                             &function_return_type,
+                            return_type_node,
                             &mut builder,
                             self.named_source()
                         )?
@@ -2209,6 +2232,8 @@ impl <'a> Compiler <'a> {
         };
 
         if !self.block_is_terminated(builder.current_block().unwrap(), builder) {
+            println!("{:#?}", self.current_function);
+
             if ret_value_optional.is_none() {
                 builder.ins().return_(&[]);
             } else {
@@ -2218,7 +2243,8 @@ impl <'a> Compiler <'a> {
                         expected: "void".to_string(),
                         invalid: "return value".to_string(),
                         span: ret_value_node.source_span(),
-                        src: self.named_source()
+                        src: self.named_source(),
+                        type_def: None
                     }.into());
                 }
 
@@ -2226,7 +2252,7 @@ impl <'a> Compiler <'a> {
 
                 let ret_type = self.resolve_type(ret_value_node)?;
                 if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
-                    ret_value = CometType::try_implicit_cast(ret_value_node, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), builder, self.named_source())?;
+                    ret_value = CometType::try_implicit_cast(ret_value_node, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), None, builder, self.named_source())?;
                 }
 
                 builder.ins().return_(&[ret_value]);
@@ -2259,7 +2285,7 @@ impl <'a> Compiler <'a> {
             let address = self.visit_l_value(ident_node, builder)?;
 
             if target_type != value_type {
-                value = CometType::try_implicit_cast(value_node, value, &value_type, &target_type, builder, self.named_source())?;
+                value = CometType::try_implicit_cast(value_node, value, &value_type, &target_type, Some(ident_node), builder, self.named_source())?;
             }
 
             
@@ -2294,7 +2320,8 @@ impl <'a> Compiler <'a> {
                     expected: var_type.to_string(),
                     invalid: value_type.to_string(),
                     span: value_node.source_span(),
-                    src: self.named_source()
+                    src: self.named_source(),
+                    type_def: Self::type_definition_span_for_error(Some(&value_type), Some(var_type))
                 }.into());
             }
 
@@ -2339,7 +2366,7 @@ impl <'a> Compiler <'a> {
 
             // get type of type annotation
             if var_type != value_type {
-                value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, builder, self.named_source())?;
+                value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, type_node.as_deref(), builder, self.named_source())?;
                 final_type = var_type;
             } else {
                 final_type = self.unify_types(&final_type, &var_type).clone();
@@ -2416,7 +2443,8 @@ impl <'a> Compiler <'a> {
                     expected: "union".to_string(),
                     invalid: union_type.to_string(),
                     span: path[0].source_span(),
-                    src: self.named_source()
+                    src: self.named_source(),
+                    type_def: None
                 }.into());
             }
         };
@@ -2458,7 +2486,8 @@ impl <'a> Compiler <'a> {
                     expected: "union".to_string(),
                     invalid: expected_type.to_string(),
                     span,
-                    src: self.named_source()
+                    src: self.named_source(),
+                    type_def: None
                 }.into());
             }
         };
@@ -2468,7 +2497,8 @@ impl <'a> Compiler <'a> {
                 expected: expected_union.to_string(),
                 invalid: item.union_name().to_string(),
                 span,
-                src: self.named_source()
+                src: self.named_source(),
+                type_def: None
             }.into());
         }
 
@@ -3019,7 +3049,10 @@ impl <'a> Compiler <'a> {
 
         // predeclare the empty struct so the user can have types in themself
         let base_struct = CometStruct::new(ident.clone(), vec![]);
-        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(base_struct.clone()));
+        self.scopes.last_mut().unwrap().types.insert(
+            ident.clone(),
+            CometType::new_struct(base_struct.clone()).with_definition_span(Some(ident_node.source_span()))
+        );
 
         for field_node in field_nodes {
             let (field_ident_node, field_type_node) = match field_node.node_type() {
@@ -3039,7 +3072,10 @@ impl <'a> Compiler <'a> {
 
         let new_struct = CometStruct::new(ident.clone(), fields);
 
-        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_struct(new_struct.clone()));
+        self.scopes.last_mut().unwrap().types.insert(
+            ident.clone(),
+            CometType::new_struct(new_struct.clone()).with_definition_span(Some(ident_node.source_span()))
+        );
 
         Ok(Some(new_struct))
     }
@@ -3069,7 +3105,7 @@ impl <'a> Compiler <'a> {
 
         self.scopes.last_mut().unwrap().types.insert(
             ident.clone(),
-            CometType::new_union(CometUnion::new(ident.clone(), Vec::new()))
+            CometType::new_union(CometUnion::new(ident.clone(), Vec::new())).with_definition_span(Some(ident_node.source_span()))
         );
 
         let mut items = Vec::new();
@@ -3128,7 +3164,10 @@ impl <'a> Compiler <'a> {
         }
 
         let new_union = CometUnion::new(ident.clone(), items);
-        self.scopes.last_mut().unwrap().types.insert(ident.clone(), CometType::new_union(new_union.clone()));
+        self.scopes.last_mut().unwrap().types.insert(
+            ident.clone(),
+            CometType::new_union(new_union.clone()).with_definition_span(Some(ident_node.source_span()))
+        );
 
         Ok(Some(new_union))
     }
@@ -3158,7 +3197,8 @@ impl <'a> Compiler <'a> {
                 invalid: struct_type.to_string(),
                 expected: "struct".to_string(),
                 span: struct_node.source_span(),
-                src: self.named_source()
+                src: self.named_source(),
+                type_def: None
             }.into()) }
         };
 
@@ -3354,7 +3394,7 @@ impl <'a> Compiler <'a> {
         }
 
         self.scopes.iter_mut().last().unwrap().variables.insert(name.clone(), CometVariable { 
-            type_: CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Module },
+            type_: CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Module, definition_span: None },
             var_type: CometVarType::Module(include_scope),
             function_id: None,
             mutable: false

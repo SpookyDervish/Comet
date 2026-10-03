@@ -47,12 +47,12 @@ Any systems supported by the Cranelift backend can be compiled for. This include
         - [x] Impl blocks (methods)
         - [x] Constructor
         - [x] Generic structs
-    - [ ] Tagged unions
+    - [x] Tagged unions
         - [x] Creation
         - [x] Pattern matching
-        - [ ] Generic unions
+        - [x] Generic unions
             - [x] Creation
-            - [ ] Pattern matching
+            - [x] Pattern matching
   - [x] "new" keyword
 - [x] Command line args
 - [x] Arrays

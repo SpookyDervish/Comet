@@ -61,7 +61,10 @@ pub struct TypeMismatch {
     pub span: SourceSpan,
 
     pub invalid: String,
-    pub expected: String
+    pub expected: String,
+
+    #[label("Type defined here")]
+    pub type_def: Option<SourceSpan>
 }
 
 #[derive(Diagnostic, Debug, Error)]
