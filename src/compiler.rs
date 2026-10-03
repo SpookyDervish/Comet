@@ -2232,8 +2232,6 @@ impl <'a> Compiler <'a> {
         };
 
         if !self.block_is_terminated(builder.current_block().unwrap(), builder) {
-            println!("{:#?}", self.current_function);
-
             if ret_value_optional.is_none() {
                 builder.ins().return_(&[]);
             } else {
