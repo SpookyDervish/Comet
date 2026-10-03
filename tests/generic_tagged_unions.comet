@@ -1,3 +1,5 @@
+#ext puts: fun(str) :: i32
+
 union Maybe<T> {
     Some(value: T),
     None()
@@ -12,9 +14,9 @@ fun main() :: i64 {
         },
 
         Maybe<u64>::None() {
-            ret 50
+            ret 0
         }
     }
 
-    ret 0
+    ret 1
 }

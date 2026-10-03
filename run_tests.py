@@ -27,7 +27,10 @@ def make_test(case: str):
         self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (Comet)!")
         
         link_result = subprocess.run(["gcc", obj_name, "-o", program_name])
-        self.assertEqual(result.returncode, 0, f"{case} did not link successfully (gcc)!")
+        self.assertEqual(link_result.returncode, 0, f"{case} did not link successfully (gcc)!")
+        
+        program_result = subprocess.run([program_name])
+        self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
     return test
 
 for i, (test_name) in enumerate(os.listdir("tests")):

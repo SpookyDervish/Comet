@@ -1,5 +1,7 @@
-fun add(num1: i64, num2: i64) :: i64 => num1 + num2
+fun add(a: i64, b: i64) :: i64 => a + b
 
 fun main() :: i64 {
-    ret add(2, 4)
+    a = 2
+    b = 4
+    ret add(a, b)
 }
