@@ -1,15 +1,10 @@
-func main() -> int {
-    small x = 123
-    int y = 123456
-    big z = 123123123123
+fun main() :: i64 {
+    x = 123
+    y = 123456
+    z = 123123123123
 
-    float my_float = 3.1415
-    double hi = 0.123123123123
+    my_float = 3.1415
+    hi = 0.123123123123
 
-    bool my_bool = true
-
-    mut bool my_bool2 = true
-    my_bool2 = false
-
-    return 0
+    ret 0
 }

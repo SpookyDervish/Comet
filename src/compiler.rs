@@ -2074,12 +2074,13 @@ impl <'a> Compiler <'a> {
             FunctionOwner::Global => (false, name.to_string().clone()),
             FunctionOwner::Impl(struct_name) => (true, format!("{struct_name}_{name}"))
         };
-
         let mut sig = self.module.make_signature();
 
         let mut builder_context = FunctionBuilderContext::new();
         let mut arg_types = Vec::new();
         let previous_function = self.current_function.clone();
+
+        self.scopes.push(ScopeFrame::new());
 
         for (i, arg) in args.iter().enumerate() {
             let (arg_name_node, arg_type_node)= match arg.node_type() {
@@ -2149,7 +2150,7 @@ impl <'a> Compiler <'a> {
         builder.def_var(func_var, func_addr);
 
         if !is_struct_impl {
-            self.scopes.last_mut().unwrap().variables.insert(symbol_name.clone(), CometVariable {
+            self.scopes.iter_mut().rev().nth(1).unwrap().variables.insert(symbol_name.clone(), CometVariable {
                 type_: function_type,
                 var_type: Local(func_var),
                 mutable: false,
@@ -2157,7 +2158,7 @@ impl <'a> Compiler <'a> {
             });
         }
         
-        self.scopes.push(ScopeFrame::new());
+        
 
         // generate code
         let result = match body.node_type() {
@@ -2200,7 +2201,7 @@ impl <'a> Compiler <'a> {
         builder.seal_all_blocks();
         builder.finalize(target_config);
 
-        println!("=== BUILT FUNCTION ===\n{}", ctx.func);
+        //println!("=== BUILT FUNCTION ===\n{}", ctx.func);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
@@ -3404,6 +3405,7 @@ impl <'a> Compiler <'a> {
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &ASTNode<'a>, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
+
         match ast.node_type() {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },
             ASTNodeType::Block(_) => { return self.visit_block(ast, builder.unwrap()); },

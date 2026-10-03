@@ -1,7 +1,5 @@
-struct Foo {
-    x: i64
-}
+fun add(num1: i64, num2: i64) :: i64 => num1 + num2
 
 fun main() :: i64 {
-    ret new Foo { x = 0.123 }
+    ret add(2, 4)
 }

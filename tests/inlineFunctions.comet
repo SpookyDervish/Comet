@@ -1,11 +1,5 @@
-import io
+fun add(num1: i64, num2: i64) :: i64 => num1 + num2
 
-func add(int a, int b) -> int => a + b
-
-func main() -> int {
-    int a = 2
-    int b = 6
-
-    io.print("%n + %n = %n\n", a, b, add(a, b))
-    return 0
+fun main() :: i64 {
+    ret add(2, 4)
 }
