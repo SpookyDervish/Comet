@@ -1,0 +1,3 @@
+struct Test <T> {
+    x: i64
+}

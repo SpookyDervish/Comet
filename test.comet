@@ -1,7 +1,6 @@
-fun add(a: i64, b: i64) :: i64 => a + b
+bring test2 as other
 
 fun main() :: i64 {
-    a = 2
-    b = 4
-    ret add(a, b)
+    x = new other.Test<i64> { x = 50 }
+    ret x.x
 }

@@ -1,5 +1,4 @@
 use miette::{SourceOffset, SourceSpan};
-use itertools::Itertools;
 
 use crate::token::Token;
 
@@ -9,7 +8,8 @@ pub enum ASTType<'a> {
     Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } ,
     Pointer(Box<ASTNode<'a>>),
     Array(Box<ASTNode<'a>>, Box<ASTNode<'a>>),
-    Qualified(Vec<ASTNode<'a>>)
+    Qualified(Vec<ASTNode<'a>>),
+    ModuleQualified { path: Vec<ASTNode<'a>>, type_name: Box<ASTNode<'a>> }
     
 }
 

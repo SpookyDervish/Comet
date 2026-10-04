@@ -419,6 +419,22 @@ impl <'a> Parser <'a> {
         Ok(MatchPattern::Variant { path, fields })
     }
 
+    fn parse_module_qualified(&mut self) -> miette::Result<ASTType<'a>> {
+        let mut names = vec![];
+
+        while self.peek_token_is(&TokenType::Dot) {
+            let name = self.parse_identifier_literal()?;
+            names.push(name);
+
+            self.advance_token();
+            self.advance_token();
+        }
+
+        let type_name = self.parse_identifier_literal()?;
+        
+        Ok(ASTType::ModuleQualified {path: names, type_name: Box::new(type_name)})
+    }
+
     fn parse_type(&mut self) -> miette::Result<ASTNode<'a>> {
         let mut range = Range::start(self.current_token().unwrap().pos());
 
@@ -446,13 +462,20 @@ impl <'a> Parser <'a> {
             self.expect_peek(TokenType::CloseSquare)?;
         } else {
             self.advance_token();
-            let mut names = self.parse_qualified()?;
 
-            base_type = if names.len() == 1 {
-                ASTType::Identifier(Box::new(names.pop().unwrap()))
+            if self.peek_token_is(&TokenType::Dot) {
+                base_type = self.parse_module_qualified()?;
             } else {
-                ASTType::Qualified(names)
-            };
+                let mut names = self.parse_qualified()?;
+
+                base_type = if names.len() == 1 {
+                    ASTType::Identifier(Box::new(names.pop().unwrap()))
+                } else {
+                    ASTType::Qualified(names)
+                };
+            }
+
+            
         }
 
         let generic_types = if self.peek_token_is(&TokenType::Lt) {

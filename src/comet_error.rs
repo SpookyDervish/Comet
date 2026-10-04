@@ -28,6 +28,18 @@ pub struct NotAFunction {
 }
 
 #[derive(Diagnostic, Debug, Error)]
+#[error("NotAModule")]
+pub struct NotAModule {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("'{module_name}' is not a module")]
+    pub span: SourceSpan,
+
+    pub module_name: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
 #[error("UnkownType")]
 pub struct UnkownType {
     #[source_code]

@@ -12,7 +12,7 @@ use std::fs;
 use itertools::Itertools;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, NotAModule, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::comet_union::{CometUnion, CometUnionItem};
@@ -251,13 +251,16 @@ impl <'a> Compiler <'a> {
         type_name_node: &ASTNode<'b>,
         generic_types: &[ASTNode<'b>]
     ) -> miette::Result<CometType> {
+        println!("{:#?}", type_name_node.node_type());
         let type_name = match type_name_node.node_type() {
             ASTNodeType::QualifierNode { ident, .. } => {
                 match ident.node_type() {
                     ASTNodeType::IdentifierLiteral(name) => name,
                     _ => unreachable!(),
                 }
-            }
+            },
+
+            ASTNodeType::IdentifierLiteral(v) => v,
 
             _ => unreachable!(),
         };
@@ -582,6 +585,59 @@ impl <'a> Compiler <'a> {
                 }
 
                 Ok(current_type)
+            },
+
+            ASTType::ModuleQualified { path, type_name: type_name_node } => {
+
+                let mut last_scope = &self.scopes[0];
+
+                // loop over the path
+                for ident in path {
+                    let name = match ident.node_type() {
+                        ASTNodeType::IdentifierLiteral(v) => v,
+                        _ => unreachable!()
+                    };
+
+                    let var = last_scope.variables.get(name);
+                    if var.is_none() {
+                        return Err(UndefinedVariable {
+                            var: name.clone(),
+                            span: ident.source_span(),
+                            src: self.named_source(),
+                        }.into());
+                    }
+
+                    let module_scope = match &var.unwrap().var_type {
+                        CometVarType::Module(s) => s,
+                        _ => {
+                            return Err(NotAModule {
+                                src: self.named_source(),
+                                span: ident.source_span(),
+                                module_name: name.clone()
+                            }.into()); 
+                        }
+                    };
+
+                    last_scope = module_scope;
+                    
+                }
+
+                // get the final field
+                let type_name = match type_name_node.node_type() {
+                    ASTNodeType::IdentifierLiteral(v) => v,
+                    _ => unreachable!()
+                };
+
+                let type_var = last_scope.types.get(type_name);
+                if type_var.is_none() {
+                    return Err(UndefinedVariable {
+                        span: type_name_node.source_span(),
+                        src: self.named_source(),
+                        var: type_name.clone()
+                    }.into());
+                }
+                
+                Ok(type_var.unwrap().clone())
             }
         }
         
@@ -712,6 +768,8 @@ impl <'a> Compiler <'a> {
             }.into());
         }
         let var = var.unwrap();
+
+        println!("{:#?}", var.type_);
 
         return Ok(var.type_.clone());
     }
@@ -2201,7 +2259,7 @@ impl <'a> Compiler <'a> {
         builder.seal_all_blocks();
         builder.finalize(target_config);
 
-        //println!("=== BUILT FUNCTION ===\n{}", ctx.func);
+        println!("=== BUILT FUNCTION ===\n{}", ctx.func);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
@@ -3309,7 +3367,7 @@ impl <'a> Compiler <'a> {
 
     }
 
-    fn visit_include_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_bring_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
         let (path_nodes, as_node_optional) = match node.node_type() {
             ASTNodeType::BringStatement { path, as_ } => (path, as_),
             _ => unreachable!()
@@ -3361,6 +3419,7 @@ impl <'a> Compiler <'a> {
 
         let mut include_scope = scope::ScopeFrame::new();
 
+        // import functions
         for (name, value) in included_vars {
             let comet_type = &value.type_;
 
@@ -3391,6 +3450,13 @@ impl <'a> Compiler <'a> {
                 _ => {}
             }
         }
+
+        // import types
+        let included_types = &include_compiler.scopes[0].types;
+        for (name, type_) in included_types {
+            include_scope.types.insert(name.clone(), type_.clone());
+        }
+
 
         self.scopes.iter_mut().last().unwrap().variables.insert(name.clone(), CometVariable { 
             type_: CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Module, definition_span: None },
@@ -3426,7 +3492,7 @@ impl <'a> Compiler <'a> {
                 return Ok(());
             }
             ASTNodeType::ImplDefStatement { .. } => { return self.visit_impl_def_statement(ast); },
-            ASTNodeType::BringStatement { .. } => { return self.visit_include_statement(ast); },
+            ASTNodeType::BringStatement { .. } => { return self.visit_bring_statement(ast); },
 
             ASTNodeType::CompilerDirectiveStatement { .. } => { return self.visit_compiler_directive(ast); },
 
