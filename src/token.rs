@@ -1,6 +1,8 @@
 use miette::{SourceOffset, SourceSpan};
 
-use crate::position::Position;
+use std::rc::Rc;
+
+use crate::position::{Pos, SourceFile};
 use crate::precedence::PrecedenceType;
 use crate::range::Range;
 
@@ -99,20 +101,22 @@ impl TokenType {
 }
 
 #[derive(Debug, Clone)]
-pub struct Token <'a>  {
+pub struct Token {
     range: Range,
-    pos: Position <'a>,
-    end_pos: Position <'a>,
+    start_pos: Pos,
+    end_pos: Pos,
+    file: Rc<SourceFile>,
     token_type: TokenType
 }
 
-impl <'a> Token <'a> {
-    pub fn new(token_type: TokenType, range: Range, pos: Position<'a>, end_pos: Position<'a>) -> Self {
+impl Token {
+    pub fn new(token_type: TokenType, range: Range, start_pos: Pos, end_pos: Pos, file: Rc<SourceFile>) -> Self {
         Token {
             token_type: token_type,
             range: range,
-            pos: pos,
-            end_pos: end_pos
+            start_pos: start_pos,
+            end_pos: end_pos,
+            file: file,
         }
     }
 
@@ -124,15 +128,19 @@ impl <'a> Token <'a> {
         SourceSpan::new(SourceOffset::from(self.range.end_pos()), 1)
     }
 
-    pub fn pos(&self) -> &Position<'a> {
-        &self.pos
+    pub fn start_pos(&self) -> Pos {
+        self.start_pos
     }
-    pub fn end_pos(&self) -> &Position<'a> {
-        &self.end_pos
+    pub fn end_pos(&self) -> Pos {
+        self.end_pos
     }
 
     pub fn token_type(&self) -> &TokenType {
         &self.token_type
+    }
+
+    pub fn file(&self) -> &Rc<SourceFile> {
+        &self.file
     }
 
     pub fn range(&self) -> &Range {

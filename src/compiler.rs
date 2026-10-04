@@ -24,11 +24,11 @@ use crate::{ast::{ASTNode, ASTNodeType, MatchPattern}, comet_type::CometType, to
 pub struct Compiler <'a> {
     module: ObjectModule,
 
-    scopes: Vec<ScopeFrame<'a>>,
+    scopes: Vec<ScopeFrame>,
     methods: HashMap<(String, String), CometMethod>,
     resolved_generics: HashMap<String, CometType>,
 
-    generic_impls: Vec<ASTNode<'a>>,
+    generic_impls: Vec<ASTNode>,
 
     current_function: Option<CometFunction>,
 
@@ -101,7 +101,7 @@ impl <'a> Compiler <'a> {
         NamedSource::new(self.file_name, self.source.clone())
     }
 
-    fn get_variable(&self, name: &str) -> Option<&CometVariable<'a>> {
+    fn get_variable(&self, name: &str) -> Option<&CometVariable> {
         self.scopes.iter().rev().find_map(|scope| scope.variables.get(name))
     }
 
@@ -113,7 +113,7 @@ impl <'a> Compiler <'a> {
         self.methods.get(&(struct_name, method_name))
     }
 
-    fn get_generic(&self, name: &str) -> Option<&ASTNode<'a>> {
+    fn get_generic(&self, name: &str) -> Option<&ASTNode> {
         self.scopes
             .iter()
             .rev()
@@ -248,30 +248,38 @@ impl <'a> Compiler <'a> {
 
     fn get_generic_type_literal_type<'b>(
         &mut self,
-        type_name_node: &ASTNode<'b>,
-        generic_types: &[ASTNode<'b>]
+        type_name_node: &ASTNode,
+        generic_types: &[ASTNode],
+        scope_to_search: Option<ASTNode>
     ) -> miette::Result<CometType> {
-        println!("{:#?}", type_name_node.node_type());
-        let type_name = match type_name_node.node_type() {
+        let type_name_str = match type_name_node.node_type() {
             ASTNodeType::QualifierNode { ident, .. } => {
                 match ident.node_type() {
-                    ASTNodeType::IdentifierLiteral(name) => name,
+                    ASTNodeType::IdentifierLiteral(name) => name.clone(),
                     _ => unreachable!(),
                 }
-            },
+            }
+            ASTNodeType::IdentifierLiteral(v) => v.clone(),
 
-            ASTNodeType::IdentifierLiteral(v) => v,
-
-            _ => unreachable!(),
+            _ => {
+                unreachable!()
+            }
         };
 
-        let mut type_template = self.get_generic(type_name)
-            .ok_or_else(|| UnkownType {
-                span: type_name_node.source_span(),
-                src: self.named_source(),
-                type_: type_name.clone(),
-            })?
-            .clone();
+        let type_name = type_name_str.as_str();
+
+        let mut type_template;
+        
+        type_template = match scope_to_search {
+            None => self.get_generic(type_name)
+                .ok_or_else(|| UnkownType {
+                    span: type_name_node.source_span(),
+                    src: self.named_source(),
+                    type_: type_name_str.clone(),
+                })?
+                .clone(),
+            Some(node) => node
+        };
 
         let generic_names: Vec<String> = match type_template.node_type_mut() {
             ASTNodeType::StructDefinitionStatement { ident: _, fields: _, generics } => { 
@@ -315,7 +323,7 @@ impl <'a> Compiler <'a> {
                 got: generic_types.len(),
                 src: self.named_source(),
                 span: type_name_node.source_span(),
-                type_name: type_name.clone()
+                type_name: type_name_str.clone()
             }.into());
         }
 
@@ -326,11 +334,11 @@ impl <'a> Compiler <'a> {
 
         let existing_type_name = match type_template.node_type() {
             ASTNodeType::StructDefinitionStatement { .. } => {
-                CometStruct::get_mangled_name(&type_name, &resolved_generic_types)
+                CometStruct::get_mangled_name(&type_name_str, &resolved_generic_types)
             }
             ASTNodeType::UnionDefinitionStatement { .. } => {
-                CometUnion::get_mangled_name(&type_name, &resolved_generic_types)
-            },
+                CometUnion::get_mangled_name(&type_name_str, &resolved_generic_types)
+            }, 
             _ => unreachable!()
         };
 
@@ -358,7 +366,7 @@ impl <'a> Compiler <'a> {
                 let mut struct_result = self.visit_struct_def_statement(&type_template)?.unwrap();
                 struct_result.mangle_name(&resolved_generic_types);
 
-                self.instantiate_generic_impls(&type_name, &resolved_generic_types, &struct_result)?;
+                self.instantiate_generic_impls(&type_name_str, &resolved_generic_types, &struct_result)?;
 
                 let new_type = CometType::new_struct(struct_result.clone())
                     .with_definition_span(Some(type_name_node.source_span()));
@@ -392,7 +400,7 @@ impl <'a> Compiler <'a> {
     }
 
 
-    fn qualified_name <'b> (&mut self, node: &ASTNode<'b>) -> miette::Result<String> {
+    fn qualified_name <'b> (&mut self, node: &ASTNode) -> miette::Result<String> {
         match node.node_type() {
             ASTNodeType::QualifierNode { ident: ident_node, generics } => {
                 let ident = match ident_node.node_type() {
@@ -420,7 +428,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn get_type_literal_type<'b> (&mut self, node: &ASTNode<'b>) -> miette::Result<CometType> {
+    fn get_type_literal_type (&mut self, node: &ASTNode) -> miette::Result<CometType> {
         /* Takes in a type literal node and returns the type it represents. */
 
         let (ast_type, generic_types) = match node.node_type() {
@@ -429,13 +437,13 @@ impl <'a> Compiler <'a> {
         };
 
         if generic_types.is_some() {
-            return self.get_generic_type_literal_type(node, generic_types.as_ref().unwrap());
+            return self.get_generic_type_literal_type(node, generic_types.as_ref().unwrap(), None);
         }
 
         match ast_type {
             ASTType::Identifier(struct_name) => {
                 if let ASTNodeType::QualifierNode { generics: Some(generic_types), .. } = struct_name.node_type() {
-                    return self.get_generic_type_literal_type(struct_name, generic_types);
+                    return self.get_generic_type_literal_type(struct_name, generic_types, None);
                 }
 
                 let ident = self.qualified_name(struct_name)?;
@@ -503,7 +511,8 @@ impl <'a> Compiler <'a> {
                             // Resolve Test<u64>
                             self.get_generic_type_literal_type(
                                 first,
-                                generic_types
+                                generic_types,
+                                None
                             )?
                         } else {
                             // Resolve a non-generic Test
@@ -587,57 +596,101 @@ impl <'a> Compiler <'a> {
                 Ok(current_type)
             },
 
-            ASTType::ModuleQualified { path, type_name: type_name_node } => {
+            ASTType::ModuleQualified(names) => {
+                let Some((last_node, path)) = names.split_last() else {
+                    return Err(CompilerBug {
+                        span: node.source_span(),
+                        src: self.named_source(),
+                        text: String::from("uhh")
+                    }.into());
+                };
 
                 let mut last_scope = &self.scopes[0];
-
-                // loop over the path
-                for ident in path {
-                    let name = match ident.node_type() {
-                        ASTNodeType::IdentifierLiteral(v) => v,
-                        _ => unreachable!()
+                for name in path {
+                    let ASTNodeType::QualifierNode { ident: ident_node, generics } = name.node_type() else {
+                        return Err(SyntaxError {
+                            span: name.source_span(),
+                            src: self.named_source(),
+                            text: String::from("Expected qualifier")
+                        }.into());
                     };
 
-                    let var = last_scope.variables.get(name);
-                    if var.is_none() {
-                        return Err(UndefinedVariable {
-                            var: name.clone(),
-                            span: ident.source_span(),
+                    let ASTNodeType::IdentifierLiteral(ident) = ident_node.node_type() else {
+                        return Err(CompilerBug {
+                            span: ident_node.source_span(),
                             src: self.named_source(),
+                            text: String::from("Expected identifier")
+                        }.into());
+                    };
+
+                    let var = last_scope.variables.get(ident);
+                    if var.is_none() {
+                        return Err(UnkownField {
+                            field: ident.clone(),
+                            span: ident_node.source_span(),
+                            src: self.named_source(),
+                            struct_name: String::from("module")
                         }.into());
                     }
+                    let var = var.unwrap();
 
-                    let module_scope = match &var.unwrap().var_type {
-                        CometVarType::Module(s) => s,
-                        _ => {
-                            return Err(NotAModule {
-                                src: self.named_source(),
-                                span: ident.source_span(),
-                                module_name: name.clone()
-                            }.into()); 
-                        }
+                    let CometVarType::Module(ref module_scope) = var.var_type else {
+                        return Err(TypeMismatch {
+                            src: self.named_source(),
+                            span: ident_node.source_span(),
+                            invalid: format!("{:?}", var.var_type),
+                            expected: String::from("module"),
+                            type_def: None
+                        }.into());
                     };
 
                     last_scope = module_scope;
                     
                 }
 
-                // get the final field
-                let type_name = match type_name_node.node_type() {
-                    ASTNodeType::IdentifierLiteral(v) => v,
-                    _ => unreachable!()
+                let ASTNodeType::QualifierNode { ident: last_ident_node, generics } = last_node.node_type() else {
+                    return Err(SyntaxError {
+                        src: self.named_source(),
+                        span: last_node.source_span(),
+                        text: String::from("Expected qualifier")
+                    }.into());
                 };
 
-                let type_var = last_scope.types.get(type_name);
-                if type_var.is_none() {
-                    return Err(UndefinedVariable {
-                        span: type_name_node.source_span(),
+                if generics.is_some() {
+                    let ASTNodeType::IdentifierLiteral(last_ident) = last_ident_node.node_type() else {
+                        return Err(CompilerBug {
+                            src: self.named_source(),
+                            span: last_ident_node.source_span(),
+                            text: String::from("Expected identifier")
+                        }.into());
+                    };
+
+                    let looked_up = last_scope.generics.get(last_ident).cloned().ok_or_else(|| UnkownType {
                         src: self.named_source(),
-                        var: type_name.clone()
-                    }.into());
+                        span: last_ident_node.source_span(),
+                        type_: last_ident.to_string()
+                    })?;
+                    return self.get_generic_type_literal_type(last_ident_node, generics.as_ref().unwrap(), Some(looked_up));
                 }
-                
-                Ok(type_var.unwrap().clone())
+
+                let ASTNodeType::IdentifierLiteral(last) = last_ident_node.node_type() else {
+                    return Err(SyntaxError {
+                        src: self.named_source(),
+                        span: last_node.source_span(),
+                        text: String::from("Expected identifier")
+                    }.into());
+                };
+
+                let Some(final_type) = last_scope.types.get(last) else {
+                    return Err(UnkownField {
+                        src: self.named_source(),
+                        span: last_node.source_span(),
+                        field: last.clone(),
+                        struct_name: String::from("module")
+                    }.into());
+                };
+
+                Ok(final_type.clone())
             }
         }
         
@@ -708,7 +761,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_get_union_item(&mut self, _left: &ASTNode<'a>, right: &ASTNode<'a>, union: &CometUnion) -> miette::Result<CometType> {
+    fn visit_get_union_item(&mut self, _left: &ASTNode, right: &ASTNode, union: &CometUnion) -> miette::Result<CometType> {
         let right_ident = match right.node_type() {
             ASTNodeType::IdentifierLiteral(v) => v,
             _ => { return Err(SyntaxError {
@@ -731,7 +784,7 @@ impl <'a> Compiler <'a> {
         Ok(CometType::new_variant(item.unwrap().clone()))
     }
 
-    fn resolve_module_access_type(&mut self, node: &ASTNode<'a>) -> miette::Result<CometType> {
+    fn resolve_module_access_type(&mut self, node: &ASTNode) -> miette::Result<CometType> {
         let (left, right) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op: _, right } => (left, right),
             _ => unreachable!()
@@ -774,7 +827,7 @@ impl <'a> Compiler <'a> {
         return Ok(var.type_.clone());
     }
 
-    fn resolve_type(&mut self, node: &ASTNode<'a>) -> miette::Result<CometType> {
+    fn resolve_type(&mut self, node: &ASTNode) -> miette::Result<CometType> {
         match node.node_type() {
             ASTNodeType::IntLiteral(_) => {
                 Ok(CometType::new_int(types::I64, false))
@@ -996,7 +1049,7 @@ impl <'a> Compiler <'a> {
     // END OF UTIL METHODS
 
     // VISIT METHODS //
-    fn visit_program(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_program(&mut self, node: &ASTNode) -> miette::Result<()> {
         let nodes = match node.node_type() {
             ASTNodeType::Program(value) => value,
             _ => unreachable!()
@@ -1009,7 +1062,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_block(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_block(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let nodes = match node.node_type() {
             ASTNodeType::Block(value) => value,
             _ => unreachable!()
@@ -1024,9 +1077,9 @@ impl <'a> Compiler <'a> {
 
     fn visit_module_func_call(
         &mut self,
-        receiver_node: &ASTNode<'a>,
-        method_node: &ASTNode<'a>,
-        args: &[ASTNode<'a>],
+        receiver_node: &ASTNode,
+        method_node: &ASTNode,
+        args: &[ASTNode],
         builder: &mut FunctionBuilder
     ) -> miette::Result<ir::Value> {
         let var_name = match receiver_node.node_type() {
@@ -1101,10 +1154,10 @@ impl <'a> Compiler <'a> {
 
     fn visit_method_call(
         &mut self,
-        receiver_node: &ASTNode<'a>,
-        method_node: &ASTNode<'a>,
+        receiver_node: &ASTNode,
+        method_node: &ASTNode,
         op: &TokenType,
-        args: &[ASTNode<'a>],
+        args: &[ASTNode],
         builder: &mut FunctionBuilder
     ) -> miette::Result<ir::Value> {
         let receiver_type = self.resolve_type(receiver_node)?;
@@ -1178,7 +1231,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_variant_instance(&mut self, item: &CometUnionItem, fields: &Option<Vec<ASTNode<'a>>>, span: miette::SourceSpan, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_variant_instance(&mut self, item: &CometUnionItem, fields: &Option<Vec<ASTNode>>, span: miette::SourceSpan, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let discriminant_type = types::I32;
         let payload_offset = item.payload_offset(discriminant_type.bytes());
         let union_type = self.get_type(item.union_name()).cloned().ok_or_else(|| CompilerBug {
@@ -1282,7 +1335,7 @@ impl <'a> Compiler <'a> {
         Ok(stack_addr)
     }
 
-    fn visit_value(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
             ASTNodeType::InfixExpression { left: _, op, right: _ } => {
                 if op.token_type() == &TokenType::Dot {
@@ -1560,7 +1613,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_l_value(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_l_value(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         match node.node_type() {
             ASTNodeType::IdentifierLiteral(_) => self.visit_value(node, builder),
 
@@ -1673,7 +1726,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_logical_op_expr(&mut self, left: &ASTNode<'a>, op: &TokenType, right: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_logical_op_expr(&mut self, left: &ASTNode, op: &TokenType, right: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let left_type = self.resolve_type(left)?;
         let right_type = self.resolve_type(right)?;
         let unified_type = self.unify_types(&left_type, &right_type).clone();
@@ -1755,7 +1808,7 @@ impl <'a> Compiler <'a> {
         Ok(result)
     }
 
-    fn visit_infix_expression(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_infix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (left, op, right) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
             _ => unreachable!()
@@ -1974,7 +2027,7 @@ impl <'a> Compiler <'a> {
         Ok(out)
     }
 
-    fn visit_get_field(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_get_field(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (left_node, op, right_node) = match node.node_type() {
             ASTNodeType::InfixExpression { left, op, right } => (left, op, right),
             _ => unreachable!()
@@ -2022,7 +2075,7 @@ impl <'a> Compiler <'a> {
         Ok(builder.ins().load(field.field_type().cranelift_type, MemFlagsData::new(), left, comet_struct_layout.0[*field_index] as i32))
     }
 
-    fn visit_prefix_expression(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
+    fn visit_prefix_expression(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let (op, right_node) = match node.node_type() {
             ASTNodeType::PrefixExpression { op, right } => (op, right),
             _ => unreachable!()
@@ -2109,7 +2162,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_expression_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_expression_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         match node.node_type() {
             ASTNodeType::ExpressionStatement(expr) => {
                 self.visit_value(expr, builder)?;
@@ -2123,9 +2176,9 @@ impl <'a> Compiler <'a> {
     fn compile_function(
         &mut self,
         name: &str,
-        args: &[ASTNode<'a>],
-        return_type_node: Option<&ASTNode<'a>>,
-        body: &ASTNode<'a>,
+        args: &[ASTNode],
+        return_type_node: Option<&ASTNode>,
+        body: &ASTNode,
         owner: FunctionOwner
     ) -> miette::Result<FuncId> {
         let (is_struct_impl, symbol_name) = match owner {
@@ -2267,7 +2320,7 @@ impl <'a> Compiler <'a> {
         Ok(func_id)
     }
 
-    fn visit_func_def(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_func_def(&mut self, node: &ASTNode) -> miette::Result<()> {
         let (name_node, func_args, return_type_optional, body) = match node.node_type() {
             ASTNodeType::FuncDefinitionStatement {name, args, return_type, body } => (name, args, return_type, body),
             _ => unreachable!()
@@ -2284,7 +2337,7 @@ impl <'a> Compiler <'a> {
         
     }
 
-    fn visit_ret_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_ret_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let ret_value_optional = match node.node_type() {
             ASTNodeType::ReturnStatement(value) => value,
             _ => unreachable!()
@@ -2319,7 +2372,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_assign_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_assign_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (ident_node, type_node, value_node) = match node.node_type() {
             ASTNodeType::AssignStatement { ident, type_, value } => (ident, type_, value),
             _ => unreachable!()
@@ -2454,7 +2507,7 @@ impl <'a> Compiler <'a> {
 
     fn pattern_variant_item(
         &mut self,
-        path: &[ASTNode<'a>],
+        path: &[ASTNode],
         expected_type: &CometType,
         span: miette::SourceSpan
     ) -> miette::Result<CometUnionItem> {
@@ -2484,7 +2537,7 @@ impl <'a> Compiler <'a> {
         };
 
         let union_type = if let Some(generic_types) = generic_types {
-            self.get_generic_type_literal_type(&path[0], generic_types)?
+            self.get_generic_type_literal_type(&path[0], generic_types, None)?
         } else {
             self.get_type(&union_name).cloned().ok_or_else(|| UnkownType {
                 span: path[0].source_span(),
@@ -2567,7 +2620,7 @@ impl <'a> Compiler <'a> {
      */
     fn collect_pattern_bindings(
         &mut self,
-        pattern: &MatchPattern<'a>,
+        pattern: &MatchPattern,
         expected_type: &CometType
     ) -> miette::Result<Vec<(String, CometType)>> {
         match pattern {
@@ -2621,7 +2674,7 @@ impl <'a> Compiler <'a> {
 
     fn emit_variant_match_branch(
         &mut self,
-        pattern: &MatchPattern<'a>,
+        pattern: &MatchPattern,
         value: ir::Value,
         value_type: &CometType,
         matched_block: Block,
@@ -2688,7 +2741,7 @@ impl <'a> Compiler <'a> {
 
     fn bind_variant_pattern(
         &mut self,
-        pattern: &MatchPattern<'a>,
+        pattern: &MatchPattern,
         value: ir::Value,
         value_type: &CometType,
         variables: &HashMap<String, (Variable, CometType)>,
@@ -2743,7 +2796,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn pattern_is_unconditional_variant(pattern: &MatchPattern<'a>) -> bool {
+    fn pattern_is_unconditional_variant(pattern: &MatchPattern) -> bool {
         /* returns true if a variant carries no data */
         match pattern {
             MatchPattern::Variant { fields, .. } => fields.iter().all(|field| matches!(field, MatchPattern::Binding(_))),
@@ -2751,7 +2804,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn pattern_key(pattern: &MatchPattern<'a>) -> Option<String> {
+    fn pattern_key(pattern: &MatchPattern) -> Option<String> {
         match pattern {
             MatchPattern::Variant { path, fields } => {
                 let names = path.iter().map(|node| match node.node_type() {
@@ -2769,7 +2822,7 @@ impl <'a> Compiler <'a> {
         }
     }
 
-    fn visit_match_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_match_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, match_nodes, default_branch) = match node.node_type() {
             ASTNodeType::MatchStatement { expr, nodes, default } => (expr, nodes, default),
             _ => unreachable!()
@@ -3008,7 +3061,7 @@ impl <'a> Compiler <'a> {
         return is_terminated;
     }
 
-    fn visit_if_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_if_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, body_node, else_body) = match node.node_type() {
             ASTNodeType::IfStatement { expr, body, else_body } => (expr, body, else_body),
             _ => unreachable!()
@@ -3055,7 +3108,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_while_statement(&mut self, node: &ASTNode<'a>, builder: &mut FunctionBuilder) -> miette::Result<()> {
+    fn visit_while_statement(&mut self, node: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<()> {
         let (expr_node, body_node) = match node.node_type() {
             ASTNodeType::WhileStatement { expr, body } => (expr, body),
             _ => unreachable!()
@@ -3085,7 +3138,7 @@ impl <'a> Compiler <'a> {
     }
 
 
-    fn visit_struct_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<Option<CometStruct>> {
+    fn visit_struct_def_statement(&mut self, node: &ASTNode) -> miette::Result<Option<CometStruct>> {
         let (ident_node, field_nodes, generics) = match node.node_type() {
             ASTNodeType::StructDefinitionStatement { ident, fields, generics } => (ident, fields, generics),
             _ => unreachable!()
@@ -3137,7 +3190,7 @@ impl <'a> Compiler <'a> {
         Ok(Some(new_struct))
     }
 
-    fn visit_union_def_statement(&mut self, node: &ASTNode<'a>, resolved_generics: Option<&Vec<CometType>>) -> miette::Result<Option<CometUnion>> {
+    fn visit_union_def_statement(&mut self, node: &ASTNode, resolved_generics: Option<&Vec<CometType>>) -> miette::Result<Option<CometUnion>> {
         let (ident_node, item_nodes, generics) = match node.node_type() {
             ASTNodeType::UnionDefinitionStatement { ident, fields, generics } => (ident, fields, generics),
             _ => unreachable!()
@@ -3229,7 +3282,7 @@ impl <'a> Compiler <'a> {
         Ok(Some(new_union))
     }
 
-    fn visit_impl_def_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_impl_def_statement(&mut self, node: &ASTNode) -> miette::Result<()> {
         let (struct_node, functions) = match node.node_type() {
             ASTNodeType::ImplDefStatement { struct_type, functions } => (struct_type, functions),
             _ => unreachable!()
@@ -3302,7 +3355,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_extern_directive(&mut self, name_node: &ASTNode<'a>, type_node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_extern_directive(&mut self, name_node: &ASTNode, type_node: &ASTNode) -> miette::Result<()> {
         let name = match name_node.node_type() {
             ASTNodeType::IdentifierLiteral(value) => value,
             _ => unreachable!()
@@ -3343,7 +3396,7 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-    fn visit_compiler_directive(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_compiler_directive(&mut self, node: &ASTNode) -> miette::Result<()> {
         let (directive_node, name_node, type_node) = match node.node_type() {
             ASTNodeType::CompilerDirectiveStatement { directive, value_name, value_type } => (directive, value_name, value_type),
             _ => unreachable!()
@@ -3367,7 +3420,7 @@ impl <'a> Compiler <'a> {
 
     }
 
-    fn visit_bring_statement(&mut self, node: &ASTNode<'a>) -> miette::Result<()> {
+    fn visit_bring_statement(&mut self, node: &ASTNode) -> miette::Result<()> {
         let (path_nodes, as_node_optional) = match node.node_type() {
             ASTNodeType::BringStatement { path, as_ } => (path, as_),
             _ => unreachable!()
@@ -3457,6 +3510,12 @@ impl <'a> Compiler <'a> {
             include_scope.types.insert(name.clone(), type_.clone());
         }
 
+        // import generics
+        let included_generics = &include_compiler.scopes[0].generics;
+        for (name, type_) in included_generics {
+            include_scope.generics.insert(name.clone(), type_.clone());
+        }
+
 
         self.scopes.iter_mut().last().unwrap().variables.insert(name.clone(), CometVariable { 
             type_: CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Module, definition_span: None },
@@ -3470,7 +3529,7 @@ impl <'a> Compiler <'a> {
     }
     // END OF VISIT METHODS //
 
-    pub fn compile(&mut self, ast: &ASTNode<'a>, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
+    pub fn compile(&mut self, ast: &ASTNode, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
 
         match ast.node_type() {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },

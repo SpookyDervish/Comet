@@ -1,6 +1,6 @@
 bring test2 as other
 
 fun main() :: i64 {
-    x = new other.Test<i64> { x = 50 }
+    x = new other.Test<u64> { x = 50 }
     ret x.x
 }

@@ -43,3 +43,50 @@ impl <'file> Position <'file> {
         self.file_text
     }
 }
+// Owned position and shared source file for lifetime-free tokens/ast
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pos {
+    index: usize,
+    line: usize,
+    column: usize,
+}
+
+impl Pos {
+    pub fn new(index: usize, line: usize, column: usize) -> Self {
+        Pos { index, line, column }
+    }
+
+    pub fn idx(&self) -> usize { self.index }
+    pub fn ln(&self) -> usize { self.line }
+    pub fn col(&self) -> usize { self.column }
+}
+
+impl From<&Position<'_>> for Pos {
+    fn from(pos: &Position<'_>) -> Self {
+        Pos { index: pos.idx(), line: pos.ln(), column: pos.col() }
+    }
+}
+
+use std::rc::Rc;
+
+#[derive(Debug, Clone)]
+pub struct SourceFile {
+    name: String,
+    text: String,
+}
+
+impl SourceFile {
+    pub fn new(name: String, text: String) -> Self {
+        SourceFile { name, text }
+    }
+
+    pub fn shared(name: String, text: String) -> Rc<SourceFile> {
+        Rc::new(SourceFile::new(name, text))
+    }
+
+    pub fn name(&self) -> &str { &self.name }
+    pub fn text(&self) -> &str { &self.text }
+    pub fn named_source(&self) -> miette::NamedSource<String> {
+        miette::NamedSource::new(self.name.clone(), self.text.clone())
+    }
+}

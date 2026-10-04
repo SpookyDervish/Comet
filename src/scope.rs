@@ -6,29 +6,29 @@ use cranelift_module::FuncId;
 use crate::{ast::ASTNode, comet_type::CometType};
 
 #[derive(Debug)]
-pub enum CometVarType <'a> {
+pub enum CometVarType {
     Local(Variable),
     FuncArg(usize), // stores func arg index
     External(FuncId),
-    Module(ScopeFrame<'a>)
+    Module(ScopeFrame)
 }
 
 #[derive(Debug)]
-pub struct CometVariable<'a> {
+pub struct CometVariable {
     pub type_: CometType,
-    pub var_type: CometVarType<'a>,
+    pub var_type: CometVarType,
     pub mutable: bool,
     pub function_id: Option<FuncId>
 }
 
 #[derive(Debug)]
-pub struct ScopeFrame<'a> {
-    pub variables: HashMap<String, CometVariable<'a>>,
+pub struct ScopeFrame {
+    pub variables: HashMap<String, CometVariable>,
     pub types: HashMap<String, CometType>,
-    pub generics: HashMap<String, ASTNode<'a>>
+    pub generics: HashMap<String, ASTNode>
 }
 
-impl <'a> ScopeFrame <'a> {
+impl ScopeFrame {
     pub fn new() -> Self {
         ScopeFrame {
             variables: HashMap::new(),

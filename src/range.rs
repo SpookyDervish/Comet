@@ -1,6 +1,6 @@
 use miette::SourceSpan;
 
-use crate::position::Position;
+use crate::position::Pos;
 
 #[derive(Debug, Clone)]
 pub struct Range {
@@ -34,7 +34,7 @@ impl Range {
         self.end_pos
     }
 
-    pub fn from(pos: &Position) -> Self {
+    pub fn from(pos: Pos) -> Self {
         Range { 
             start_line: pos.ln(), end_line: pos.ln(),
             start_column: pos.col(), end_column: pos.col(),
@@ -42,7 +42,7 @@ impl Range {
         }
     }
 
-    pub fn start(pos: &Position) -> Self {
+    pub fn start(pos: Pos) -> Self {
         Range {
             start_line: pos.ln(), end_line: 0,
             start_column: pos.col(), end_column: 0,
@@ -50,7 +50,7 @@ impl Range {
         }
     }
 
-    pub fn end(&mut self, pos: &Position) {
+    pub fn end(&mut self, pos: Pos) {
         self.end_line = pos.ln();
         self.end_column = pos.col();
         self.end_pos = pos.idx();

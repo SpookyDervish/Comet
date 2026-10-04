@@ -3,74 +3,75 @@ use miette::{SourceOffset, SourceSpan};
 use crate::token::Token;
 
 #[derive(Debug, Clone)]
-pub enum ASTType<'a> {
-    Identifier(Box<ASTNode<'a>>),
-    Function { arg_types: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>> } ,
-    Pointer(Box<ASTNode<'a>>),
-    Array(Box<ASTNode<'a>>, Box<ASTNode<'a>>),
-    Qualified(Vec<ASTNode<'a>>),
-    ModuleQualified { path: Vec<ASTNode<'a>>, type_name: Box<ASTNode<'a>> }
+pub enum ASTType {
+    Identifier(Box<ASTNode>),
+    Function { arg_types: Vec<ASTNode>, return_type: Option<Box<ASTNode>> } ,
+    Pointer(Box<ASTNode>),
+    Array(Box<ASTNode>, Box<ASTNode>),
+    Qualified(Vec<ASTNode>),
+    ModuleQualified(Vec<ASTNode>)
     
 }
 
 #[derive(Debug, Clone)]
-pub enum MatchPattern <'a> {
-    Expression(ASTNode<'a>),
-    Binding(ASTNode<'a>),
-    Variant { path: Vec<ASTNode<'a>>, fields: Vec<MatchPattern<'a>> }
+pub enum MatchPattern {
+    Expression(ASTNode),
+    Binding(ASTNode),
+    Variant { path: Vec<ASTNode>, fields: Vec<MatchPattern> }
 }
 
 // TODO: use an arena allocator instead of heap allocating all the nodes
 #[derive(Debug, Clone)]
-pub enum ASTNodeType<'a> {
-    Program(Vec<ASTNode<'a>>),
-    Block(Vec<ASTNode<'a>>),
+pub enum ASTNodeType {
+    Program(Vec<ASTNode>),
+    Block(Vec<ASTNode>),
 
-    FuncArgDefinition { name: Box<ASTNode<'a>>, type_: Box<ASTNode<'a>> },
-    MatchNode { expressions: Vec<MatchPattern<'a>>, block: Box<ASTNode<'a>> },
-    StructFieldDefinition { ident: Box<ASTNode<'a>>, type_: Box<ASTNode<'a>> },
-    StructField { ident: Box<ASTNode<'a>>, value: Box<ASTNode<'a>> },
-    UnionItemDefinition { ident: Box<ASTNode<'a>>, names: Vec<ASTNode<'a>>, types: Vec<ASTNode<'a>> },
-    QualifierNode { ident: Box<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
+    FuncArgDefinition { name: Box<ASTNode>, type_: Box<ASTNode> },
+    MatchNode { expressions: Vec<MatchPattern>, block: Box<ASTNode> },
+    StructFieldDefinition { ident: Box<ASTNode>, type_: Box<ASTNode> },
+    StructField { ident: Box<ASTNode>, value: Box<ASTNode> },
+    UnionItemDefinition { ident: Box<ASTNode>, names: Vec<ASTNode>, types: Vec<ASTNode> },
+    QualifierNode { ident: Box<ASTNode>, generics: Option<Vec<ASTNode>> },
+    ModuleQualifierNode { ident: Box<ASTNode>, generics: Option<Vec<ASTNode>> },
 
     // statements
-    ExpressionStatement(Box<ASTNode<'a>>),
-    FuncDefinitionStatement { name: Box<ASTNode<'a>>, args: Vec<ASTNode<'a>>, return_type: Option<Box<ASTNode<'a>>>, body: Box<ASTNode<'a>> },
-    ReturnStatement(Option<Box<ASTNode<'a>>>),
-    AssignStatement { ident: Box<ASTNode<'a>>, type_: Option<Box<ASTNode<'a>>>, value: Box<ASTNode<'a>> },
-    MatchStatement { expr: Box<ASTNode<'a>>, nodes: Vec<ASTNode<'a>>, default: Option<Box<ASTNode<'a>>> },
-    IfStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>>, else_body: Option<Box<ASTNode<'a>>> },
-    WhileStatement { expr: Box<ASTNode<'a>>, body: Box<ASTNode<'a>> },
-    StructDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
-    UnionDefinitionStatement { ident: Box<ASTNode<'a>>, fields: Vec<ASTNode<'a>>, generics: Option<Vec<ASTNode<'a>>> },
-    CompilerDirectiveStatement { directive: Box<ASTNode<'a>>, value_name: Box<ASTNode<'a>>, value_type: Box<ASTNode<'a>> },
-    ImplDefStatement { struct_type: Box<ASTNode<'a>>, functions: Vec<ASTNode<'a>> },
-    BringStatement { path: Vec<ASTNode<'a>>, as_: Option<Box<ASTNode<'a>>> },
+    ExpressionStatement(Box<ASTNode>),
+    FuncDefinitionStatement { name: Box<ASTNode>, args: Vec<ASTNode>, return_type: Option<Box<ASTNode>>, body: Box<ASTNode> },
+    ReturnStatement(Option<Box<ASTNode>>),
+    AssignStatement { ident: Box<ASTNode>, type_: Option<Box<ASTNode>>, value: Box<ASTNode> },
+    MatchStatement { expr: Box<ASTNode>, nodes: Vec<ASTNode>, default: Option<Box<ASTNode>> },
+    IfStatement { expr: Box<ASTNode>, body: Box<ASTNode>, else_body: Option<Box<ASTNode>> },
+    WhileStatement { expr: Box<ASTNode>, body: Box<ASTNode> },
+    StructDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
+    UnionDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
+    CompilerDirectiveStatement { directive: Box<ASTNode>, value_name: Box<ASTNode>, value_type: Box<ASTNode> },
+    ImplDefStatement { struct_type: Box<ASTNode>, functions: Vec<ASTNode> },
+    BringStatement { path: Vec<ASTNode>, as_: Option<Box<ASTNode>> },
 
     // expressions
-    InfixExpression { left: Box<ASTNode<'a>>, op: Token<'a>, right: Box<ASTNode<'a>> },
-    PrefixExpression { op: Token<'a>, right: Box<ASTNode<'a>> },
-    FuncCall { left: Box<ASTNode<'a>>, args: Vec<ASTNode<'a>> },
-    NewInstanceExpression { type_: Box<ASTNode<'a>>, fields: Option<Vec<ASTNode<'a>>> },
-    IndexExpression { left: Box<ASTNode<'a>>, index: Box<ASTNode<'a>> },
+    InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
+    PrefixExpression { op: Token, right: Box<ASTNode> },
+    FuncCall { left: Box<ASTNode>, args: Vec<ASTNode> },
+    NewInstanceExpression { type_: Box<ASTNode>, fields: Option<Vec<ASTNode>> },
+    IndexExpression { left: Box<ASTNode>, index: Box<ASTNode> },
 
     // literals
     IntLiteral(u64),
     FloatLiteral(f64),
     IdentifierLiteral(String),
     StringLiteral(String),
-    TypeLiteral { base_type: ASTType<'a>, generic_types: Option<Vec<ASTNode<'a>>> },
-    ArrayLiteral(Vec<ASTNode<'a>>)
+    TypeLiteral { base_type: ASTType, generic_types: Option<Vec<ASTNode>> },
+    ArrayLiteral(Vec<ASTNode>)
 }
 
 #[derive(Debug, Clone)]
-pub struct ASTNode<'a> {
-    node_type: ASTNodeType<'a>,
+pub struct ASTNode {
+    node_type: ASTNodeType,
     source_span: SourceSpan
 }
 
-impl <'a> ASTNode <'a> {
-    pub fn new(node_type: ASTNodeType<'a>, source_span: SourceSpan) -> Self {
+impl ASTNode {
+    pub fn new(node_type: ASTNodeType, source_span: SourceSpan) -> Self {
         ASTNode {
             node_type: node_type,
             source_span: source_span
@@ -93,11 +94,11 @@ impl <'a> ASTNode <'a> {
         self.source_span.clone()
     }
 
-    pub fn node_type(&self) -> &ASTNodeType<'a> {
+    pub fn node_type(&self) -> &ASTNodeType {
         &self.node_type
     }
 
-    pub fn node_type_mut(&mut self) -> &mut ASTNodeType<'a> {
+    pub fn node_type_mut(&mut self) -> &mut ASTNodeType {
         &mut self.node_type
     }
 }
