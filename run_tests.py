@@ -22,12 +22,15 @@ def make_test(case: str):
     def test(self):
         obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.out"
         program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
+
+        result = subprocess.run(["Comet", f"{TESTS_FOLDER_NAME}/{case}", "-o", obj_name])
+        self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (Comet)!")
         
-        result = subprocess.run(["./cometc", f"{TESTS_FOLDER_NAME}/{case}", "-o", obj_name])
-        self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (cometc)!")
+        link_result = subprocess.run(["gcc", obj_name, "-o", program_name])
+        self.assertEqual(link_result.returncode, 0, f"{case} did not link successfully (gcc)!")
         
-        program_result = subprocess.run(["./comet", obj_name], stdout=subprocess.PIPE)
-        self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully (comet)!")
+        program_result = subprocess.run([program_name])
+        self.assertEqual(program_result.returncode, 0, f"{case} did not run successfully!")
     return test
 
 for i, (test_name) in enumerate(os.listdir("tests")):

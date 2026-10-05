@@ -20,5 +20,5 @@ fun main() :: i64 {
 
     x = @Pointer<f16>.init(8)
 
-    ret x.capacity != 8
+    ret x.capacity
 }

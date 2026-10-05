@@ -1,6 +1,6 @@
-import io
+#ext puts: fun(str) :: i32
 
-func main() -> int {
-    io.print("Hello, World!\n")
-    return 0
+fun main() :: i64 {
+    puts("Hello, World!\n")
+    ret 0
 }

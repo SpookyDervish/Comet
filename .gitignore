@@ -61,4 +61,8 @@ comet
 test_objs
 Makefile
 test.cvm
-test.comet
+test
+
+# Added by cargo
+
+/target
