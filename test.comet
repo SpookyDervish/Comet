@@ -1,24 +1,23 @@
-#ext malloc: fun(usize) :: &u8
+#ext puts: fun(str) :: i32
 
-struct Pointer <T> {
-    ptr: &T,
-    capacity: usize
+trait Displayable {
+    toString: fun(Self) :: str
 }
 
-imp <T> Pointer <T> {
-    fun init(capacity: usize) :: Self {
-        ptr = new Self {
-            ptr = malloc(capacity),
-            capacity = capacity
-        }
+struct Test has Displayable {
+    x: i64
+}
 
-        ret ptr
+imp Test has Displayable {
+    fun toString(self: Self) :: str {
+        ret "hi"
     }
 }
 
 fun main() :: i64 {
+    x = new Test { x = 123 }
 
-    x = @Pointer<f16>.init(8)
+    puts(x.toString())
 
-    ret x.capacity
+    ret 0
 }

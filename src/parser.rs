@@ -232,7 +232,7 @@ impl Parser {
 
         let mut arg_types: Vec<ASTNode> = Vec::new();
 
-        while !self.peek_token_is(&TokenType::CloseParen) {
+        while !self.peek_token_is(&TokenType::CloseParen) {    
             let arg_type = self.parse_type()?;
             arg_types.push(arg_type);
 
@@ -241,7 +241,6 @@ impl Parser {
             }
 
             self.expect_peek(TokenType::Comma)?;
-            self.advance_token();
         }
 
         self.advance_token();

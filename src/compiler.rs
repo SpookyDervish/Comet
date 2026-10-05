@@ -2452,7 +2452,7 @@ impl <'a> Compiler <'a> {
 
         builder.finalize(target_config);
 
-        //println!("=== BUILT FUNCTION ===\n{}", ctx.func);
+        println!("=== BUILT FUNCTION ===\n{}", ctx.func);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
@@ -2613,6 +2613,7 @@ impl <'a> Compiler <'a> {
         let mut final_type = value_type.clone();
         if type_node.is_some() {
             let var_type = self.get_type_literal_type(type_node.as_ref().unwrap())?;
+            
 
             // get type of type annotation
             if var_type != value_type {

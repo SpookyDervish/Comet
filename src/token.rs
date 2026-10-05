@@ -14,7 +14,7 @@ pub enum TokenType {
     // keywords,
     Fun, Ret,
     Match, Default, If, Else, While,
-    Struct, New, Imp, Union,
+    Struct, New, Imp, Union, Trait, Has,
     Bring, As,
 
     // symbols
@@ -85,6 +85,8 @@ impl TokenType {
             "imp" => Some(TokenType::Imp),
             "bring" => Some(TokenType::Bring),
             "as" => Some(TokenType::As),
+            "trait" => Some(TokenType::Trait),
+            "has" => Some(TokenType::Has),
 
             "or" => Some(TokenType::Or),
             "and" => Some(TokenType::And),
