@@ -23,7 +23,7 @@ def make_test(case: str):
         obj_name = f"{TESTS_OBJ_FOLDER_NAME}/{case}.out"
         program_name = f"{TESTS_OBJ_FOLDER_NAME}/{case.rstrip(".comet")}"
 
-        result = subprocess.run(["Comet", f"{TESTS_FOLDER_NAME}/{case}", "-o", obj_name])
+        result = subprocess.run(["cargo", "run", "--", f"{TESTS_FOLDER_NAME}/{case}", "-o", obj_name])
         self.assertEqual(result.returncode, 0, f"{case} did not compile successfully (Comet)!")
         
         link_result = subprocess.run(["gcc", obj_name, "-o", program_name])

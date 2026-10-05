@@ -2,32 +2,35 @@
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "Comet",
 	"patterns": [
-        {
-            "include": "#comments"
-        },
+		{
+			"include": "#comments"
+		},
 		{
 			"include": "#keywords"
 		},
-        {
-            "include": "#functions"
-        },
-        {
-            "include": "#types"
-        },
-        {
-            "include": "#operators"
-        },
+		{
+			"include": "#macros_or_identifiers"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#types"
+		},
+		{
+			"include": "#operators"
+		},
 		{
 			"include": "#strings"
 		},
-        {
-            "include": "#numbers"
-        }
+		{
+			"include": "#numbers"
+		}
 	],
 	"repository": {
-        "comments": {
+		"comments": {
 			"patterns": [
-                {
+				{
 					"name": "comment.block.comet",
 					"begin": "\\/",
 					"end": "\\*/"
@@ -37,19 +40,26 @@
 					"begin": "--",
 					"end": "$"
 				}
-            ]
+			]
 		},
 
 		"keywords": {
 			"patterns": [{
 				"name": "keyword.control.comet",
-				"match": "\\b(trait|with|bring|as|union|match|default|or|and|if|self|while|for|ret|ext|fun|struct|imp|mut|private|protected|readonly|override|destroy|as|new|in|can|enum|step|else|break|continue|breakpoint|try|except|throw|drop|true|false)\\b"
+				"match": "\\b(trait|has|with|bring|as|union|match|default|or|and|if|self|while|for|ret|fun|struct|imp|mut|private|protected|readonly|override|destroy|as|new|in|can|enum|step|else|break|continue|breakpoint|try|except|throw|drop|true|false)\\b"
 			}]
 		},
 
-        "functions": {
-            "patterns": [
-                {
+		"macros_or_identifiers": {
+			"patterns": [{
+				"name": "keyword.other.macro.comet",
+				"match": "#[a-zA-Z_][a-zA-Z0-9_]*"
+			}]
+		},
+
+		"functions": {
+			"patterns": [
+				{
 					"comment": "Function definition: fun myFunc(",
 					"match": "\\b(fun)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\b\\s*(?=\\()",
 					"captures": {
@@ -64,21 +74,21 @@
 						"1": { "name": "entity.name.function.comet" }
 					}
 				}
-            ]
-        },
+			]
+		},
 
-        "types": {
-            "patterns": [
-                {
-                    "name": "support.type.primitive.comet",
-                    "match": "\\b(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize|f16|f32|f64|bool|str)\\b"
-                },
-                {
+		"types": {
+			"patterns": [
+				{
+					"name": "support.type.primitive.comet",
+					"match": "\\b(i8|i16|i32|i64|isize|u8|u16|u32|u64|usize|f16|f32|f64|bool|str)\\b"
+				},
+				{
 					"name": "storage.type.comet",
 					"match": "\\b[A-Z][a-zA-Z0-9_]*\\b"
 				}
-            ]
-        },
+			]
+		},
 
         "operators": {
             "patterns": [{

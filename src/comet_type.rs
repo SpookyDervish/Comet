@@ -210,13 +210,15 @@ impl CometType {
     pub fn try_implicit_cast(value_node: &ASTNode, value: Value, value_comet_type: &CometType, target_type: &CometType, target_node: Option<&ASTNode>, builder: &mut FunctionBuilder, named_source: NamedSource<String>) -> miette::Result<Value> {
         let their_type = target_type.cranelift_type;
 
-        if value_comet_type == target_type {
+        if target_type == value_comet_type {
             return Ok(value);
         }
 
         let value_type = value_comet_type.cranelift_type;
 
         let out: Value;
+
+
 
         // cast one int type to another
         if value_comet_type.is_int() && target_type.is_int() {
