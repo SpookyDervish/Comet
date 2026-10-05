@@ -1,16 +1,19 @@
-#ext puts: fun(str) :: i32
+#ext malloc: fun(usize) :: i32
 
-struct Test <T> {
-    x: T
+struct Pointer <T> {
+    ptr: &T,
+    capacity: usize
 }
 
-imp <T> Test <T> {
-    fun getValue(self: Self) :: T {
-        ret self.x
+imp <T> Pointer <T> {
+    fun init(capacity: usize) :: Self {
+        ptr = new Self <T> { capacity = capacity }
     }
 }
 
 fun main() :: i64 {
-    x = new Test<i64> { x = 123 }
-    ret x.getValue()
+
+    x = Pointer<u8>::init()
+
+    ret 0
 }

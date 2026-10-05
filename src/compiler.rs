@@ -181,7 +181,7 @@ impl <'a> Compiler <'a> {
                 
                 for generic_node in inner_generics.as_ref().unwrap() {
                     let ident = match generic_node.node_type() {
-                        ASTNodeType::TypeLiteral { base_type, generic_types } => {
+                        ASTNodeType::TypeLiteral { base_type, .. } => {
                             match base_type {
                                 ASTType::Identifier(qualifier_node) => {
                                     match qualifier_node.node_type() {
@@ -228,8 +228,6 @@ impl <'a> Compiler <'a> {
                 Ok(names) => names,
                 Err(()) => continue,
             };
-
-            println!("{}, {}", generic_names.len(), concrete_types.len());
 
             if generic_names.len() != concrete_types.len() {
                 continue;
@@ -877,8 +875,6 @@ impl <'a> Compiler <'a> {
             }.into());
         }
         let var = var.unwrap();
-
-        println!("{:#?}", var.type_);
 
         return Ok(var.type_.clone());
     }
@@ -2366,6 +2362,7 @@ impl <'a> Compiler <'a> {
 
         // finalize func
         builder.seal_all_blocks();
+
         builder.finalize(target_config);
 
         println!("=== BUILT FUNCTION ===\n{}", ctx.func);
