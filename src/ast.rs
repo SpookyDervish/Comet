@@ -45,7 +45,7 @@ pub enum ASTNodeType {
     StructDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
     UnionDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
     CompilerDirectiveStatement { directive: Box<ASTNode>, value_name: Box<ASTNode>, value_type: Box<ASTNode> },
-    ImplDefStatement { struct_type: Box<ASTNode>, functions: Vec<ASTNode> },
+    ImplDefStatement { struct_type: Box<ASTNode>, functions: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
     BringStatement { path: Vec<ASTNode>, as_: Option<Box<ASTNode>> },
 
     // expressions

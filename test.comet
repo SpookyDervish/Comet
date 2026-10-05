@@ -1,6 +1,16 @@
-bring test2 as other
+#ext puts: fun(str) :: i32
+
+struct Test <T> {
+    x: T
+}
+
+imp <T> Test <T> {
+    fun getValue(self: Self) :: T {
+        ret self.x
+    }
+}
 
 fun main() :: i64 {
-    x = new other.Test<u64> { x = 50 }
-    ret x.x
+    x = new Test<i64> { x = 123 }
+    ret x.getValue()
 }

@@ -49,8 +49,7 @@ impl Parser {
         let peek = self.peek_token();
 
         let curr = self.current_token().unwrap();
-        let pos = curr.start_pos();
-
+        
         let err_src = NamedSource::new(self.current_token().unwrap().file().name(), self.current_token().unwrap().file().text().to_string());
 
         if peek.is_none() {
@@ -813,6 +812,11 @@ impl Parser {
 
     fn parse_impl_block(&mut self) -> miette::Result<ASTNode> {
         let mut range = Range::start(self.current_token().unwrap().start_pos());
+
+        let mut generics = None;
+        if &TokenType::Lt == self.peek_token().unwrap().token_type() {
+            generics = Some(self.parse_generic_def()?);
+        }
         
         let struct_type = self.parse_type()?;
 
@@ -825,10 +829,8 @@ impl Parser {
             let function = self.parse_statement()?;
 
             match function.node_type() {
-                ASTNodeType::FuncDefinitionStatement { name: _, args: _, return_type: _, body: _ } => {},
+                ASTNodeType::FuncDefinitionStatement { .. } => {},
                 _ => {
-                    let pos = self.current_token().unwrap().start_pos();
-
                     return Err(NotAFunction {
                         func_name: String::new(),
                         span: function.source_span(),
@@ -844,7 +846,7 @@ impl Parser {
 
         range.end(self.current_token().unwrap().end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::ImplDefStatement { struct_type: Box::new(struct_type), functions: functions }, range.source_span()))
+        Ok(ASTNode::new(ASTNodeType::ImplDefStatement { struct_type: Box::new(struct_type), functions: functions, generics: generics }, range.source_span()))
     }
 
     fn parse_union_def_statement(&mut self) -> miette::Result<ASTNode> {
@@ -965,8 +967,6 @@ impl Parser {
         let curr = &self.current_token().unwrap();
         let prefix_fn = self.get_prefix_parse_func(curr.token_type());
         if prefix_fn.is_none() {
-            let pos = curr.start_pos();
-
             return Err(SyntaxError {
                 span: curr.source_span(),
                 src: NamedSource::new(self.current_token().unwrap().file().name(), self.current_token().unwrap().file().text().to_string()),

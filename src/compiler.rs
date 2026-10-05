@@ -130,21 +130,44 @@ impl <'a> Compiler <'a> {
         let impls = self.generic_impls.clone();
 
         for impl_node in impls {
-            let (struct_type_node, functions) = match impl_node.node_type() {
-                ASTNodeType::ImplDefStatement { struct_type, functions } => (struct_type, functions),
+            let (struct_type_node, functions, generic_defs) = match impl_node.node_type() {
+                ASTNodeType::ImplDefStatement { struct_type, functions, generics } => (struct_type, functions, generics),
                 _ => unreachable!()
             };
+
+            for (i, generic_type) in generic_defs.as_ref().unwrap().iter().enumerate() {
+                let ASTNodeType::IdentifierLiteral(generic_type_name) = generic_type.node_type() else {
+                    return Err(SyntaxError {
+                        src: self.named_source(),
+                        span: generic_type.source_span(),
+                        text: String::from("Expected identifier")
+                    }.into());
+                };
+
+                self.scopes.iter_mut().last().unwrap().types.insert(generic_type_name.clone(), concrete_types[i].clone());
+            }
+
+
 
             let target = match struct_type_node.node_type() {
                 ASTNodeType::TypeLiteral { base_type, generic_types, .. } => (base_type, generic_types),
                 _ => continue,
             };
 
-            let type_name = match target.0 {
+
+
+            let (type_name, inner_generics) = match target.0 {
                 ASTType::Identifier(name_node) => match name_node.as_ref().node_type() {
-                    ASTNodeType::IdentifierLiteral(name) => name,
+                    ASTNodeType::IdentifierLiteral(name) => (name, &None),
+                    ASTNodeType::QualifierNode { ident, generics } => {
+                        match ident.node_type() {
+                            ASTNodeType::IdentifierLiteral(name) => (name, generics),
+                            _ => continue
+                        }
+                    }
                     _ => continue,
                 },
+
                 _ => continue,
             };
 
@@ -152,7 +175,38 @@ impl <'a> Compiler <'a> {
                 continue;
             }
 
-            
+            let mut inner_generic_names = Vec::new();
+
+            if inner_generics.is_some() {
+                
+                for generic_node in inner_generics.as_ref().unwrap() {
+                    let ident = match generic_node.node_type() {
+                        ASTNodeType::TypeLiteral { base_type, generic_types } => {
+                            match base_type {
+                                ASTType::Identifier(qualifier_node) => {
+                                    match qualifier_node.node_type() {
+                                        ASTNodeType::QualifierNode { ident: ident_node, .. } => {
+                                            match ident_node.node_type() {
+                                                ASTNodeType::IdentifierLiteral(ident) => ident.clone(),
+                                                _ => continue
+                                            }
+                                        },
+                                        _ => continue
+                                    }
+                                },
+                                _ => continue
+                            }
+                        }
+                        _ => continue
+                    };
+
+                    inner_generic_names.push(ident);
+                }
+
+                
+            }
+
+
             let generic_names = match target.1.as_ref() {
                 Some(generic_nodes) => generic_nodes
                     .iter()
@@ -167,13 +221,15 @@ impl <'a> Compiler <'a> {
                         _ => Err(()),
                     })
                     .collect::<Result<Vec<_>, _>>(),
-                None => continue,
+                None => Ok(inner_generic_names)
             };
 
             let generic_names = match generic_names {
                 Ok(names) => names,
                 Err(()) => continue,
             };
+
+            println!("{}, {}", generic_names.len(), concrete_types.len());
 
             if generic_names.len() != concrete_types.len() {
                 continue;
@@ -3283,15 +3339,17 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_impl_def_statement(&mut self, node: &ASTNode) -> miette::Result<()> {
-        let (struct_node, functions) = match node.node_type() {
-            ASTNodeType::ImplDefStatement { struct_type, functions } => (struct_type, functions),
+        let (struct_node, functions, generic_defs) = match node.node_type() {
+            ASTNodeType::ImplDefStatement { struct_type, functions, generics } => (struct_type, functions, generics),
             _ => unreachable!()
         };
 
-        let is_generic_impl = match struct_node.node_type() {
+        let is_generic_impl = generic_defs.is_some();
+        /*match struct_node.node_type() {
             ASTNodeType::TypeLiteral { generic_types, .. } => generic_types.is_some(),
             _ => false
-        };
+        };*/
+
         if is_generic_impl {
             self.generic_impls.push(node.clone());
             return Ok(());
