@@ -131,7 +131,7 @@ impl <'a> Compiler <'a> {
 
         for impl_node in impls {
             let (struct_type_node, functions, generic_defs) = match impl_node.node_type() {
-                ASTNodeType::ImplDefStatement { struct_type, functions, generics } => (struct_type, functions, generics),
+                ASTNodeType::ImplDefStatement { struct_type, functions, generics, traits } => (struct_type, functions, generics),
                 _ => unreachable!()
             };
 
@@ -336,7 +336,7 @@ impl <'a> Compiler <'a> {
         };
 
         let generic_names: Vec<String> = match type_template.node_type_mut() {
-            ASTNodeType::StructDefinitionStatement { ident: _, fields: _, generics } => { 
+            ASTNodeType::StructDefinitionStatement { generics, traits, .. } => { 
                 let generic_names = generics
                 .as_ref()
                 .unwrap()
@@ -520,7 +520,7 @@ impl <'a> Compiler <'a> {
                     .as_deref()
                     .map(|t| self.get_type_literal_type(t))
                     .transpose()?
-                    .unwrap_or_else(|| CometType::new(types::INVALID));
+                    .unwrap_or_else(|| CometType::new_void());
 
                 Ok(CometType::new_function(CometFunction {
                     arg_types: compiled_arg_types,
@@ -2452,7 +2452,7 @@ impl <'a> Compiler <'a> {
 
         builder.finalize(target_config);
 
-        println!("=== BUILT FUNCTION ===\n{}", ctx.func);
+        //println!("=== BUILT FUNCTION ===\n{}", ctx.func);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
@@ -3280,8 +3280,8 @@ impl <'a> Compiler <'a> {
 
 
     fn visit_struct_def_statement(&mut self, node: &ASTNode) -> miette::Result<Option<CometStruct>> {
-        let (ident_node, field_nodes, generics) = match node.node_type() {
-            ASTNodeType::StructDefinitionStatement { ident, fields, generics } => (ident, fields, generics),
+        let (ident_node, field_nodes, generics, traits) = match node.node_type() {
+            ASTNodeType::StructDefinitionStatement { ident, fields, generics, traits } => (ident, fields, generics, traits),
             _ => unreachable!()
         };
 
@@ -3424,8 +3424,8 @@ impl <'a> Compiler <'a> {
     }
 
     fn visit_impl_def_statement(&mut self, node: &ASTNode) -> miette::Result<()> {
-        let (struct_node, functions, generic_defs) = match node.node_type() {
-            ASTNodeType::ImplDefStatement { struct_type, functions, generics } => (struct_type, functions, generics),
+        let (struct_node, functions, generic_defs, traits) = match node.node_type() {
+            ASTNodeType::ImplDefStatement { struct_type, functions, generics, traits } => (struct_type, functions, generics, traits),
             _ => unreachable!()
         };
 

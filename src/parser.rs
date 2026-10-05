@@ -150,6 +150,7 @@ impl Parser {
             TokenType::Imp => self.parse_impl_block(),
             TokenType::Union => self.parse_union_def_statement(),
             TokenType::Bring => self.parse_bring_statement(),
+            TokenType::Trait => self.parse_trait_def_statement(),
 
             TokenType::Hash => self.parse_compiler_directive(),
 
@@ -774,7 +775,12 @@ impl Parser {
         } else {
             None
         };
-        
+
+        let traits = if self.peek_token_is(&TokenType::Has) {
+            self.parse_trait_list()?
+        } else {
+            vec![]
+        };
 
         self.expect_peek(TokenType::OpenCurly)?;
 
@@ -805,9 +811,10 @@ impl Parser {
             break;
         }
 
+
         struct_range.end(self.current_token().unwrap().end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields, generics: generic_args }, struct_range.source_span()))
+        Ok(ASTNode::new(ASTNodeType::StructDefinitionStatement { ident: Box::new(ident), fields: fields, generics: generic_args, traits: traits }, struct_range.source_span()))
     }
 
     fn parse_impl_block(&mut self) -> miette::Result<ASTNode> {
@@ -819,6 +826,12 @@ impl Parser {
         }
         
         let struct_type = self.parse_type()?;
+
+        let traits = if self.peek_token_is(&TokenType::Has) {
+            self.parse_trait_list()?
+        } else {
+            vec![]
+        };
 
         self.expect_peek(TokenType::OpenCurly)?;
         self.advance_token();
@@ -846,7 +859,7 @@ impl Parser {
 
         range.end(self.current_token().unwrap().end_pos());
 
-        Ok(ASTNode::new(ASTNodeType::ImplDefStatement { struct_type: Box::new(struct_type), functions: functions, generics: generics }, range.source_span()))
+        Ok(ASTNode::new(ASTNodeType::ImplDefStatement { struct_type: Box::new(struct_type), functions, generics, traits }, range.source_span()))
     }
 
     fn parse_union_def_statement(&mut self) -> miette::Result<ASTNode> {
@@ -959,6 +972,77 @@ impl Parser {
         range.end(self.current_token().unwrap().end_pos());
 
         Ok(ASTNode::new(ASTNodeType::BringStatement { path, as_: as_node }, range.source_span()))
+    }
+
+    fn parse_trait_def_statement(&mut self) -> miette::Result<ASTNode> {
+        let mut range = Range::start(self.current_token().unwrap().start_pos());
+
+        self.expect_peek(TokenType::Identifier(String::new()))?;
+        let ident = self.parse_identifier_literal()?;
+
+        let generic_args = if self.peek_token_is(&TokenType::Lt) {
+            Some(self.parse_generic_def()?)
+        } else {
+            None
+        };
+
+        self.expect_peek(TokenType::OpenCurly)?;
+
+        let mut methods = vec![];
+        while !self.peek_token_is(&TokenType::CloseCurly) {
+            // syntax for default func implementation
+            // e.g: "fun test() :: T { ... }"
+            if self.peek_token_is(&TokenType::Fun) {
+                methods.push(self.parse_func_def_statement()?);
+                continue;
+            }
+
+            // syntax for only a func signature
+            // e.g: "test: fun() :: T"
+            self.expect_peek(TokenType::Identifier(String::new()))?;
+            let mut member_range = Range::start(self.current_token().unwrap().start_pos());
+
+            let method_ident = self.parse_identifier_literal()?;
+
+            self.expect_peek(TokenType::Colon)?;
+
+            let method_type = self.parse_type()?;
+            member_range.end(self.current_token().unwrap().end_pos());
+
+            methods.push(ASTNode::new(ASTNodeType::TraitMethodDefinition {
+                ident: Box::new(method_ident), type_: Box::new(method_type), default_body: None
+            }, member_range.source_span()));
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+            }
+        }
+
+        self.expect_peek(TokenType::CloseCurly)?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::TraitDefinitionStatement { ident: Box::new(ident), methods, generics: generic_args }, range.source_span()))
+
+    }
+
+    fn parse_trait_list(&mut self) -> miette::Result<Vec<ASTNode>> {
+        self.expect_peek(TokenType::Has)?;
+        self.advance_token();
+
+        let mut traits = vec![];
+        loop {
+            traits.push(self.parse_identifier_literal()?);
+
+            if self.peek_token_is(&TokenType::Comma) {
+                self.advance_token();
+                continue;
+            }
+
+            break;
+        }
+
+        Ok(traits)
     }
     // END OF STATEMENT METHODS //
 

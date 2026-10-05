@@ -42,11 +42,14 @@ pub enum ASTNodeType {
     MatchStatement { expr: Box<ASTNode>, nodes: Vec<ASTNode>, default: Option<Box<ASTNode>> },
     IfStatement { expr: Box<ASTNode>, body: Box<ASTNode>, else_body: Option<Box<ASTNode>> },
     WhileStatement { expr: Box<ASTNode>, body: Box<ASTNode> },
-    StructDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
+    StructDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>>, traits: Vec<ASTNode> },
     UnionDefinitionStatement { ident: Box<ASTNode>, fields: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
     CompilerDirectiveStatement { directive: Box<ASTNode>, value_name: Box<ASTNode>, value_type: Box<ASTNode> },
-    ImplDefStatement { struct_type: Box<ASTNode>, functions: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
+    ImplDefStatement { struct_type: Box<ASTNode>, functions: Vec<ASTNode>, generics: Option<Vec<ASTNode>>, traits: Vec<ASTNode> },
     BringStatement { path: Vec<ASTNode>, as_: Option<Box<ASTNode>> },
+    
+    TraitDefinitionStatement { ident: Box<ASTNode>, methods: Vec<ASTNode>, generics: Option<Vec<ASTNode>> },
+    TraitMethodDefinition { ident: Box<ASTNode>, type_: Box<ASTNode>, default_body: Option<Box<ASTNode>> },
 
     // expressions
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
