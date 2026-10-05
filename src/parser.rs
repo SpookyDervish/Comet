@@ -102,6 +102,7 @@ impl Parser {
             TokenType::Times => Some(Parser::parse_prefix_expr),
             TokenType::StarStar => Some(Parser::parse_prefix_expr),
             TokenType::Tilde => Some(Parser::parse_prefix_expr),
+            TokenType::At => Some(Parser::parse_at_expr),
 
             TokenType::OpenParen => Some(Parser::parse_grouped_expression),
             _ => None
@@ -1030,9 +1031,26 @@ impl Parser {
         return Ok(ASTNode::new(ASTNodeType::PrefixExpression { op: op, right: Box::new(right_expr) }, range.source_span()));
     }
 
-    fn parse_func_call(&mut self, left_node: ASTNode) -> miette::Result<ASTNode> {
-        let mut func_call_range = Range::start(self.current_token().unwrap().start_pos());
+    fn parse_at_expr(&mut self) -> miette::Result<ASTNode> {
+        let mut range = Range::start(self.current_token().unwrap().start_pos());
 
+        let type_ = self.parse_type()?;
+
+        self.expect_peek(TokenType::Dot)?;
+        self.advance_token();
+
+        let func_ident = self.parse_identifier_literal()?;
+
+        self.advance_token();
+
+        let args = self.parse_func_call_args()?;
+
+        range.end(self.current_token().unwrap().end_pos());
+
+        Ok(ASTNode::new(ASTNodeType::StaticFuncCall { left: Box::new(type_), ident: Box::new(func_ident), args: args }, range.source_span()))
+    }
+
+    fn parse_func_call_args(&mut self) -> miette::Result<Vec<ASTNode>> {
         let mut func_call_args: Vec<ASTNode> = Vec::new();
 
         let mut should_loop = true;
@@ -1055,6 +1073,14 @@ impl Parser {
             self.expect_peek(TokenType::CloseParen)?;
             break;
         }
+
+        Ok(func_call_args)
+    }
+
+    fn parse_func_call(&mut self, left_node: ASTNode) -> miette::Result<ASTNode> {
+        let mut func_call_range = Range::start(self.current_token().unwrap().start_pos());
+
+        let func_call_args = self.parse_func_call_args()?;
 
         func_call_range.end(self.current_token().unwrap().end_pos());
 

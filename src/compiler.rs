@@ -1075,6 +1075,37 @@ impl <'a> Compiler <'a> {
                 }
             },
 
+            ASTNodeType::StaticFuncCall { left, ident, .. } => {
+                let left_type = self.get_type_literal_type(left)?;
+
+                let CometTypeKind::Struct(left_struct) = left_type.kind else {
+                    return Err(TypeMismatch {
+                        src: self.named_source(),
+                        span: left.source_span(),
+                        invalid: left_type.to_string(),
+                        expected: String::from("struct"),
+                        type_def: Some(left.source_span())
+                    }.into());
+                };
+
+                let ASTNodeType::IdentifierLiteral(func_ident) = ident.node_type() else {
+                    return Err(SyntaxError {
+                        src: self.named_source(),
+                        span: ident.source_span(),
+                        text: String::from("Expected identifier")
+                    }.into());
+                };
+
+                let method = self.get_method(left_struct.name().to_string(), func_ident.clone()).ok_or(UnkownMethod {
+                    src: self.named_source(),
+                    span: ident.source_span(),
+                    method: func_ident.clone(),
+                    struct_name: left_struct.name().to_string()
+                })?;
+
+                Ok(*method.function.return_type.clone())
+            }
+
             ASTNodeType::NewInstanceExpression { type_, fields: _ } => {
                 let struct_type = self.get_type_literal_type(type_)?;
 
@@ -1580,6 +1611,63 @@ impl <'a> Compiler <'a> {
                 }
                 
             },
+
+            ASTNodeType::StaticFuncCall { left, ident, args } => {
+                let left_type = self.get_type_literal_type(left)?;
+
+                let CometTypeKind::Struct(left_struct) = left_type.kind else {
+                    return Err(TypeMismatch {
+                        src: self.named_source(),
+                        span: left.source_span(),
+                        invalid: left_type.to_string(),
+                        expected: String::from("struct"),
+                        type_def: Some(left.source_span())
+                    }.into());
+                };
+
+                let ASTNodeType::IdentifierLiteral(func_ident) = ident.node_type() else {
+                    return Err(SyntaxError {
+                        src: self.named_source(),
+                        span: ident.source_span(),
+                        text: String::from("Expected identifier")
+                    }.into());
+                };
+
+                let method = self.get_method(left_struct.name().to_string(), func_ident.clone()).ok_or(UnkownMethod {
+                    src: self.named_source(),
+                    span: ident.source_span(),
+                    method: func_ident.clone(),
+                    struct_name: left_struct.name().to_string()
+                })?;
+
+                let func_id = method.func_id;
+
+                let mut sig = self.module.make_signature();
+                for arg_type in &method.function.arg_types {
+                    sig.params.push(AbiParam::new(arg_type.cranelift_type));
+                }
+                if method.function.return_type.cranelift_type != types::INVALID {
+                    sig.returns.push(AbiParam::new(method.function.return_type.cranelift_type));
+                }
+
+                let mut compiled_args: Vec<ir::Value> = vec![];
+                for arg in args {
+                    compiled_args.push(self.visit_value(arg, builder)?);
+                }
+
+                let func_ref = self.module.declare_func_in_func(func_id, &mut builder.func);
+
+                let call_inst = builder.ins().call(func_ref, &compiled_args);
+                let results = builder.inst_results(call_inst);
+
+
+                if results.is_empty() {
+                    // Return a dummy value or handle void returns
+                    Ok(builder.ins().iconst(types::I64, 0))
+                } else {
+                    Ok(results[0])
+                }
+            }
 
             ASTNodeType::NewInstanceExpression { type_: type_node, fields } => {
                 let struct_type = self.get_type_literal_type(type_node)?;

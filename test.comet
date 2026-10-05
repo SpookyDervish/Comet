@@ -1,4 +1,4 @@
-#ext malloc: fun(usize) :: i32
+#ext malloc: fun(usize) :: &u8
 
 struct Pointer <T> {
     ptr: &T,
@@ -7,13 +7,18 @@ struct Pointer <T> {
 
 imp <T> Pointer <T> {
     fun init(capacity: usize) :: Self {
-        ptr = new Self <T> { capacity = capacity }
+        ptr = new Self {
+            capacity = capacity ,
+            ptr = malloc(capacity)
+        }
+
+        ret ptr
     }
 }
 
 fun main() :: i64 {
 
-    x = Pointer<u8>::init()
+    x = @Pointer<u8>.init(8)
 
-    ret 0
+    ret x.capacity
 }

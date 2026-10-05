@@ -28,6 +28,7 @@ pub enum TokenType {
     Colon, Comma, ColonColon, Arrow,
     StarStar,
     Pipe, Ampersand, Caret, Tilde,
+    At,
     Or, And,
     Hash,
     Dot,

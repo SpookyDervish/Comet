@@ -250,6 +250,10 @@ impl<'a> Lexer<'a> {
                     tokens.push(Token::new(TokenType::CloseSquare, Range::from(Pos::from(&self.pos)), Pos::from(&self.pos), Pos::from(&self.pos), self.file.clone()));
                     self.consume();
                 }
+                '@' => {
+                    tokens.push(Token::new(TokenType::At, Range::from(Pos::from(&self.pos)), Pos::from(&self.pos), Pos::from(&self.pos), self.file.clone()));
+                    self.consume();
+                }
                 ':' => {
                     let mut range = Range::from(Pos::from(&self.pos));
                     self.consume();

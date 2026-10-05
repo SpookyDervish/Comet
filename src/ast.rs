@@ -52,6 +52,7 @@ pub enum ASTNodeType {
     InfixExpression { left: Box<ASTNode>, op: Token, right: Box<ASTNode> },
     PrefixExpression { op: Token, right: Box<ASTNode> },
     FuncCall { left: Box<ASTNode>, args: Vec<ASTNode> },
+    StaticFuncCall { left: Box<ASTNode>, ident: Box<ASTNode>, args: Vec<ASTNode> },
     NewInstanceExpression { type_: Box<ASTNode>, fields: Option<Vec<ASTNode>> },
     IndexExpression { left: Box<ASTNode>, index: Box<ASTNode> },
 
