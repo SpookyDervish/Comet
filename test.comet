@@ -8,8 +8,8 @@ struct Pointer <T> {
 imp <T> Pointer <T> {
     fun init(capacity: usize) :: Self {
         ptr = new Self {
-            capacity = capacity ,
-            ptr = malloc(capacity)
+            ptr = malloc(capacity),
+            capacity = capacity
         }
 
         ret ptr
@@ -18,7 +18,7 @@ imp <T> Pointer <T> {
 
 fun main() :: i64 {
 
-    x = @Pointer<u8>.init(8)
+    x = @Pointer<f16>.init(8)
 
     ret x.capacity
 }
