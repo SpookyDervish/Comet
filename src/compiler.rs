@@ -1660,7 +1660,6 @@ impl <'a> Compiler <'a> {
                 let call_inst = builder.ins().call(func_ref, &compiled_args);
                 let results = builder.inst_results(call_inst);
 
-
                 if results.is_empty() {
                     // Return a dummy value or handle void returns
                     Ok(builder.ins().iconst(types::I64, 0))
@@ -2453,7 +2452,7 @@ impl <'a> Compiler <'a> {
 
         builder.finalize(target_config);
 
-        println!("=== BUILT FUNCTION ===\n{}", ctx.func);
+        //println!("=== BUILT FUNCTION ===\n{}", ctx.func);
 
         self.module.define_function(func_id, &mut ctx).unwrap();
         self.module.clear_context(&mut ctx);
