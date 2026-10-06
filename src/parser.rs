@@ -839,6 +839,7 @@ impl Parser {
         let mut functions = Vec::new();
 
         while !self.current_token_is(&TokenType::CloseCurly) {
+            
             let function = self.parse_statement()?;
 
             match function.node_type() {
@@ -851,11 +852,10 @@ impl Parser {
                     }.into()) ;
                 }
             }
+            self.advance_token();
 
             functions.push(function);
         }
-
-        self.advance_token();
 
         range.end(self.current_token().unwrap().end_pos());
 

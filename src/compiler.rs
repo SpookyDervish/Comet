@@ -12,8 +12,9 @@ use std::fs;
 use itertools::Itertools;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, NotAFunction, NotAModule, SyntaxError, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, MissingTraitMethod, NotAFunction, NotAModule, SyntaxError, TraitAlreadyImplemented, TraitNotDeclared, TraitSignatureMismatch, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownTrait, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
 use crate::comet_struct::{CometStruct, CometStructField};
+use crate::comet_trait::{CometTrait, CometTraitMethod};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::comet_union::{CometUnion, CometUnionItem};
 use crate::{lexer, parser, scope};
@@ -26,9 +27,11 @@ pub struct Compiler <'a> {
 
     scopes: Vec<ScopeFrame>,
     methods: HashMap<(String, String), CometMethod>,
+    traits: HashMap<String, CometTrait>,
     resolved_generics: HashMap<String, CometType>,
 
     generic_impls: Vec<ASTNode>,
+    trait_impls: HashMap<(String, String), bool>,
 
     current_function: Option<CometFunction>,
 
@@ -79,8 +82,10 @@ impl <'a> Compiler <'a> {
             current_function: None,
 
             methods: HashMap::new(),
+            traits: HashMap::new(),
             resolved_generics: HashMap::new(),
             generic_impls: Vec::new(),
+            trait_impls: HashMap::new(),
 
             var_index: 0
         })
@@ -1443,6 +1448,8 @@ impl <'a> Compiler <'a> {
                 data_desc.define(str.as_bytes().to_vec().into_boxed_slice());
 
                 let string_name = format!("string_literal_{}", self.var_index);
+                self.var_index += 1;
+
                 let data_id = self.module
                     .declare_data(&string_name, Linkage::Local, false, false).unwrap();
 
@@ -3278,7 +3285,6 @@ impl <'a> Compiler <'a> {
         Ok(())
     }
 
-
     fn visit_struct_def_statement(&mut self, node: &ASTNode) -> miette::Result<Option<CometStruct>> {
         let (ident_node, field_nodes, generics, traits) = match node.node_type() {
             ASTNodeType::StructDefinitionStatement { ident, fields, generics, traits } => (ident, fields, generics, traits),
@@ -3290,6 +3296,7 @@ impl <'a> Compiler <'a> {
             _ => unreachable!()
         };
 
+        // if its a generic struct, save it for later
         if generics.is_some() {
             let generic_template = node.clone();
             self.scopes.last_mut().unwrap().generics.insert(ident.clone(), generic_template);
@@ -3327,6 +3334,18 @@ impl <'a> Compiler <'a> {
             ident.clone(),
             CometType::new_struct(new_struct.clone()).with_definition_span(Some(ident_node.source_span()))
         );
+
+        for trait_node in traits {
+            let ASTNodeType::IdentifierLiteral(trait_name) = trait_node.node_type() else {
+                return Err(SyntaxError {
+                    src: self.named_source(),
+                    span: trait_node.source_span(),
+                    text: String::from("Expected identifier")
+                }.into());
+            };
+
+            self.trait_impls.insert((new_struct.name().to_string(), trait_name.clone()), false);
+        }
 
         Ok(Some(new_struct))
     }
@@ -3430,10 +3449,6 @@ impl <'a> Compiler <'a> {
         };
 
         let is_generic_impl = generic_defs.is_some();
-        /*match struct_node.node_type() {
-            ASTNodeType::TypeLiteral { generic_types, .. } => generic_types.is_some(),
-            _ => false
-        };*/
 
         if is_generic_impl {
             self.generic_impls.push(node.clone());
@@ -3442,9 +3457,8 @@ impl <'a> Compiler <'a> {
 
         let struct_type = self.get_type_literal_type(struct_node)?;
 
-        self.scopes.last_mut().unwrap().types.insert("Self".to_string(), struct_type.clone());
 
-        let comet_struct = match struct_type.kind {
+        let comet_struct = match &struct_type.kind {
             CometTypeKind::Struct(s) => s,
             _ => { return Err(TypeMismatch {
                 invalid: struct_type.to_string(),
@@ -3455,6 +3469,30 @@ impl <'a> Compiler <'a> {
             }.into()) }
         };
 
+
+        let mut compiled_traits = vec![];
+        if !traits.is_empty() {
+
+            for struct_trait_node in traits {
+                let ASTNodeType::IdentifierLiteral(struct_trait) = struct_trait_node.node_type() else {
+                    return Err(SyntaxError {
+                        src: self.named_source(),
+                        span: struct_trait_node.source_span(),
+                        text: String::from("Expected identifier")
+                    }.into());
+                };
+
+                let comet_trait = self.traits.get(struct_trait).ok_or(UnkownTrait {
+                    src: self.named_source(),
+                    span: struct_trait_node.source_span(),
+                    trait_name: struct_trait.clone()
+                })?;
+                compiled_traits.push(comet_trait.clone());
+            }
+        }
+
+        self.scopes.push(ScopeFrame::new());
+        self.scopes.last_mut().unwrap().types.insert("Self".to_string(), struct_type.clone());
 
         for function in functions {
             let (name_node, func_args, return_type_optional, body) = match function.node_type() {
@@ -3468,7 +3506,7 @@ impl <'a> Compiler <'a> {
             };
 
             let func_owner = FunctionOwner::Impl(String::from(comet_struct.name()));
-            let func_id = self.compile_function(name, func_args, return_type_optional.as_ref().map(|r| r.as_ref()), body, func_owner)?;
+            
         
             let mut arg_types = Vec::new();
             for func_arg in func_args {
@@ -3489,11 +3527,63 @@ impl <'a> Compiler <'a> {
                 return_type: Box::new(return_type)
             };
 
+            for trait_ in &compiled_traits {
+                for trait_method in &trait_.methods {
+                    let trait_implemented = self.trait_impls.get(&(comet_struct.name().to_string(), trait_.name.clone()))
+                        .ok_or(TraitNotDeclared {
+                            src: self.named_source(),
+                            span: struct_node.source_span(),
+                            trait_name: trait_.name.clone(),
+                            struct_name: comet_struct.name().to_string()
+                        })?;
+
+                    if trait_implemented == &true {
+                        return Err(TraitAlreadyImplemented {
+                            src: self.named_source(),
+                            span: struct_node.source_span(),
+                            trait_name: trait_.name.clone(),
+                            struct_name: comet_struct.name().to_string()
+                        }.into());
+                    }
+
+                    if &trait_method.name == name {
+                        let struct_trait_method = CometType::new_function(function.clone());
+
+                        let trait_method_type = self.get_type_literal_type(&trait_method.type_node)?;
+
+                        if struct_trait_method != trait_method_type {
+                            return Err(TraitSignatureMismatch {
+                                src: self.named_source(),
+                                span: struct_node.source_span(),
+                                trait_name: trait_.name.clone(),
+                                struct_name: comet_struct.name().to_string(),
+                                method: trait_method.name.clone(),
+
+                                expected: trait_method_type.to_string(),
+                                got: struct_trait_method.to_string()
+                            }.into());
+                        }
+                    }
+                }
+
+                
+
+                if let Some(defined) = self.trait_impls.get_mut(&(comet_struct.name().to_string(), trait_.name.clone())) {
+                    *defined = true;
+                }
+            }
+
+            let func_id = self.compile_function(name, func_args, return_type_optional.as_ref().map(|r| r.as_ref()), body, func_owner)?;
+
             self.methods.insert((comet_struct.name().to_string(), name.clone()), CometMethod {
                 function: function,
                 func_id: func_id
             });
         }
+
+        
+
+        self.scopes.pop();
 
         Ok(())
     }
@@ -3670,10 +3760,61 @@ impl <'a> Compiler <'a> {
 
         Ok(())
     }
+
+    fn visit_trait_def_statement(&mut self, node: &ASTNode) -> miette::Result<()> {
+        let ASTNodeType::TraitDefinitionStatement { ident: ident_node, methods, generics } = node.node_type() else {
+            return Err(CompilerBug {
+                src: self.named_source(),
+                span: node.source_span(),
+                text: String::from("Expected trait definition statement")
+            }.into());
+        };
+
+        let ASTNodeType::IdentifierLiteral(ident) = ident_node.node_type() else {
+            return Err(SyntaxError {
+                src: self.named_source(),
+                span: node.source_span(),
+                text: String::from("Expected identifier")
+            }.into());
+        };
+
+        let mut compiled_methods: Vec<CometTraitMethod> = vec!{};
+        for trait_method in methods {
+            let ASTNodeType::TraitMethodDefinition { ident: method_ident_node, type_, default_body } = trait_method.node_type() else {
+                return Err(SyntaxError {
+                    src: self.named_source(),
+                    span: node.source_span(),
+                    text: String::from("Expected trait method definition")
+                }.into());
+            };
+
+            let ASTNodeType::IdentifierLiteral(method_ident) = method_ident_node.node_type() else {
+                return Err(SyntaxError {
+                    src: self.named_source(),
+                    span: node.source_span(),
+                    text: String::from("Expected identifier")
+                }.into());
+            };
+
+            compiled_methods.push(CometTraitMethod {
+                name: method_ident.clone(),
+                type_node: *type_.clone(),
+                default_body: default_body.as_ref().map(|n| *n.clone())
+            })
+        }
+
+        let compiled_generics = generics.as_ref().map(|nodes| nodes.iter().map(|n| match n.node_type() {
+            ASTNodeType::IdentifierLiteral(ident) => ident.clone(),
+            _ => unreachable!()
+        }).collect()).unwrap_or(vec![]);
+
+        self.traits.insert(ident.clone(), CometTrait::new(ident.clone(), compiled_methods, compiled_generics, Some(node.source_span())));
+
+        Ok(())
+    }
     // END OF VISIT METHODS //
 
     pub fn compile(&mut self, ast: &ASTNode, builder: Option<&mut FunctionBuilder>) -> miette::Result<()> {
-
         match ast.node_type() {
             ASTNodeType::Program(_) => { return self.visit_program(ast); },
             ASTNodeType::Block(_) => { return self.visit_block(ast, builder.unwrap()); },
@@ -3695,6 +3836,7 @@ impl <'a> Compiler <'a> {
             }
             ASTNodeType::ImplDefStatement { .. } => { return self.visit_impl_def_statement(ast); },
             ASTNodeType::BringStatement { .. } => { return self.visit_bring_statement(ast); },
+            ASTNodeType::TraitDefinitionStatement { .. } => { return self.visit_trait_def_statement(ast); }
 
             ASTNodeType::CompilerDirectiveStatement { .. } => { return self.visit_compiler_directive(ast); },
 

@@ -251,3 +251,72 @@ pub struct WrongNumberOfGenerics {
     pub expect: usize,
     pub got: usize
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("UnkownTrait")]
+pub struct UnkownTrait {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("Unkown trait '{trait_name}'")]
+    pub span: SourceSpan,
+
+    pub trait_name: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("TraitNotDeclared")]
+pub struct TraitNotDeclared {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("The trait '{trait_name}' was no declared for the struct '{struct_name}'")]
+    pub span: SourceSpan,
+
+    pub trait_name: String,
+    pub struct_name: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("TraitAlreadyImplemented")]
+pub struct TraitAlreadyImplemented {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("The trait '{trait_name}' was is already implemented for the struct '{struct_name}'")]
+    pub span: SourceSpan,
+
+    pub trait_name: String,
+    pub struct_name: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("MissingTraitMethod")]
+pub struct MissingTraitMethod {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("The struct '{struct_name}' has trait '{trait_name}' but is missing the method '{method}'")]
+    pub span: SourceSpan,
+
+    pub trait_name: String,
+    pub struct_name: String,
+    pub method: String
+}
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("TraitSignatureMismatch")]
+pub struct TraitSignatureMismatch {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("The struct '{struct_name}' has trait '{trait_name}' but method '{method}' has the wrong signature. Expected '{expected}' but got '{got}'")]
+    pub span: SourceSpan,
+
+    pub trait_name: String,
+    pub struct_name: String,
+    pub method: String,
+
+    pub expected: String,
+    pub got: String
+}
