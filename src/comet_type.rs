@@ -17,7 +17,8 @@ pub struct CometMethod {
 
 pub enum FunctionOwner {
     Global,
-    Impl(String)
+    Impl(String),
+    TraitImpl { struct_name: String, trait_name: String }
 }
 
 #[derive(Clone, Eq, PartialEq, Debug)]

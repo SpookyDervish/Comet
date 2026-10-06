@@ -135,8 +135,8 @@ impl <'a> Compiler <'a> {
         let impls = self.generic_impls.clone();
 
         for impl_node in impls {
-            let (struct_type_node, functions, generic_defs) = match impl_node.node_type() {
-                ASTNodeType::ImplDefStatement { struct_type, functions, generics, traits } => (struct_type, functions, generics),
+            let (struct_type_node, functions, generic_defs, traits) = match impl_node.node_type() {
+                ASTNodeType::ImplDefStatement { struct_type, functions, generics, traits } => (struct_type, functions, generics, traits),
                 _ => unreachable!()
             };
 
@@ -270,7 +270,19 @@ impl <'a> Compiler <'a> {
                     args,
                     return_type.as_ref().map(|r| r.as_ref()),
                     body,
-                    FunctionOwner::Impl(concrete_struct.name().to_string()),
+                    if traits.is_empty() {
+                        FunctionOwner::Impl(concrete_struct.name().to_string())
+                    } else {
+                        let ASTNodeType::IdentifierLiteral(trait_name) = traits[0].node_type() else {
+                            return Err(SyntaxError {
+                                src: self.named_source(),
+                                span: traits[0].source_span(),
+                                text: String::from("Expected identifier")
+                            }.into());
+                        };
+
+                        FunctionOwner::TraitImpl { struct_name: concrete_struct.name().to_string(), trait_name: trait_name.clone() }
+                    }
                 )?;
 
                 let mut arg_types = Vec::new();
@@ -2329,7 +2341,8 @@ impl <'a> Compiler <'a> {
     ) -> miette::Result<FuncId> {
         let (is_struct_impl, symbol_name) = match owner {
             FunctionOwner::Global => (false, name.to_string().clone()),
-            FunctionOwner::Impl(struct_name) => (true, format!("{struct_name}_{name}"))
+            FunctionOwner::Impl(struct_name) => (true, format!("{struct_name}_{name}")),
+            FunctionOwner::TraitImpl { struct_name, trait_name } => (true, format!("{struct_name}_{trait_name}_{name}"))
         };
         let mut sig = self.module.make_signature();
 
@@ -3675,17 +3688,17 @@ impl <'a> Compiler <'a> {
         });
 
         let path: String = path_nodes
-                    .iter()
-                    .map(|n| match n.node_type() {
-                        ASTNodeType::QualifierNode { ident, .. } => {
-                            match ident.node_type() {
-                                ASTNodeType::IdentifierLiteral(v) => v,
-                                _ => unreachable!()
-                            }
-                        },
+            .iter()
+            .map(|n| match n.node_type() {
+                ASTNodeType::QualifierNode { ident, .. } => {
+                    match ident.node_type() {
+                        ASTNodeType::IdentifierLiteral(v) => v,
                         _ => unreachable!()
-                    })
-                    .join("/") + ".comet";
+                    }
+                },
+                _ => unreachable!()
+            })
+            .join("/") + ".comet";
 
         
 
@@ -3749,6 +3762,10 @@ impl <'a> Compiler <'a> {
             include_scope.generics.insert(name.clone(), type_.clone());
         }
 
+        // import traits
+        for (name, trait_) in include_compiler.traits.clone() {
+            self.traits.insert(name, trait_);
+        }
 
         self.scopes.iter_mut().last().unwrap().variables.insert(name.clone(), CometVariable { 
             type_: CometType { cranelift_type: types::INVALID, kind: CometTypeKind::Module, definition_span: None },

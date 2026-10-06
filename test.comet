@@ -1,6 +1,6 @@
 #ext puts: fun(str) :: i32
 
-trait Displayable <T> {
+trait Displayable {
     toString: fun(Self) :: str
 }
 
