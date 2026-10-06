@@ -1035,7 +1035,8 @@ impl Parser {
             traits.push(self.parse_identifier_literal()?);
 
             if self.peek_token_is(&TokenType::Comma) {
-                self.advance_token();
+                self.advance_token(); // move onto ','
+                self.advance_token(); // move onto the next trait name
                 continue;
             }
 

@@ -20,6 +20,20 @@ pub struct CometTrait {
     definition_span: Option<SourceSpan>
 }
 
+/// Tracks whether a `struct X has Trait` obligation has been discharged.
+///
+/// Keyed by `(struct_name, trait_name)` in `Compiler::trait_impls`.
+#[derive(Debug, Clone)]
+pub struct TraitImplStatus {
+    /// Set to true once an `imp X has Trait` block has supplied every method
+    /// declared by the trait.
+    pub satisfied: bool,
+
+    /// Span of the `has Trait` clause in the struct declaration, used to point
+    /// at it when the obligation is never discharged.
+    pub declaration_span: SourceSpan
+}
+
 impl CometTrait {
     pub fn new(name: String, methods: Vec<CometTraitMethod>, generics: Vec<String>, definition_span: Option<SourceSpan>) -> Self {
         let mut cached_methods = HashMap::new();

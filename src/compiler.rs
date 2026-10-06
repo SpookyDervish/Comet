@@ -12,9 +12,9 @@ use std::fs;
 use itertools::Itertools;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, MissingTraitMethod, NotAFunction, NotAModule, SyntaxError, TraitAlreadyImplemented, TraitNotDeclared, TraitSignatureMismatch, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownTrait, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, MissingTraitMethod, NotAFunction, NotAModule, NotImplemented, SyntaxError, TraitAlreadyImplemented, TraitNotDeclared, TraitSignatureMismatch, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownTrait, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
 use crate::comet_struct::{CometStruct, CometStructField};
-use crate::comet_trait::{CometTrait, CometTraitMethod};
+use crate::comet_trait::{CometTrait, CometTraitMethod, TraitImplStatus};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
 use crate::comet_union::{CometUnion, CometUnionItem};
 use crate::{lexer, parser, scope};
@@ -31,7 +31,7 @@ pub struct Compiler <'a> {
     resolved_generics: HashMap<String, CometType>,
 
     generic_impls: Vec<ASTNode>,
-    trait_impls: HashMap<(String, String), bool>,
+    trait_impls: HashMap<(String, String), TraitImplStatus>,
 
     current_function: Option<CometFunction>,
 
@@ -1157,6 +1157,38 @@ impl <'a> Compiler <'a> {
 
         for node in nodes {
             self.compile(node, None)?;
+        }
+
+        self.check_trait_obligations()?;
+
+        Ok(())
+    }
+
+    /// Any `struct X has Trait` whose obligation was never discharged by an
+    /// `imp X has Trait` block is an error. Checked once the whole program has
+    /// been compiled, since the impl block may appear after the struct.
+    fn check_trait_obligations(&self) -> miette::Result<()> {
+        // Sort so diagnostics are deterministic regardless of hash ordering.
+        let mut pending: Vec<_> = self.trait_impls
+            .iter()
+            .filter(|(_, status)| !status.satisfied)
+            .collect();
+        pending.sort_by(|a, b| a.0.cmp(b.0));
+
+        for ((struct_name, trait_name), status) in pending {
+            let Some(comet_trait) = self.traits.get(trait_name) else {
+                continue;
+            };
+
+            if let Some(trait_method) = comet_trait.methods.first() {
+                return Err(MissingTraitMethod {
+                    src: self.named_source(),
+                    span: status.declaration_span.clone(),
+                    trait_name: trait_name.clone(),
+                    struct_name: struct_name.clone(),
+                    method: trait_method.name.clone()
+                }.into());
+            }
         }
 
         Ok(())
@@ -3357,7 +3389,13 @@ impl <'a> Compiler <'a> {
                 }.into());
             };
 
-            self.trait_impls.insert((new_struct.name().to_string(), trait_name.clone()), false);
+            self.trait_impls.insert(
+                (new_struct.name().to_string(), trait_name.clone()),
+                TraitImplStatus {
+                    satisfied: false,
+                    declaration_span: trait_node.source_span()
+                }
+            );
         }
 
         Ok(Some(new_struct))
@@ -3464,6 +3502,14 @@ impl <'a> Compiler <'a> {
         let is_generic_impl = generic_defs.is_some();
 
         if is_generic_impl {
+            if !traits.is_empty() {
+                return Err(NotImplemented {
+                    src: self.named_source(),
+                    span: node.source_span(),
+                    text: String::from("Generic traits are not supported yet, sorry!")
+                }.into());
+            }
+
             self.generic_impls.push(node.clone());
             return Ok(());
         }
@@ -3484,28 +3530,51 @@ impl <'a> Compiler <'a> {
 
 
         let mut compiled_traits = vec![];
-        if !traits.is_empty() {
 
-            for struct_trait_node in traits {
-                let ASTNodeType::IdentifierLiteral(struct_trait) = struct_trait_node.node_type() else {
-                    return Err(SyntaxError {
-                        src: self.named_source(),
-                        span: struct_trait_node.source_span(),
-                        text: String::from("Expected identifier")
-                    }.into());
-                };
-
-                let comet_trait = self.traits.get(struct_trait).ok_or(UnkownTrait {
+        for struct_trait_node in traits {
+            let ASTNodeType::IdentifierLiteral(struct_trait) = struct_trait_node.node_type() else {
+                return Err(SyntaxError {
                     src: self.named_source(),
                     span: struct_trait_node.source_span(),
-                    trait_name: struct_trait.clone()
-                })?;
-                compiled_traits.push(comet_trait.clone());
+                    text: String::from("Expected identifier")
+                }.into());
+            };
+
+            let comet_trait = self.traits.get(struct_trait).ok_or(UnkownTrait {
+                src: self.named_source(),
+                span: struct_trait_node.source_span(),
+                trait_name: struct_trait.clone()
+            })?.clone();
+
+            // The struct must have declared `has Trait`, and the trait must not
+            // already be satisfied by an earlier impl block. Checked once per
+            // trait, before compiling anything.
+            let struct_name = comet_struct.name().to_string();
+
+            let status = self.trait_impls.get(&(struct_name.clone(), comet_trait.name.clone())).ok_or(TraitNotDeclared {
+                src: self.named_source(),
+                span: struct_node.source_span(),
+                trait_name: comet_trait.name.clone(),
+                struct_name: struct_name.clone()
+            })?;
+
+            if status.satisfied {
+                return Err(TraitAlreadyImplemented {
+                    src: self.named_source(),
+                    span: struct_node.source_span(),
+                    trait_name: comet_trait.name.clone(),
+                    struct_name: struct_name
+                }.into());
             }
+
+            compiled_traits.push(comet_trait);
         }
 
         self.scopes.push(ScopeFrame::new());
         self.scopes.last_mut().unwrap().types.insert("Self".to_string(), struct_type.clone());
+
+        // Names of the trait methods this impl block actually supplies.
+        let mut provided: HashSet<String> = HashSet::new();
 
         for function in functions {
             let (name_node, func_args, return_type_optional, body) = match function.node_type() {
@@ -3540,50 +3609,31 @@ impl <'a> Compiler <'a> {
                 return_type: Box::new(return_type)
             };
 
+            // If any trait in this impl block declares a method by this name,
+            // its signature must match the declared one exactly. Matching names
+            // are recorded as provided for the completeness check below.
             for trait_ in &compiled_traits {
-                for trait_method in &trait_.methods {
-                    let trait_implemented = self.trait_impls.get(&(comet_struct.name().to_string(), trait_.name.clone()))
-                        .ok_or(TraitNotDeclared {
-                            src: self.named_source(),
-                            span: struct_node.source_span(),
-                            trait_name: trait_.name.clone(),
-                            struct_name: comet_struct.name().to_string()
-                        })?;
+                let Some(trait_method) = trait_.get_method(name) else {
+                    continue;
+                };
 
-                    if trait_implemented == &true {
-                        return Err(TraitAlreadyImplemented {
-                            src: self.named_source(),
-                            span: struct_node.source_span(),
-                            trait_name: trait_.name.clone(),
-                            struct_name: comet_struct.name().to_string()
-                        }.into());
-                    }
+                let trait_method_type = self.get_type_literal_type(&trait_method.type_node)?;
+                let struct_trait_method = CometType::new_function(function.clone());
 
-                    if &trait_method.name == name {
-                        let struct_trait_method = CometType::new_function(function.clone());
+                if struct_trait_method != trait_method_type {
+                    return Err(TraitSignatureMismatch {
+                        src: self.named_source(),
+                        span: struct_node.source_span(),
+                        trait_name: trait_.name.clone(),
+                        struct_name: comet_struct.name().to_string(),
+                        method: trait_method.name.clone(),
 
-                        let trait_method_type = self.get_type_literal_type(&trait_method.type_node)?;
-
-                        if struct_trait_method != trait_method_type {
-                            return Err(TraitSignatureMismatch {
-                                src: self.named_source(),
-                                span: struct_node.source_span(),
-                                trait_name: trait_.name.clone(),
-                                struct_name: comet_struct.name().to_string(),
-                                method: trait_method.name.clone(),
-
-                                expected: trait_method_type.to_string(),
-                                got: struct_trait_method.to_string()
-                            }.into());
-                        }
-                    }
+                        expected: trait_method_type.to_string(),
+                        got: struct_trait_method.to_string()
+                    }.into());
                 }
 
-                
-
-                if let Some(defined) = self.trait_impls.get_mut(&(comet_struct.name().to_string(), trait_.name.clone())) {
-                    *defined = true;
-                }
+                provided.insert(trait_method.name.clone());
             }
 
             let func_id = self.compile_function(name, func_args, return_type_optional.as_ref().map(|r| r.as_ref()), body, func_owner)?;
@@ -3594,7 +3644,25 @@ impl <'a> Compiler <'a> {
             });
         }
 
-        
+        // Every method the trait declares must have been supplied. Only once
+        // that holds is the obligation discharged.
+        for trait_ in &compiled_traits {
+            for trait_method in &trait_.methods {
+                if !provided.contains(&trait_method.name) {
+                    return Err(MissingTraitMethod {
+                        src: self.named_source(),
+                        span: trait_.source_span(),
+                        trait_name: trait_.name.clone(),
+                        struct_name: comet_struct.name().to_string(),
+                        method: trait_method.name.clone()
+                    }.into());
+                }
+            }
+
+            if let Some(status) = self.trait_impls.get_mut(&(comet_struct.name().to_string(), trait_.name.clone())) {
+                status.satisfied = true;
+            }
+        }
 
         self.scopes.pop();
 
