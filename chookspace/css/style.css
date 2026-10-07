@@ -205,7 +205,7 @@ h2 {
     margin-left: 2em !important;
     flex: 1 !important;
     background: var(--code-bg) !important;
-    border-radius: px !important;
+    border-radius: 8px !important;
     padding: 1em !important;
     border: 1px solid var(--border) !important;
     max-width: 600px !important;
