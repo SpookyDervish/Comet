@@ -205,7 +205,14 @@ impl <'a> Compiler <'a> {
             }
 
             let mut data = DataDescription::new();
-            data.define_zeroinit(func_ids.len() * 8);
+            // NOTE: must use `define` (real bytes), not `define_zeroinit`.
+            // `define_zeroinit` yields `Init::Zeros`, which cranelift-object
+            // emits into `.bss` — a SHT_NOBITS section with no file contents.
+            // The function-pointer relocations written below would then never
+            // be materialised, leaving the vtable slots as null and crashing
+            // `call_indirect`. Real zero bytes land in a file-backed section
+            // (`.data.rel.ro`) where the relocations are applied.
+            data.define(vec![0u8; func_ids.len() * 8].into_boxed_slice());
             data.set_align(8);
 
             for (i, func_id) in func_ids.iter().enumerate() {
@@ -1728,7 +1735,12 @@ impl <'a> Compiler <'a> {
 
             ASTNodeType::StringLiteral(str) => {
                 let mut data_desc = DataDescription::new();
-                data_desc.define(str.as_bytes().to_vec().into_boxed_slice());
+                // NUL-terminate the literal so it is a valid C string for
+                // `#ext` functions such as `puts`. Without this, the data of
+                // adjacent literals runs together and `puts` over-reads.
+                let mut bytes = str.as_bytes().to_vec();
+                bytes.push(0);
+                data_desc.define(bytes.into_boxed_slice());
 
                 let string_name = format!("string_literal_{}", self.var_index);
                 self.var_index += 1;
