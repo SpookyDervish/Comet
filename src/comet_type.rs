@@ -40,6 +40,7 @@ pub enum CometTypeKind {
     Array { base_type: Box<CometType>, size: u32 },
     Module,
     Generic(String),
+    TraitObject(String), // stores the name of the trait
     Void,
     Unkown
 }
@@ -112,6 +113,13 @@ impl CometType {
         CometType {
             cranelift_type: types::INVALID,
             kind: CometTypeKind::Generic(name),
+            definition_span: None
+        }
+    }
+    pub fn new_trait_object(trait_name: String) -> Self {
+        CometType {
+            cranelift_type: types::I64, 
+            kind: CometTypeKind::TraitObject(trait_name), 
             definition_span: None
         }
     }
@@ -188,6 +196,7 @@ impl CometType {
             CometTypeKind::Array{ base_type, size } => base_type.size() * size,
             CometTypeKind::Generic(_) => 0,
             CometTypeKind::Module => 0,
+            CometTypeKind::TraitObject(_) => 16,
             CometTypeKind::Void => 0,
             CometTypeKind::Unkown => 0
         }
@@ -203,6 +212,7 @@ impl CometType {
             CometTypeKind::Array { base_type, .. } => base_type.align(),
             CometTypeKind::Generic(_) => 0,
             CometTypeKind::Module => 0,
+            CometTypeKind::TraitObject(_) => 8,
             CometTypeKind::Void => 0,
             CometTypeKind::Unkown => 0
         }
@@ -311,6 +321,7 @@ impl CometType {
             CometTypeKind::Array { base_type, .. } => format!("a_{}", base_type.generic_type_name()),
             CometTypeKind::Void => String::from("v"),
             CometTypeKind::Module => String::from("m"),
+            CometTypeKind::TraitObject(name) => format!("trait_{name}"),
             CometTypeKind::Unkown => unreachable!()
         }
     }
@@ -343,6 +354,7 @@ impl fmt::Display for CometType {
             CometTypeKind::Generic(name) => write!(f, "{}", name),
             CometTypeKind::Array { base_type, size } => write!(f, "{}[{}]", base_type, size),
             CometTypeKind::Module => write!(f, "module"),
+            CometTypeKind::TraitObject(name) => write!(f, "{}", name),
             CometTypeKind::Void => write!(f, "(none)"),
             CometTypeKind::Unkown => write!(f, "(unkown)"),
         }
@@ -396,6 +408,7 @@ impl PartialEq for CometType {
             (CometTypeKind::Array { base_type: left, size: left_size }, CometTypeKind::Array { base_type: right, size: right_size }) => {
                 left == right && left_size == right_size
             }
+            (CometTypeKind::TraitObject(a), CometTypeKind::TraitObject(b)) => a == b,
             (CometTypeKind::Void, CometTypeKind::Void) => true,
             _ => false
         }

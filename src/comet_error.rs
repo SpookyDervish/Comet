@@ -320,3 +320,15 @@ pub struct TraitSignatureMismatch {
     pub expected: String,
     pub got: String
 }
+
+#[derive(Diagnostic, Debug, Error)]
+#[error("ImplementationNotCompiled")]
+pub struct ImplementationNotCompiled {
+    #[source_code]
+    pub src: NamedSource<String>,
+
+    #[label("The implementation block has not been compiled for the struct '{struct_name}' yet")]
+    pub span: SourceSpan,
+
+    pub struct_name: String
+}

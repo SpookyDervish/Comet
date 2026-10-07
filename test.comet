@@ -1,9 +1,27 @@
 #ext puts: fun(str) :: i32
 
 trait Displayable {
-    toString: fun(Self) :: str,
+    toString: fun(Self) :: str
+}
+
+struct Test has Displayable {
+    x: i64
+}
+
+imp Test has Displayable {
+    fun toString(self: Self) :: str {
+        ret "hi 123"
+    }
+}
+
+fun stringify(x: Displayable) :: str {
+    ret x.toString()
 }
 
 fun main() :: i64 {
+    t = new Test { x = 1 }
+    puts(stringify(t))
+
+    
     ret 0
 }

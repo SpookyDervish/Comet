@@ -5,14 +5,14 @@ use cranelift_codegen::ir::{self, Block, InstBuilder, InstBuilderBase, MemFlagsD
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use cranelift_module::{DataDescription, FuncId, Linkage, Module, default_libcall_names};
 use cranelift_object::{ObjectBuilder, ObjectModule};
-use miette::{NamedSource, IntoDiagnostic};
+use miette::{IntoDiagnostic, NamedSource, SourceSpan};
 use std::collections::{HashMap, HashSet};
 use std::iter::zip;
 use std::fs;
 use itertools::Itertools;
 
 use crate::ast::ASTType;
-use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, MissingTraitMethod, NotAFunction, NotAModule, NotImplemented, SyntaxError, TraitAlreadyImplemented, TraitNotDeclared, TraitSignatureMismatch, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownTrait, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
+use crate::comet_error::{CompilerBug, EmptyArrayLiteral, ImmutableReassignment, ImplementationNotCompiled, InvalidCompilerDirective, InvalidLValue, InvalidOperator, InvalidVariableType, MissingTraitMethod, NotAFunction, NotAModule, NotImplemented, SyntaxError, TraitAlreadyImplemented, TraitNotDeclared, TraitSignatureMismatch, TypeAnnotationNeeded, TypeMismatch, UndefinedVariable, UnkownField, UnkownMethod, UnkownTrait, UnkownType, UnkownUnionItem, WrongNumberOfGenerics};
 use crate::comet_struct::{CometStruct, CometStructField};
 use crate::comet_trait::{CometTrait, CometTraitMethod, TraitImplStatus};
 use crate::comet_type::{CometFunction, CometMethod, CometTypeKind, FunctionOwner};
@@ -29,6 +29,7 @@ pub struct Compiler <'a> {
     methods: HashMap<(String, String), CometMethod>,
     traits: HashMap<String, CometTrait>,
     resolved_generics: HashMap<String, CometType>,
+    vtables: HashMap<(String, String), cranelift_module::DataId>,
 
     generic_impls: Vec<ASTNode>,
     trait_impls: HashMap<(String, String), TraitImplStatus>,
@@ -86,6 +87,7 @@ impl <'a> Compiler <'a> {
             resolved_generics: HashMap::new(),
             generic_impls: Vec::new(),
             trait_impls: HashMap::new(),
+            vtables: HashMap::new(),
 
             var_index: 0
         })
@@ -123,6 +125,104 @@ impl <'a> Compiler <'a> {
             .iter()
             .rev()
             .find_map(|scope| scope.generics.get(name))
+    }
+
+    fn coerce_to(
+        &mut self,
+        value_node: &ASTNode,
+        value: ir::Value,
+        from: &CometType,
+        to: &CometType,
+        target_node: Option<&ASTNode>,
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<ir::Value> {
+        if let (CometTypeKind::Struct(s), CometTypeKind::TraitObject(trait_name)) = (&from.kind, &to.kind) {
+            let status = self.trait_impls
+                .get(&(s.name().to_string(), trait_name.clone()))
+                .ok_or_else(|| TraitNotDeclared {
+                    src: self.named_source(),
+                    span: value_node.source_span(),
+                    trait_name: trait_name.clone(),
+                    struct_name: s.name().to_string()
+                })?;
+
+            if !status.satisfied {
+                return Err(ImplementationNotCompiled {
+                    src: self.named_source(),
+                    span: value_node.source_span(),
+                    struct_name: s.name().to_string()
+                }.into());
+            }
+
+            let vtable_ptr = self.get_or_create_vtable(s.name(), trait_name, value_node.source_span(), builder)?;
+            let slot = builder.create_sized_stack_slot(StackSlotData::new(
+                StackSlotKind::ExplicitSlot,
+                16,
+                8
+            ));
+            let addr = builder.ins().stack_addr(self.module.isa().pointer_type(), slot, 0);
+            builder.ins().store(MemFlagsData::new(), value, addr, 0); // data ptr
+            builder.ins().store(MemFlagsData::new(), vtable_ptr, addr, 8); // vtable ptr
+            Ok(addr)
+
+        } else {
+            CometType::try_implicit_cast(
+                value_node, value, from, to, target_node, builder, self.named_source()
+            )
+        }
+    }
+
+    fn get_or_create_vtable(
+        &mut self,
+        struct_name: &str,
+        trait_name: &str,
+        span: SourceSpan,
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<ir::Value> {
+        let key = (struct_name.to_string(), trait_name.to_string());
+
+        let data_id = if let Some(existing) = self.vtables.get(&key) {
+            *existing
+        } else {
+            let trait_ = self.traits.get(trait_name)
+                .ok_or_else(|| UnkownTrait {
+                    src: self.named_source(),
+                    span: span,
+                    trait_name: trait_name.to_string()
+                })?
+                .clone();
+
+            let mut func_ids = Vec::new();
+            for method in &trait_.methods {
+                let m = self.methods.get(&(struct_name.to_string(), method.name.clone()))
+                        .ok_or_else(|| ImplementationNotCompiled {
+                            src: self.named_source(),
+                            span: trait_.source_span(),
+                            struct_name: struct_name.to_string()
+                           
+                        })?;
+                func_ids.push(m.func_id);
+            }
+
+            let mut data = DataDescription::new();
+            data.define_zeroinit(func_ids.len() * 8);
+            data.set_align(8);
+
+            for (i, func_id) in func_ids.iter().enumerate() {
+                let func_ref = self.module.declare_func_in_data(*func_id, &mut data);
+                data.write_function_addr((i * 8) as u32, func_ref);
+            }
+
+            let name = format!("vtable_{}_{}", struct_name, trait_name);
+
+            let data_id = self.module.declare_data(&name, Linkage::Local, false, false).unwrap();
+            self.module.define_data(data_id, &data).unwrap();
+            self.vtables.insert(key.clone(), data_id);
+            data_id
+        };
+
+        let local = self.module.declare_data_in_func(data_id, &mut builder.func);
+        Ok(builder.ins().symbol_value(self.module.isa().pointer_type(), local))
     }
 
     fn instantiate_generic_impls(
@@ -519,9 +619,17 @@ impl <'a> Compiler <'a> {
 
                 let ident = self.qualified_name(struct_name)?;
 
-                self.get_type(&ident).cloned().ok_or(UnkownType {
-                    span: struct_name.source_span(),
+                if let Some(ty) = self.get_type(&ident).cloned() {
+                    return Ok(ty);
+                }
+
+                if self.traits.contains_key(&ident) {
+                    return Ok(CometType::new_trait_object(ident));
+                }
+
+                Err(UnkownType {
                     src: self.named_source(),
+                    span: struct_name.source_span(),
                     type_: ident
                 }.into())
             },
@@ -767,7 +875,7 @@ impl <'a> Compiler <'a> {
         
     }
 
-    fn rank_type(&self, type_: &CometType) -> u8 {
+    fn rank_type(type_: &CometType) -> u8 {
         match type_.cranelift_type {
             types::INVALID => 0,
             types::I8 => 1,
@@ -785,9 +893,9 @@ impl <'a> Compiler <'a> {
         invalid_type.and_then(|t| t.definition_span())
     }
 
-    fn unify_types(&self, a: &'a CometType, b: &'a CometType) -> &CometType {
-        if self.rank_type(a) >= 4 || self.rank_type(b) >= 4 {
-            return if self.rank_type(a) > self.rank_type(b) {
+    fn unify_types(a: &'a CometType, b: &'a CometType) -> &'a CometType {
+        if Compiler::rank_type(a) >= 4 || Compiler::rank_type(b) >= 4 {
+            return if Compiler::rank_type(a) > Compiler::rank_type(b) {
                 a
             } else {
                 b
@@ -795,7 +903,7 @@ impl <'a> Compiler <'a> {
         }
 
         if !a.is_int() || !b.is_int() {
-            return if self.rank_type(a) > self.rank_type(b) {
+            return if Compiler::rank_type(a) > Compiler::rank_type(b) {
                 a
             } else {
                 b
@@ -967,6 +1075,35 @@ impl <'a> Compiler <'a> {
                         let struct_type = match left_value.kind {
                             CometTypeKind::Struct(comet_struct) => comet_struct,
                             CometTypeKind::Module => { return self.resolve_module_access_type(node); },
+                            CometTypeKind::TraitObject(trait_name) => {
+                                let trait_ = self.traits.get(&trait_name)
+                                    .ok_or_else(|| UnkownTrait {
+                                        src: self.named_source(),
+                                        span: left.source_span(),
+                                        trait_name: trait_name.clone()
+                                    })?.clone();
+
+                                let field_name = match right.node_type() {
+                                    ASTNodeType::IdentifierLiteral(v) => v,
+                                    _ => unreachable!()
+                                };
+
+                                let method = trait_.get_method(field_name)
+                                    .ok_or_else(|| UnkownTrait {
+                                        src: self.named_source(),
+                                        span: left.source_span(),
+                                        trait_name: trait_name 
+                                    })?
+                                    .clone();
+
+                                // Resolve the signature with Self = a pointer-sized placeholder.
+                                self.scopes.push(ScopeFrame::new());
+                                self.scopes.last_mut().unwrap().types
+                                    .insert("Self".to_string(), CometType::new_int(types::I64, false));
+                                let ty = self.get_type_literal_type(&method.type_node);
+                                self.scopes.pop();
+                                return ty;
+                            },
                             _ => { return Err(InvalidOperator {
                                     op: op.token_type().clone(),
                                     span: op.source_span(),
@@ -1012,10 +1149,10 @@ impl <'a> Compiler <'a> {
                 let right_value = self.resolve_type(right)?;
 
                 if op.token_type() == &TokenType::Or || op.token_type() == &TokenType::And {
-                    return Ok(self.unify_types(&left_value, &right_value).clone());
+                    return Ok(Compiler::unify_types(&left_value, &right_value).clone());
                 }
 
-                return Ok(self.unify_types(&left_value, &right_value).clone());
+                return Ok(Compiler::unify_types(&left_value, &right_value).clone());
             },
 
             ASTNodeType::PrefixExpression { op, right } => {
@@ -1260,6 +1397,16 @@ impl <'a> Compiler <'a> {
             ));
         }
 
+        let mut compiled_args = vec![];
+
+        for (arg, param_type) in args.iter().zip(&func.arg_types.clone()) {
+            let arg_type = self.resolve_type(arg)?;
+            let arg_value = self.visit_value(arg, builder)?;
+            compiled_args.push(
+                self.coerce_to(arg, arg_value, &arg_type, param_type, None, builder)?
+            );
+        }
+
         let func_id = self.module
                                     .declare_function(func_name, Linkage::Import, &sig)
                                     .unwrap();
@@ -1268,13 +1415,110 @@ impl <'a> Compiler <'a> {
             .module
             .declare_func_in_func(func_id, builder.func);
 
-        let mut compiled_args = vec![];
-
-        for arg in args {
-            compiled_args.push(self.visit_value(arg, builder)?);
-        }
+        
 
         let call_inst = builder.ins().call(func_ref, &compiled_args);
+        let results = builder.inst_results(call_inst);
+
+        if results.is_empty() {
+            Ok(builder.ins().iconst(types::I64, 0))
+        } else {
+            Ok(results[0])
+        }
+    }
+
+    fn visit_trait_method(
+        &mut self,
+        receiver_node: &ASTNode,
+        method_node: &ASTNode,
+        op: &TokenType,
+        args: &[ASTNode],
+        builder: &mut FunctionBuilder
+    ) -> miette::Result<ir::Value> {
+        if op != &TokenType::Dot {
+            return Err(SyntaxError {
+                src: self.named_source(),
+                span: receiver_node.source_span(),
+                text: String::from("Expected '.' operator, trait methods are not static")
+            }.into());
+        }
+
+        let receiver_type = self.resolve_type(receiver_node)?;
+        let CometTypeKind::TraitObject(trait_name) = receiver_type.kind else {
+            return Err(CompilerBug {
+                src: self.named_source(),
+                span: receiver_node.source_span(),
+                text: String::from("Expected trait object")
+            }.into());
+        };
+
+        let method_name = match method_node.node_type() {
+            ASTNodeType::IdentifierLiteral(name) => name,
+            _ => unreachable!(),
+        };
+
+        let trait_ = self.traits.get(&trait_name)
+            .ok_or_else(|| UnkownTrait {
+                src: self.named_source(),
+                span: receiver_node.source_span(),
+                trait_name: trait_name.clone()
+            })?;
+
+        let method_index = *trait_.get_method_index(method_name)
+            .ok_or_else(|| UnkownMethod {
+                src: self.named_source(),
+                span: method_node.source_span(),
+                method: method_name.clone(),
+                struct_name: trait_name.clone()
+            })?;
+
+        let method = trait_.get_method(method_name).unwrap().clone();
+
+        self.scopes.push(ScopeFrame::new());
+        self.scopes.last_mut().unwrap().types
+            .insert("Self".to_string(), CometType::new_int(types::I64, false));
+        let CometTypeKind::Function(method_func) = self.get_type_literal_type(&method.type_node)?.kind else {
+            return Err(CompilerBug {
+                src: self.named_source(),
+                span: method_node.source_span(),
+                text: String::from("Expected method")
+            }.into());
+        };
+        self.scopes.pop();
+
+        let receiver_value = self.visit_value(receiver_node, builder)?;
+
+        // self
+        let data_ptr = builder.ins().load(types::I64, MemFlagsData::new(), receiver_value, 0);
+        // vtable
+        let vtable_ptr = builder.ins().load(types::I64, MemFlagsData::new(), receiver_value, 8);
+        // function
+        let fn_ptr = builder.ins().load(types::I64, MemFlagsData::new(), vtable_ptr, (method_index as i32) * 8);
+
+        let mut compiled_args = vec![];
+        compiled_args.push(data_ptr);
+
+        let mut sig = self.module.make_signature();
+
+        if method_func.return_type.cranelift_type != types::INVALID {
+            sig.returns.push(AbiParam::new(method_func.return_type.cranelift_type));
+        }
+
+        sig.params.push(AbiParam::new(self.module.isa().pointer_type()));
+        for (arg, param_type) in args.iter().zip(&method_func.arg_types[1..]) {
+            let arg_type = self.resolve_type(arg)?;
+
+            sig.params.push(AbiParam::new(arg_type.cranelift_type));
+
+            let arg_value = self.visit_value(arg, builder)?;
+            compiled_args.push(
+                self.coerce_to(arg, arg_value, &arg_type, param_type, None, builder)?
+            );
+        }
+
+        let sig_ref = builder.import_signature(sig);
+        let call_inst = builder.ins().call_indirect(sig_ref, fn_ptr, &compiled_args);
+
         let results = builder.inst_results(call_inst);
 
         if results.is_empty() {
@@ -1297,6 +1541,7 @@ impl <'a> Compiler <'a> {
         let struct_name = match &receiver_type.kind {
             CometTypeKind::Struct(comet_struct) => comet_struct.name(),
             CometTypeKind::Module => { return self.visit_module_func_call(receiver_node, method_node, args, builder); },
+            CometTypeKind::TraitObject(_) => { return self.visit_trait_method(receiver_node, method_node, op, args, builder); },
             _ => {
                 return Err(TypeMismatch {
                     expected: "struct".to_string(),
@@ -1323,9 +1568,7 @@ impl <'a> Compiler <'a> {
             compiled_args.push(receiver_value);
         }
 
-        for arg in args {
-            compiled_args.push(self.visit_value(arg, builder)?);
-        }
+        
 
         let method = self
             .get_method(struct_name.to_string(), method_name.clone())
@@ -1336,22 +1579,19 @@ impl <'a> Compiler <'a> {
                 src: self.named_source()
             })?;
 
-        // method.function.arg_types includes self as argument zero
-        let mut sig = self.module.make_signature();
+        let func_id = method.func_id;
 
-        for arg_type in &method.function.arg_types {
-            sig.params.push(AbiParam::new(arg_type.cranelift_type));
-        }
-
-        if method.function.return_type.cranelift_type != types::INVALID {
-            sig.returns.push(AbiParam::new(
-                method.function.return_type.cranelift_type,
-            ));
+        for (arg, param_type) in args.iter().zip(&method.function.arg_types.clone()) {
+            let arg_type = self.resolve_type(arg)?;
+            let arg_value = self.visit_value(arg, builder)?;
+            compiled_args.push(
+                self.coerce_to(arg, arg_value, &arg_type, param_type, None, builder)?
+            );
         }
 
         let method_ref = self
             .module
-            .declare_func_in_func(method.func_id, builder.func);
+            .declare_func_in_func(func_id, builder.func);
 
         let call_inst = builder.ins().call(method_ref, &compiled_args);
         let results = builder.inst_results(call_inst);
@@ -1435,14 +1675,13 @@ impl <'a> Compiler <'a> {
             let value_type = self.resolve_type(value_node)?;
             let mut value = self.visit_value(value_node, builder)?;
             if value_type != *field_type || value_type.cranelift_type != field_type.cranelift_type {
-                value = CometType::try_implicit_cast(
+                value = self.coerce_to(
                     value_node,
                     value,
                     &value_type,
                     field_type,
-                    Some(field_name_node),
-                    builder,
-                    self.named_source()
+                    Some(&**field_name_node),
+                    builder
                 )?;
             }
             let field_offset = item.field_offset(field_name).unwrap();
@@ -1637,8 +1876,12 @@ impl <'a> Compiler <'a> {
                 };
 
                 let mut compiled_args: Vec<ir::Value> = vec![];
-                for arg in args {
-                    compiled_args.push(self.visit_value(arg, builder)?);
+                for (arg, param_type) in args.iter().zip(&comet_function.arg_types) {
+                    let arg_type = self.resolve_type(arg)?;
+                    let arg_value = self.visit_value(arg, builder)?;
+                    compiled_args.push(
+                        self.coerce_to(arg, arg_value, &arg_type, param_type, None, builder)?
+                    );
                 }
 
                 let mut sig = self.module.make_signature();
@@ -1702,8 +1945,12 @@ impl <'a> Compiler <'a> {
                 }
 
                 let mut compiled_args: Vec<ir::Value> = vec![];
-                for arg in args {
-                    compiled_args.push(self.visit_value(arg, builder)?);
+                for (arg, param_type) in args.iter().zip(&method.function.arg_types.clone()) {
+                    let arg_type = self.resolve_type(arg)?;
+                    let arg_value = self.visit_value(arg, builder)?;
+                    compiled_args.push(
+                        self.coerce_to(arg, arg_value, &arg_type, param_type, None, builder)?
+                    );
                 }
 
                 let func_ref = self.module.declare_func_in_func(func_id, &mut builder.func);
@@ -1919,7 +2166,7 @@ impl <'a> Compiler <'a> {
     fn visit_logical_op_expr(&mut self, left: &ASTNode, op: &TokenType, right: &ASTNode, builder: &mut FunctionBuilder) -> miette::Result<ir::Value> {
         let left_type = self.resolve_type(left)?;
         let right_type = self.resolve_type(right)?;
-        let unified_type = self.unify_types(&left_type, &right_type).clone();
+        let unified_type = Compiler::unify_types(&left_type, &right_type).clone();
 
         let end_block = builder.create_block();
         let result = builder.append_block_param(end_block, unified_type.cranelift_type);
@@ -1929,14 +2176,13 @@ impl <'a> Compiler <'a> {
         let left_value = self.visit_value(left, builder)?;
         let mut left_result = left_value;
         if left_type != unified_type {
-            left_result = CometType::try_implicit_cast(
+            left_result = self.coerce_to(
                 left,
                 left_result,
                 &left_type,
                 &unified_type,
                 None,
                 builder,
-                self.named_source()
             )?;
         }
 
@@ -1951,14 +2197,13 @@ impl <'a> Compiler <'a> {
             builder.switch_to_block(right_block);
             let right_value = self.visit_value(right, builder)?;
             let right_result = if right_type != unified_type {
-                CometType::try_implicit_cast(
+                self.coerce_to(
                     right,
                     right_value,
                     &right_type,
                     &unified_type,
                     None,
-                    builder,
-                    self.named_source()
+                    builder
                 )?
             } else {
                 right_value
@@ -1976,14 +2221,13 @@ impl <'a> Compiler <'a> {
             builder.switch_to_block(right_block);
             let right_value = self.visit_value(right, builder)?;
             let right_result = if right_type != unified_type {
-                CometType::try_implicit_cast(
+                self.coerce_to(
                     right,
                     right_value,
                     &right_type,
                     &unified_type,
                     None,
-                    builder,
-                    self.named_source()
+                    builder
                 )?
             } else {
                 right_value
@@ -2014,31 +2258,29 @@ impl <'a> Compiler <'a> {
 
         let left_type = self.resolve_type(left)?;
         let right_type = self.resolve_type(right)?;
-        let unified_type = self.unify_types(&left_type, &right_type);
+        let unified_type = Compiler::unify_types(&left_type, &right_type);
 
         let is_signed = unified_type.is_signed();
         let is_int = unified_type.is_int();
 
         if &left_type != unified_type {
-            left_side = CometType::try_implicit_cast(
+            left_side = self.coerce_to(
                 left,
                 left_side,
                 &left_type,
                 unified_type,
                 None,
-                builder,
-                self.named_source()
+                builder
             )?;
         }
         if &right_type != unified_type {
-            right_side = CometType::try_implicit_cast(
+            right_side = self.coerce_to(
                 right,
                 right_side,
                 &right_type,
                 unified_type,
                 None,
-                builder,
-                self.named_source()
+                builder
             )?;
         }
 
@@ -2476,14 +2718,13 @@ impl <'a> Compiler <'a> {
                 } else {
                     let ret_type = self.resolve_type(body)?;
                     let ret_value = if ret_type != function_return_type {
-                        CometType::try_implicit_cast(
+                        self.coerce_to(
                             body,
                             ret_value,
                             &ret_type,
                             &function_return_type,
                             return_type_node,
-                            &mut builder,
-                            self.named_source()
+                            &mut builder
                         )?
                     } else {
                         ret_value
@@ -2554,7 +2795,8 @@ impl <'a> Compiler <'a> {
 
                 let ret_type = self.resolve_type(ret_value_node)?;
                 if ret_type != *(self.current_function.as_ref().unwrap().return_type) {
-                    ret_value = CometType::try_implicit_cast(ret_value_node, ret_value, &ret_type, &*(self.current_function.as_ref().unwrap().return_type), None, builder, self.named_source())?;
+                    let func_ret_type = *self.current_function.as_ref().unwrap().return_type.clone();
+                    ret_value = self.coerce_to(ret_value_node, ret_value, &ret_type, &func_ret_type, None, builder)?;
                 }
 
                 builder.ins().return_(&[ret_value]);
@@ -2587,7 +2829,7 @@ impl <'a> Compiler <'a> {
             let address = self.visit_l_value(ident_node, builder)?;
 
             if target_type != value_type {
-                value = CometType::try_implicit_cast(value_node, value, &value_type, &target_type, Some(ident_node), builder, self.named_source())?;
+                value = self.coerce_to(value_node, value, &value_type, &target_type, Some(ident_node), builder)?;
             }
 
             
@@ -2669,10 +2911,10 @@ impl <'a> Compiler <'a> {
 
             // get type of type annotation
             if var_type != value_type {
-                value = CometType::try_implicit_cast(&value_node, value, &value_type, &var_type, type_node.as_deref(), builder, self.named_source())?;
+                value = self.coerce_to(&value_node, value, &value_type, &var_type, type_node.as_deref(), builder)?;
                 final_type = var_type;
             } else {
-                final_type = self.unify_types(&final_type, &var_type).clone();
+                final_type = Compiler::unify_types(&final_type, &var_type).clone();
             }
         }
 

@@ -55,7 +55,11 @@ impl CometTrait {
         self.definition_span.unwrap().clone()
     }
 
+    pub fn get_method_index(&self, name: &str) -> Option<&usize> {
+        self.cached_methods.get(name)
+    }
+
     pub fn get_method(&self, name: &str) -> Option<&CometTraitMethod> {
-        self.cached_methods.get(name).map(|i| &self.methods[*i])
+        self.get_method_index(name).map(|i| &self.methods[*i])
     }
 }

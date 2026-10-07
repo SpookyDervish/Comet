@@ -1,0 +1,22 @@
+ #ext puts: fun(str) :: i32
+
+  trait Displayable { toString: fun(Self) :: str }
+
+  struct A has Displayable { x: i64 }
+  struct B has Displayable { x: i64 }
+
+  imp A has Displayable { fun toString(self: Self) :: str { ret "A" } }
+  imp B has Displayable { fun toString(self: Self) :: str { ret "B" } }
+
+  fun show(x: Displayable) :: i64 {
+      puts(x.toString())
+      ret 0
+  }
+
+  fun main() :: i64 {
+      a = new A { x = 1 }
+      b = new B { x = 2 }
+      show(a)
+      show(b)
+      ret 0
+  }
